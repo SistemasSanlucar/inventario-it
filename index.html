@@ -949,7 +949,7 @@
         
         const CONFIG = {
             sharepoint: {
-                siteId: 'sanlucarfruit.sharepoint.com,ec4c8c0e-b8f0-4e5e-a56b-08eb8ad3c13a,5e3d7d8b-9b09-4c57-bb38-346bb376731d',
+                sitePath: 'sanlucarfruit.sharepoint.com:/sites/InformationSystems',
                 lists: {
                     inventario: 'StockControl_InventarioIT',
                     tecnicos: 'StockControl_TecnicosIT',
@@ -1010,13 +1010,13 @@
             }
 
             async getListItems(listName) {
-                const endpoint = `/sites/${CONFIG.sharepoint.siteId}/lists/${listName}/items?expand=fields&$top=5000`;
+                const endpoint = `/sites/${CONFIG.sharepoint.sitePath}:/lists/${listName}/items?expand=fields&$top=5000`;
                 const result = await this.request(endpoint);
                 return result.value.map(item => ({ ...item.fields, sharePointId: item.id }));
             }
 
             async createListItem(listName, data) {
-                const endpoint = `/sites/${CONFIG.sharepoint.siteId}/lists/${listName}/items`;
+                const endpoint = `/sites/${CONFIG.sharepoint.sitePath}:/lists/${listName}/items`;
                 const result = await this.request(endpoint, {
                     method: 'POST',
                     body: JSON.stringify({ fields: data })
@@ -1025,7 +1025,7 @@
             }
 
             async updateListItem(listName, itemId, data) {
-                const endpoint = `/sites/${CONFIG.sharepoint.siteId}/lists/${listName}/items/${itemId}/fields`;
+                const endpoint = `/sites/${CONFIG.sharepoint.sitePath}:/lists/${listName}/items/${itemId}/fields`;
                 await this.request(endpoint, {
                     method: 'PATCH',
                     body: JSON.stringify(data)
@@ -1034,7 +1034,7 @@
             }
 
             async deleteListItem(listName, itemId) {
-                const endpoint = `/sites/${CONFIG.sharepoint.siteId}/lists/${listName}/items/${itemId}`;
+                const endpoint = `/sites/${CONFIG.sharepoint.sitePath}:/lists/${listName}/items/${itemId}`;
                 await this.request(endpoint, { method: 'DELETE' });
                 return true;
             }
