@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Inventario IT - Sanlucar</title>
     <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -1347,7 +1348,16 @@
         // ==========================================
         // REACT COMPONENTS
         // ==========================================
+        // REACT COMPONENTS
+        // ==========================================
         
+        // Esperar a que React esté disponible
+        window.addEventListener('load', function() {
+            if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+                document.getElementById('root').innerHTML = '<div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px;"><div style="max-width: 500px; text-align: center; color: white;"><h1 style="font-size: 24px; margin-bottom: 16px;">⚠️ Error</h1><p style="color: #8b949e;">React no se pudo cargar. Recarga la página.</p></div></div>';
+                return;
+            }
+
         const { useState, useEffect, useRef, createElement: e } = React;
 
         function LoginScreen({ onLogin }) {
@@ -2526,6 +2536,7 @@
         }
 
         ReactDOM.render(e(App), document.getElementById('root'));
+        }); // Fin window.addEventListener('load')
     </script>
 </body>
 </html>
