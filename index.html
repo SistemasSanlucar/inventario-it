@@ -261,12 +261,12 @@
     <div id="app"></div>
 
     <script>
-        // Configuración MSAL - IMPORTANTE: Actualizar redirectUri después de desplegar
+        // Configuración MSAL
         const msalConfig = {
             auth: {
                 clientId: '80ba264e-e1fc-4749-bf00-2c25b93b4ee5',
                 authority: 'https://login.microsoftonline.com/f37778d8-59b2-4e5e-a56b-08eb8ad3c13a',
-                redirectUri: window.location.origin // Se auto-detecta
+                redirectUri: window.location.href.split('?')[0].split('#')[0] // URL completa sin query params
             },
             cache: {
                 cacheLocation: 'localStorage',
