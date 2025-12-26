@@ -39,7 +39,6 @@
             overflow-x: hidden;
         }
 
-        /* Login Screen */
         .login-screen {
             display: flex;
             align-items: center;
@@ -89,7 +88,6 @@
             line-height: 1.6;
         }
 
-        /* Buttons */
         .button {
             padding: 14px 28px;
             border: none;
@@ -130,7 +128,6 @@
             border: 1px solid var(--border);
         }
 
-        /* Loading Spinner */
         .loading-spinner {
             display: inline-block;
             width: 20px;
@@ -145,7 +142,6 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Messages */
         .toast-container {
             position: fixed;
             top: 20px;
@@ -170,46 +166,20 @@
         }
 
         @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(100px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
         }
 
-        .toast.success {
-            border-color: var(--accent-green);
-            background: rgba(63, 185, 80, 0.1);
-        }
+        .toast.success { border-color: var(--accent-green); background: rgba(63, 185, 80, 0.1); }
+        .toast.error { border-color: var(--accent-red); background: rgba(239, 68, 68, 0.1); }
+        .toast.warning { border-color: var(--accent-orange); background: rgba(249, 115, 22, 0.1); }
 
-        .toast.error {
-            border-color: var(--accent-red);
-            background: rgba(239, 68, 68, 0.1);
-        }
-
-        .toast.warning {
-            border-color: var(--accent-orange);
-            background: rgba(249, 115, 22, 0.1);
-        }
-
-        .toast .icon {
-            font-size: 20px;
-        }
-
-        .toast .text {
-            flex: 1;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
+        .toast .icon { font-size: 20px; }
+        .toast .text { flex: 1; font-size: 14px; font-weight: 600; }
         .toast.success .text { color: var(--accent-green); }
         .toast.error .text { color: var(--accent-red); }
         .toast.warning .text { color: var(--accent-orange); }
 
-        /* App Container */
         .app-container {
             max-width: 1600px;
             margin: 0 auto;
@@ -217,7 +187,6 @@
             animation: fadeIn 0.5s ease;
         }
 
-        /* Header */
         .header {
             background: var(--bg-secondary);
             padding: 24px 32px;
@@ -312,7 +281,6 @@
         .stat-value.blue { color: var(--accent-blue); }
         .stat-value.purple { color: var(--accent-purple); }
 
-        /* Navigation */
         .nav-tabs {
             display: flex;
             gap: 8px;
@@ -353,7 +321,6 @@
             transform: none;
         }
 
-        /* Content Section */
         .content-section {
             background: var(--bg-secondary);
             padding: 32px;
@@ -363,7 +330,6 @@
             min-height: 500px;
         }
 
-        /* Toolbar */
         .toolbar {
             display: flex;
             gap: 12px;
@@ -422,7 +388,6 @@
             border-color: var(--accent-blue);
         }
 
-        /* Dashboard Grid */
         .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -452,12 +417,6 @@
             letter-spacing: 0.5px;
         }
 
-        .chart-container {
-            position: relative;
-            height: 250px;
-        }
-
-        /* Inventory Grid */
         .inventory-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -590,7 +549,77 @@
             min-width: 100px;
         }
 
-        /* Empty State */
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 24px;
+            display: block;
+            overflow-x: auto;
+        }
+
+        .history-table thead,
+        .history-table tbody,
+        .history-table tr {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+        }
+
+        .history-table tbody {
+            display: block;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .history-table th {
+            text-align: left;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .history-table td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        .history-table tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .movement-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .movement-badge.Entrada {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+        }
+
+        .movement-badge.Salida {
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .movement-badge.Devolucion {
+            background: rgba(249, 115, 22, 0.15);
+            color: var(--accent-orange);
+        }
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -614,7 +643,6 @@
             font-size: 14px;
         }
 
-        /* Loading State */
         .loading-state {
             display: flex;
             flex-direction: column;
@@ -630,7 +658,6 @@
             border-width: 4px;
         }
 
-        /* Modal */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -659,14 +686,8 @@
         }
 
         @keyframes slideUp {
-            from { 
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to { 
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .modal-header {
@@ -694,7 +715,7 @@
             cursor: pointer;
             padding: 4px;
             line-height: 1;
-            transition: color 0.2s ease;
+            transition: all 0.2s ease;
             width: 32px;
             height: 32px;
             display: flex;
@@ -723,7 +744,6 @@
             background: var(--bg-secondary);
         }
 
-        /* Form Elements */
         .form-group {
             margin-bottom: 20px;
         }
@@ -767,50 +787,153 @@
             gap: 16px;
         }
 
-        /* Responsive */
+        .scanner-input {
+            width: 100%;
+            padding: 20px;
+            background: var(--bg-primary);
+            border: 3px dashed var(--accent-blue);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 18px;
+            font-family: 'IBM Plex Mono', monospace;
+            margin-bottom: 24px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .scanner-input:focus {
+            outline: none;
+            border-color: var(--accent-green);
+            box-shadow: 0 0 0 6px rgba(63, 185, 80, 0.2);
+            animation: pulse 0.5s ease;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .signature-container {
+            margin-top: 24px;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            border: 2px solid var(--border);
+        }
+
+        .signature-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .signature-canvas {
+            width: 100%;
+            height: 200px;
+            background: var(--bg-primary);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: crosshair;
+            touch-action: none;
+            display: block;
+        }
+
+        .signature-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .required-asterisk {
+            color: var(--accent-red);
+        }
+
+        .alert-banner {
+            background: rgba(249, 115, 22, 0.1);
+            border: 2px solid var(--accent-orange);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-icon {
+            font-size: 24px;
+        }
+
+        .alert-content {
+            flex: 1;
+        }
+
+        .alert-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--accent-orange);
+            margin-bottom: 4px;
+        }
+
+        .alert-message {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .signature-preview {
+            max-width: 150px;
+            max-height: 80px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .signature-preview:hover {
+            transform: scale(2);
+            z-index: 1000;
+        }
+
+        .action-icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            font-size: 16px;
+        }
+
+        .action-icon:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-blue);
+        }
+
+        .action-icon.danger:hover {
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+        }
+
         @media (max-width: 768px) {
-            .app-container {
-                padding: 12px;
-            }
-
-            .header {
-                padding: 20px;
-            }
-
-            .header h1 {
-                font-size: 22px;
-            }
-
-            .inventory-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-
-            .toolbar {
-                flex-direction: column;
-            }
-
-            .toolbar-left,
-            .toolbar-right {
-                width: 100%;
-            }
-
-            .content-section {
-                padding: 20px;
-            }
-
-            .modal {
-                margin: 0;
-                max-height: 100vh;
-                border-radius: 0;
-            }
+            .app-container { padding: 12px; }
+            .header { padding: 20px; }
+            .header h1 { font-size: 22px; }
+            .inventory-grid { grid-template-columns: 1fr; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+            .toolbar { flex-direction: column; }
+            .toolbar-left, .toolbar-right { width: 100%; }
+            .content-section { padding: 20px; }
+            .modal { margin: 0; max-height: 100vh; border-radius: 0; }
         }
     </style>
 </head>
@@ -820,7 +943,7 @@
 
     <script>
         // ==========================================
-        // CONFIGURACIÓN
+        // CONFIGURACIÓN GLOBAL
         // ==========================================
         
         const CONFIG = {
@@ -841,75 +964,9 @@
             scopes: ['User.Read', 'Sites.ReadWrite.All']
         };
 
-        // ==========================================
-        // MSAL SETUP
-        // ==========================================
-        
         let msalInstance;
         let graphClient;
-
-        async function initializeMSAL() {
-            try {
-                msalInstance = new msal.PublicClientApplication({
-                    auth: CONFIG.msal,
-                    cache: {
-                        cacheLocation: 'localStorage',
-                        storeAuthStateInCookie: false
-                    }
-                });
-                
-                await msalInstance.initialize();
-                return true;
-            } catch (error) {
-                console.error('Error inicializando MSAL:', error);
-                return false;
-            }
-        }
-
-        async function getAccessToken() {
-            const accounts = msalInstance.getAllAccounts();
-            
-            if (accounts.length === 0) {
-                return null;
-            }
-
-            try {
-                const response = await msalInstance.acquireTokenSilent({
-                    scopes: CONFIG.scopes,
-                    account: accounts[0]
-                });
-                return response.accessToken;
-            } catch (error) {
-                console.error('Error obteniendo token:', error);
-                return null;
-            }
-        }
-
-        async function login() {
-            try {
-                const response = await msalInstance.loginPopup({
-                    scopes: CONFIG.scopes
-                });
-                
-                msalInstance.setActiveAccount(response.account);
-                return {
-                    name: response.account.name,
-                    email: response.account.username,
-                    token: response.accessToken
-                };
-            } catch (error) {
-                console.error('Error en login:', error);
-                throw error;
-            }
-        }
-
-        async function logout() {
-            try {
-                await msalInstance.logoutPopup();
-            } catch (error) {
-                console.error('Error en logout:', error);
-            }
-        }
+        let dataManager;
 
         // ==========================================
         // MICROSOFT GRAPH API CLIENT
@@ -940,6 +997,10 @@
                         throw new Error(error.error?.message || `HTTP ${response.status}`);
                     }
 
+                    if (response.status === 204) {
+                        return null;
+                    }
+
                     return await response.json();
                 } catch (error) {
                     console.error('Graph API Error:', error);
@@ -947,11 +1008,10 @@
                 }
             }
 
-            // Listas de SharePoint
             async getListItems(listName) {
-                const endpoint = `/sites/${CONFIG.sharepoint.siteId}/lists/${listName}/items?expand=fields`;
+                const endpoint = `/sites/${CONFIG.sharepoint.siteId}/lists/${listName}/items?expand=fields&$top=5000`;
                 const result = await this.request(endpoint);
-                return result.value.map(item => item.fields);
+                return result.value.map(item => ({ ...item.fields, sharePointId: item.id }));
             }
 
             async createListItem(listName, data) {
@@ -960,23 +1020,21 @@
                     method: 'POST',
                     body: JSON.stringify({ fields: data })
                 });
-                return result.fields;
+                return { ...result.fields, sharePointId: result.id };
             }
 
             async updateListItem(listName, itemId, data) {
                 const endpoint = `/sites/${CONFIG.sharepoint.siteId}/lists/${listName}/items/${itemId}/fields`;
-                const result = await this.request(endpoint, {
+                await this.request(endpoint, {
                     method: 'PATCH',
                     body: JSON.stringify(data)
                 });
-                return result;
+                return true;
             }
 
             async deleteListItem(listName, itemId) {
                 const endpoint = `/sites/${CONFIG.sharepoint.siteId}/lists/${listName}/items/${itemId}`;
-                await this.request(endpoint, {
-                    method: 'DELETE'
-                });
+                await this.request(endpoint, { method: 'DELETE' });
                 return true;
             }
 
@@ -986,37 +1044,189 @@
         }
 
         // ==========================================
-        // TOAST NOTIFICATIONS
+        // DATA MANAGER
         // ==========================================
         
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            
-            const icons = {
-                success: '✓',
-                error: '✗',
-                warning: '⚠'
-            };
-            
-            toast.innerHTML = `
-                <span class="icon">${icons[type] || '•'}</span>
-                <span class="text">${message}</span>
-            `;
-            
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'slideIn 0.3s ease reverse';
-                setTimeout(() => toast.remove(), 300);
-            }, 4000);
+        class DataManager {
+            constructor(graphClient) {
+                this.graph = graphClient;
+            }
+
+            async loadAllData() {
+                try {
+                    const [inventario, tecnicos, historial, admins] = await Promise.all([
+                        this.graph.getListItems(CONFIG.sharepoint.lists.inventario),
+                        this.graph.getListItems(CONFIG.sharepoint.lists.tecnicos),
+                        this.graph.getListItems(CONFIG.sharepoint.lists.historial),
+                        this.graph.getListItems(CONFIG.sharepoint.lists.admins)
+                    ]);
+
+                    return {
+                        inventory: inventario.map(item => ({
+                            id: item.sharePointId,
+                            nombre: item.Nombre || item.Title,
+                            categoria: item.Categoria,
+                            barcode: item.CodigoBarras,
+                            stock: parseInt(item.Stock) || 0,
+                            stockMinimo: parseInt(item.StockMinimo) || 0,
+                            ubicacion: item.Ubicacion || ''
+                        })),
+                        technicians: tecnicos.map(item => ({
+                            id: item.sharePointId,
+                            nombre: item.NombreTecnico || item.Title,
+                            codigo: item.CodigoTecnico,
+                            email: item.Email,
+                            activo: item.Activo === true || item.Activo === 'Yes'
+                        })),
+                        history: historial.map(item => ({
+                            id: item.sharePointId,
+                            fecha: item.FechaHora || item.Created,
+                            tipo: item.TipoMovimiento,
+                            producto: item.Producto,
+                            cantidad: parseInt(item.Cantidad) || 0,
+                            ticket: item.Ticket || '',
+                            usuario: item.Usuario || '',
+                            tecnico: item.Tecnico || '',
+                            firma: item.Firma || null
+                        })).sort((a, b) => new Date(b.fecha) - new Date(a.fecha)),
+                        admins: admins
+                    };
+                } catch (error) {
+                    console.error('Error cargando datos:', error);
+                    throw error;
+                }
+            }
+
+            async createInventoryItem(data) {
+                return await this.graph.createListItem(CONFIG.sharepoint.lists.inventario, {
+                    Title: data.nombre,
+                    Nombre: data.nombre,
+                    Categoria: data.categoria,
+                    CodigoBarras: data.barcode,
+                    Stock: data.stock,
+                    StockMinimo: data.stockMinimo,
+                    Ubicacion: data.ubicacion
+                });
+            }
+
+            async updateInventoryItem(itemId, data) {
+                await this.graph.updateListItem(CONFIG.sharepoint.lists.inventario, itemId, data);
+            }
+
+            async deleteInventoryItem(itemId) {
+                await this.graph.deleteListItem(CONFIG.sharepoint.lists.inventario, itemId);
+            }
+
+            async addToHistory(data) {
+                await this.graph.createListItem(CONFIG.sharepoint.lists.historial, {
+                    Title: `${data.tipo} - ${data.producto}`,
+                    TipoMovimiento: data.tipo,
+                    Producto: data.producto,
+                    Cantidad: data.cantidad,
+                    Ticket: data.ticket || '',
+                    Usuario: data.usuario || '',
+                    Tecnico: data.tecnico || '',
+                    FechaHora: new Date().toISOString(),
+                    Firma: data.firma || ''
+                });
+            }
+
+            async createTechnician(data) {
+                return await this.graph.createListItem(CONFIG.sharepoint.lists.tecnicos, {
+                    Title: data.nombre,
+                    NombreTecnico: data.nombre,
+                    CodigoTecnico: data.codigo,
+                    Email: data.email,
+                    Activo: true
+                });
+            }
+
+            async toggleTechnicianStatus(itemId, currentStatus) {
+                await this.graph.updateListItem(CONFIG.sharepoint.lists.tecnicos, itemId, {
+                    Activo: !currentStatus
+                });
+            }
+
+            async deleteHistoryItem(itemId) {
+                await this.graph.deleteListItem(CONFIG.sharepoint.lists.historial, itemId);
+            }
         }
 
         // ==========================================
         // UTILITY FUNCTIONS
         // ==========================================
         
+        async function initializeMSAL() {
+            try {
+                msalInstance = new msal.PublicClientApplication({
+                    auth: CONFIG.msal,
+                    cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
+                });
+                await msalInstance.initialize();
+                return true;
+            } catch (error) {
+                console.error('Error inicializando MSAL:', error);
+                return false;
+            }
+        }
+
+        async function getAccessToken() {
+            const accounts = msalInstance.getAllAccounts();
+            if (accounts.length === 0) return null;
+
+            try {
+                const response = await msalInstance.acquireTokenSilent({
+                    scopes: CONFIG.scopes,
+                    account: accounts[0]
+                });
+                return response.accessToken;
+            } catch (error) {
+                console.error('Error obteniendo token:', error);
+                return null;
+            }
+        }
+
+        async function login() {
+            try {
+                const response = await msalInstance.loginPopup({ scopes: CONFIG.scopes });
+                msalInstance.setActiveAccount(response.account);
+                return {
+                    name: response.account.name,
+                    email: response.account.username,
+                    token: response.accessToken
+                };
+            } catch (error) {
+                console.error('Error en login:', error);
+                throw error;
+            }
+        }
+
+        async function logout() {
+            try {
+                await msalInstance.logoutPopup();
+            } catch (error) {
+                console.error('Error en logout:', error);
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icons = { success: '✓', error: '✗', warning: '⚠' };
+            toast.innerHTML = `
+                <span class="icon">${icons[type] || '•'}</span>
+                <span class="text">${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
         function exportToCSV(data, filename) {
             if (!data || data.length === 0) {
                 showToast('No hay datos para exportar', 'warning');
@@ -1055,143 +1265,93 @@
             return canvas.toDataURL('image/png');
         }
 
-        // ==========================================
-        // APPLICATION STATE
-        // ==========================================
-        
-        class AppState {
-            constructor() {
-                this.user = null;
-                this.isAdmin = false;
-                this.inventory = [];
-                this.technicians = [];
-                this.history = [];
-                this.activeTab = 'dashboard';
-                this.loading = true;
-                this.listeners = [];
-            }
-
-            setState(updates) {
-                Object.assign(this, updates);
-                this.notify();
-            }
-
-            subscribe(listener) {
-                this.listeners.push(listener);
-                return () => {
-                    this.listeners = this.listeners.filter(l => l !== listener);
-                };
-            }
-
-            notify() {
-                this.listeners.forEach(listener => listener(this));
-            }
-        }
-
-        const appState = new AppState();
-
-        // ==========================================
-        // DATA MANAGER
-        // ==========================================
-        
-        class DataManager {
-            constructor(graphClient) {
-                this.graph = graphClient;
-            }
-
-            async loadAllData() {
-                try {
-                    const [inventario, tecnicos, historial, admins] = await Promise.all([
-                        this.graph.getListItems(CONFIG.sharepoint.lists.inventario),
-                        this.graph.getListItems(CONFIG.sharepoint.lists.tecnicos),
-                        this.graph.getListItems(CONFIG.sharepoint.lists.historial),
-                        this.graph.getListItems(CONFIG.sharepoint.lists.admins)
-                    ]);
-
-                    return {
-                        inventory: inventario.map(item => ({
-                            id: item.id,
-                            nombre: item.Nombre || item.Title,
-                            categoria: item.Categoria,
-                            barcode: item.CodigoBarras,
-                            stock: parseInt(item.Stock) || 0,
-                            stockMinimo: parseInt(item.StockMinimo) || 0,
-                            ubicacion: item.Ubicacion || ''
-                        })),
-                        technicians: tecnicos.map(item => ({
-                            id: item.id,
-                            nombre: item.NombreTecnico || item.Title,
-                            codigo: item.CodigoTecnico,
-                            email: item.Email,
-                            activo: item.Activo === true || item.Activo === 'Yes'
-                        })),
-                        history: historial.map(item => ({
-                            id: item.id,
-                            fecha: item.FechaHora || item.Created,
-                            tipo: item.TipoMovimiento,
-                            producto: item.Producto,
-                            cantidad: parseInt(item.Cantidad) || 0,
-                            ticket: item.Ticket || '',
-                            usuario: item.Usuario || '',
-                            tecnico: item.Tecnico || '',
-                            firma: item.Firma || null
-                        })).sort((a, b) => new Date(b.fecha) - new Date(a.fecha)),
-                        admins: admins
-                    };
-                } catch (error) {
-                    console.error('Error cargando datos:', error);
-                    throw error;
-                }
-            }
-
-            async createInventoryItem(data) {
-                const item = await this.graph.createListItem(CONFIG.sharepoint.lists.inventario, {
-                    Title: data.nombre,
-                    Nombre: data.nombre,
-                    Categoria: data.categoria,
-                    CodigoBarras: data.barcode,
-                    Stock: data.stock,
-                    StockMinimo: data.stockMinimo,
-                    Ubicacion: data.ubicacion
-                });
-                return item;
-            }
-
-            async updateInventoryItem(itemId, data) {
-                await this.graph.updateListItem(CONFIG.sharepoint.lists.inventario, itemId, {
-                    Nombre: data.nombre,
-                    Categoria: data.categoria,
-                    Stock: data.stock,
-                    StockMinimo: data.stockMinimo,
-                    Ubicacion: data.ubicacion
-                });
-            }
-
-            async deleteInventoryItem(itemId) {
-                await this.graph.deleteListItem(CONFIG.sharepoint.lists.inventario, itemId);
-            }
-
-            async addToHistory(data) {
-                await this.graph.createListItem(CONFIG.sharepoint.lists.historial, {
-                    Title: `${data.tipo} - ${data.producto}`,
-                    TipoMovimiento: data.tipo,
-                    Producto: data.producto,
-                    Cantidad: data.cantidad,
-                    Ticket: data.ticket || '',
-                    Usuario: data.usuario || '',
-                    Tecnico: data.tecnico || '',
-                    FechaHora: new Date().toISOString(),
-                    Firma: data.firma || ''
-                });
-            }
+        function printTechnicianCard(tech) {
+            const printWindow = window.open('', '_blank');
+            const barcodeImage = generateBarcode(tech.codigo);
+            
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Tarjeta de Técnico - ${tech.nombre}</title>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            min-height: 100vh;
+                            margin: 0;
+                            background: #f0f0f0;
+                        }
+                        .card {
+                            background: white;
+                            padding: 40px;
+                            border-radius: 12px;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                            text-align: center;
+                            max-width: 400px;
+                        }
+                        h1 {
+                            color: #333;
+                            margin-bottom: 10px;
+                            font-size: 24px;
+                        }
+                        .codigo {
+                            color: #666;
+                            font-size: 18px;
+                            font-weight: bold;
+                            margin-bottom: 20px;
+                        }
+                        .email {
+                            color: #999;
+                            font-size: 14px;
+                            margin-bottom: 30px;
+                        }
+                        img {
+                            max-width: 100%;
+                            height: auto;
+                        }
+                        .footer {
+                            margin-top: 30px;
+                            padding-top: 20px;
+                            border-top: 2px solid #eee;
+                            color: #999;
+                            font-size: 12px;
+                        }
+                        @media print {
+                            body { background: white; }
+                            .card { box-shadow: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h1>${tech.nombre}</h1>
+                        <div class="codigo">Código: ${tech.codigo}</div>
+                        <div class="email">${tech.email}</div>
+                        <img src="${barcodeImage}" alt="Código de barras">
+                        <div class="footer">
+                            Sistema de Inventario IT<br>
+                            Escanea este código para identificarte
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+            setTimeout(() => printWindow.print(), 250);
         }
 
         // ==========================================
-        // UI COMPONENTS
+        // REACT COMPONENTS
         // ==========================================
         
+        const { useState, useEffect, useRef, createElement: e } = React;
+
         function LoginScreen({ onLogin }) {
-            const [loading, setLoading] = React.useState(false);
+            const [loading, setLoading] = useState(false);
 
             const handleLogin = async () => {
                 setLoading(true);
@@ -1204,25 +1364,25 @@
                 }
             };
 
-            return React.createElement('div', { className: 'login-screen' },
-                React.createElement('div', { className: 'login-box' },
-                    React.createElement('h1', null, 'Sistema de Inventario IT'),
-                    React.createElement('p', { style: { fontSize: '14px', color: 'var(--accent-purple)', fontWeight: '600', marginBottom: '12px' } },
+            return e('div', { className: 'login-screen' },
+                e('div', { className: 'login-box' },
+                    e('h1', null, 'Sistema de Inventario IT'),
+                    e('p', { style: { fontSize: '14px', color: 'var(--accent-purple)', fontWeight: '600', marginBottom: '12px' } },
                         'Sanlucar Fruit'
                     ),
-                    React.createElement('p', null,
+                    e('p', null,
                         'Inicia sesión con tu cuenta corporativa de Microsoft 365 para acceder al sistema de gestión de inventario.'
                     ),
-                    React.createElement('button', {
+                    e('button', {
                         className: 'button button-primary',
                         onClick: handleLogin,
                         disabled: loading,
                         style: { width: '100%', marginTop: '16px' }
                     },
-                        loading ? React.createElement('span', { className: 'loading-spinner' }) : '🔐',
+                        loading ? e('span', { className: 'loading-spinner' }) : '🔐',
                         loading ? ' Iniciando sesión...' : ' Iniciar Sesión con Microsoft'
                     ),
-                    React.createElement('p', { style: { fontSize: '12px', marginTop: '24px' } },
+                    e('p', { style: { fontSize: '12px', marginTop: '24px' } },
                         '💡 Usa tu cuenta @sanlucar.com'
                     )
                 )
@@ -1241,59 +1401,58 @@
                 tecnicosActivos: state.technicians.filter(t => t.activo).length
             };
 
-            return React.createElement('div', null,
-                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } },
-                    React.createElement('h2', { style: { fontSize: '24px', fontWeight: '700' } }, '📊 Dashboard'),
-                    React.createElement('button', {
+            return e('div', null,
+                e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' } },
+                    e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, '📊 Dashboard'),
+                    e('button', {
                         className: 'button button-success',
                         onClick: () => exportToCSV(state.inventory, 'inventario_completo')
                     }, '📥 Exportar Inventario')
                 ),
                 
-                React.createElement('div', { className: 'dashboard-grid' },
-                    React.createElement('div', { className: 'dashboard-card' },
-                        React.createElement('h3', null, '📦 Resumen de Stock'),
-                        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
-                            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                React.createElement('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, 'Total Productos'),
-                                React.createElement('span', { style: { color: 'var(--accent-blue)', fontSize: '18px', fontWeight: '700' } }, stats.totalProductos)
-                            ),
-                            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                React.createElement('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, 'Total Unidades'),
-                                React.createElement('span', { style: { color: 'var(--accent-green)', fontSize: '18px', fontWeight: '700' } }, stats.totalUnidades)
-                            ),
-                            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                React.createElement('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, 'Stock Bajo'),
-                                React.createElement('span', { style: { color: 'var(--accent-orange)', fontSize: '18px', fontWeight: '700' } }, stats.stockBajo)
-                            ),
-                            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                React.createElement('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, 'Sin Stock'),
-                                React.createElement('span', { style: { color: 'var(--accent-red)', fontSize: '18px', fontWeight: '700' } }, stats.sinStock)
+                e('div', { className: 'dashboard-grid' },
+                    e('div', { className: 'dashboard-card' },
+                        e('h3', null, '📦 Resumen de Stock'),
+                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+                            [
+                                { label: 'Total Productos', value: stats.totalProductos, color: 'var(--accent-blue)' },
+                                { label: 'Total Unidades', value: stats.totalUnidades, color: 'var(--accent-green)' },
+                                { label: 'Stock Bajo', value: stats.stockBajo, color: 'var(--accent-orange)' },
+                                { label: 'Sin Stock', value: stats.sinStock, color: 'var(--accent-red)' }
+                            ].map((stat, idx) =>
+                                e('div', {
+                                    key: idx,
+                                    style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' }
+                                },
+                                    e('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, stat.label),
+                                    e('span', { style: { color: stat.color, fontSize: '18px', fontWeight: '700', fontFamily: 'IBM Plex Mono, monospace' } }, stat.value)
+                                )
                             )
                         )
                     ),
                     
-                    React.createElement('div', { className: 'dashboard-card' },
-                        React.createElement('h3', null, '📈 Actividad'),
-                        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
-                            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                React.createElement('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, 'Movimientos Hoy'),
-                                React.createElement('span', { style: { color: 'var(--accent-purple)', fontSize: '18px', fontWeight: '700' } }, stats.movimientosHoy)
-                            ),
-                            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                React.createElement('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, 'Total Movimientos'),
-                                React.createElement('span', { style: { color: 'var(--accent-blue)', fontSize: '18px', fontWeight: '700' } }, state.history.length)
-                            ),
-                            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                React.createElement('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, 'Técnicos Activos'),
-                                React.createElement('span', { style: { color: 'var(--accent-green)', fontSize: '18px', fontWeight: '700' } }, stats.tecnicosActivos)
+                    e('div', { className: 'dashboard-card' },
+                        e('h3', null, '📈 Actividad'),
+                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+                            [
+                                { label: 'Movimientos Hoy', value: stats.movimientosHoy, color: 'var(--accent-purple)' },
+                                { label: 'Total Movimientos', value: state.history.length, color: 'var(--accent-blue)' },
+                                { label: 'Técnicos Activos', value: stats.tecnicosActivos, color: 'var(--accent-green)' }
+                            ].map((stat, idx) =>
+                                e('div', {
+                                    key: idx,
+                                    style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' }
+                                },
+                                    e('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, stat.label),
+                                    e('span', { style: { color: stat.color, fontSize: '18px', fontWeight: '700', fontFamily: 'IBM Plex Mono, monospace' } }, stat.value)
+                                )
                             )
                         )
                     ),
                     
-                    React.createElement('div', { className: 'dashboard-card' },
-                        React.createElement('h3', null, '🏆 Top 5 Productos'),
-                        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+                    e('div', { className: 'dashboard-card' },
+                        e('h3', null, '🏆 Top 5 Productos'),
+                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
                             state.inventory
                                 .map(item => ({
                                     ...item,
@@ -1302,37 +1461,37 @@
                                 .sort((a, b) => b.count - a.count)
                                 .slice(0, 5)
                                 .map((item, idx) =>
-                                    React.createElement('div', {
+                                    e('div', {
                                         key: item.id,
                                         style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' }
                                     },
-                                        React.createElement('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, `${idx + 1}. ${item.nombre}`),
-                                        React.createElement('span', { style: { color: 'var(--accent-yellow)', fontSize: '18px', fontWeight: '700' } }, item.count)
+                                        e('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, `${idx + 1}. ${item.nombre}`),
+                                        e('span', { style: { color: 'var(--accent-yellow)', fontSize: '18px', fontWeight: '700', fontFamily: 'IBM Plex Mono, monospace' } }, item.count)
                                     )
                                 )
                         )
                     ),
                     
-                    React.createElement('div', { className: 'dashboard-card' },
-                        React.createElement('h3', null, '⚠️ Productos Críticos'),
+                    e('div', { className: 'dashboard-card' },
+                        e('h3', null, '⚠️ Productos Críticos'),
                         state.inventory.filter(item => item.stock > 0 && item.stock <= item.stockMinimo).length > 0 ?
-                            React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+                            e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
                                 state.inventory
                                     .filter(item => item.stock > 0 && item.stock <= item.stockMinimo)
                                     .slice(0, 5)
                                     .map(item =>
-                                        React.createElement('div', {
+                                        e('div', {
                                             key: item.id,
                                             style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' }
                                         },
-                                            React.createElement('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, item.nombre),
-                                            React.createElement('span', { style: { color: 'var(--accent-orange)', fontSize: '18px', fontWeight: '700' } }, 
+                                            e('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, item.nombre),
+                                            e('span', { style: { color: 'var(--accent-orange)', fontSize: '18px', fontWeight: '700', fontFamily: 'IBM Plex Mono, monospace' } }, 
                                                 `${item.stock}/${item.stockMinimo}`
                                             )
                                         )
                                     )
                             ) :
-                            React.createElement('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' } },
+                            e('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' } },
                                 '✓ Todo el stock está en niveles óptimos'
                             )
                     )
@@ -1340,9 +1499,9 @@
             );
         }
 
-        function InventoryView({ state, onRefresh }) {
-            const [search, setSearch] = React.useState('');
-            const [filterCategory, setFilterCategory] = React.useState('all');
+        function InventoryView({ state, onRefresh, onOpenModal }) {
+            const [search, setSearch] = useState('');
+            const [filterCategory, setFilterCategory] = useState('all');
 
             const filtered = state.inventory.filter(item => {
                 const matchesSearch = item.nombre.toLowerCase().includes(search.toLowerCase()) ||
@@ -1352,116 +1511,797 @@
                 return matchesSearch && matchesCategory;
             });
 
-            const categories = [...new Set(state.inventory.map(item => item.categoria))];
+            const categories = [...new Set(state.inventory.map(item => item.categoria))].filter(Boolean);
 
-            return React.createElement('div', null,
-                React.createElement('div', { className: 'toolbar' },
-                    React.createElement('div', { className: 'toolbar-left' },
-                        React.createElement('input', {
+            return e('div', null,
+                e('div', { className: 'toolbar' },
+                    e('div', { className: 'toolbar-left' },
+                        e('input', {
                             type: 'text',
                             className: 'search-bar',
                             placeholder: '🔍 Buscar productos...',
                             value: search,
-                            onChange: (e) => setSearch(e.target.value)
+                            onChange: (ev) => setSearch(ev.target.value)
                         }),
-                        React.createElement('select', {
+                        e('select', {
                             className: 'filter-select',
                             value: filterCategory,
-                            onChange: (e) => setFilterCategory(e.target.value)
+                            onChange: (ev) => setFilterCategory(ev.target.value)
                         },
-                            React.createElement('option', { value: 'all' }, 'Todas las categorías'),
+                            e('option', { value: 'all' }, 'Todas las categorías'),
                             categories.map(cat =>
-                                React.createElement('option', { key: cat, value: cat }, cat)
+                                e('option', { key: cat, value: cat }, cat)
                             )
                         )
                     ),
-                    React.createElement('div', { className: 'toolbar-right' },
-                        React.createElement('button', {
+                    e('div', { className: 'toolbar-right' },
+                        state.isAdmin && e('button', {
                             className: 'button button-success',
+                            onClick: () => onOpenModal('entrada', null)
+                        }, '➕ Nuevo Producto'),
+                        e('button', {
+                            className: 'button button-secondary',
                             onClick: () => exportToCSV(filtered, 'inventario')
                         }, '📥 Exportar')
                     )
                 ),
                 
                 filtered.length > 0 ?
-                    React.createElement('div', { className: 'inventory-grid' },
+                    e('div', { className: 'inventory-grid' },
                         filtered.map(item => {
                             const stockClass = item.stock === 0 ? 'out-of-stock' :
                                              item.stock <= item.stockMinimo ? 'low-stock' : '';
                             
-                            return React.createElement('div', {
+                            return e('div', {
                                 key: item.id,
                                 className: `inventory-card ${stockClass}`
                             },
-                                React.createElement('div', { className: 'card-header' },
-                                    React.createElement('div', null,
-                                        React.createElement('div', { className: 'card-title' }, item.nombre),
-                                        React.createElement('div', { className: 'card-category' }, item.categoria)
+                                e('div', { className: 'card-header' },
+                                    e('div', null,
+                                        e('div', { className: 'card-title' }, item.nombre),
+                                        e('div', { className: 'card-category' }, item.categoria)
                                     ),
-                                    React.createElement('div', { className: 'card-barcode' }, item.barcode)
+                                    e('div', { className: 'card-barcode' }, item.barcode)
                                 ),
                                 
-                                React.createElement('div', { className: 'card-info' },
-                                    React.createElement('div', { className: 'info-row' },
-                                        React.createElement('span', { className: 'info-label' }, 'Stock Actual'),
-                                        React.createElement('span', {
+                                e('div', { className: 'card-info' },
+                                    e('div', { className: 'info-row' },
+                                        e('span', { className: 'info-label' }, 'Stock Actual'),
+                                        e('span', {
                                             className: `stock-badge ${item.stock === 0 ? 'out' : item.stock <= item.stockMinimo ? 'low' : 'available'}`
                                         }, `${item.stock} unidades`)
                                     ),
-                                    React.createElement('div', { className: 'info-row' },
-                                        React.createElement('span', { className: 'info-label' }, 'Stock Mínimo'),
-                                        React.createElement('span', { className: 'info-value' }, item.stockMinimo)
+                                    e('div', { className: 'info-row' },
+                                        e('span', { className: 'info-label' }, 'Stock Mínimo'),
+                                        e('span', { className: 'info-value' }, item.stockMinimo)
                                     ),
-                                    React.createElement('div', { className: 'info-row' },
-                                        React.createElement('span', { className: 'info-label' }, 'Ubicación'),
-                                        React.createElement('span', { className: 'info-value' }, item.ubicacion || '-')
+                                    e('div', { className: 'info-row' },
+                                        e('span', { className: 'info-label' }, 'Ubicación'),
+                                        e('span', { className: 'info-value' }, item.ubicacion || '-')
                                     )
                                 ),
 
-                                React.createElement('div', { className: 'card-actions' },
-                                    React.createElement('button', {
+                                e('div', { className: 'card-actions' },
+                                    e('button', {
                                         className: 'button button-primary',
-                                        disabled: item.stock === 0
+                                        disabled: item.stock === 0,
+                                        onClick: () => onOpenModal('salida', item)
                                     }, '⬆️ Salida'),
-                                    React.createElement('button', {
-                                        className: 'button button-success'
+                                    e('button', {
+                                        className: 'button button-success',
+                                        onClick: () => onOpenModal('entrada', item)
                                     }, '⬇️ Entrada'),
-                                    state.isAdmin && React.createElement('button', {
-                                        className: 'button button-secondary'
-                                    }, '✏️ Editar')
+                                    state.isAdmin && e('button', {
+                                        className: 'button button-secondary',
+                                        onClick: () => onOpenModal('editar', item)
+                                    }, '✏️'),
+                                    state.isAdmin && e('button', {
+                                        className: 'button button-danger',
+                                        onClick: () => onOpenModal('eliminar-producto', item)
+                                    }, '🗑️')
                                 )
                             );
                         })
                     ) :
-                    React.createElement('div', { className: 'empty-state' },
-                        React.createElement('div', { className: 'empty-state-icon' }, '🔍'),
-                        React.createElement('div', { className: 'empty-state-title' }, 'No se encontraron productos'),
-                        React.createElement('div', { className: 'empty-state-text' }, 'Intenta con otros términos de búsqueda')
+                    e('div', { className: 'empty-state' },
+                        e('div', { className: 'empty-state-icon' }, '🔍'),
+                        e('div', { className: 'empty-state-title' }, 'No se encontraron productos'),
+                        e('div', { className: 'empty-state-text' }, 'Intenta con otros términos de búsqueda')
                     )
             );
         }
 
+        function HistoryView({ state, onRefresh, onOpenModal }) {
+            const [search, setSearch] = useState('');
+            const [filterType, setFilterType] = useState('all');
+            const [filterDateFrom, setFilterDateFrom] = useState('');
+            const [filterDateTo, setFilterDateTo] = useState('');
+
+            const filtered = state.history.filter(entry => {
+                const matchesSearch = entry.producto.toLowerCase().includes(search.toLowerCase()) ||
+                                    entry.usuario.toLowerCase().includes(search.toLowerCase()) ||
+                                    (entry.ticket && entry.ticket.toLowerCase().includes(search.toLowerCase()));
+                const matchesType = filterType === 'all' || entry.tipo === filterType;
+                
+                let matchesDate = true;
+                if (filterDateFrom || filterDateTo) {
+                    const entryDate = new Date(entry.fecha);
+                    if (filterDateFrom) matchesDate = entryDate >= new Date(filterDateFrom);
+                    if (filterDateTo && matchesDate) matchesDate = entryDate <= new Date(filterDateTo + 'T23:59:59');
+                }
+                
+                return matchesSearch && matchesType && matchesDate;
+            });
+
+            return e('div', null,
+                e('div', { className: 'toolbar' },
+                    e('div', { className: 'toolbar-left' },
+                        e('input', {
+                            type: 'text',
+                            className: 'search-bar',
+                            placeholder: '🔍 Buscar en historial...',
+                            value: search,
+                            onChange: (ev) => setSearch(ev.target.value)
+                        }),
+                        e('select', {
+                            className: 'filter-select',
+                            value: filterType,
+                            onChange: (ev) => setFilterType(ev.target.value)
+                        },
+                            e('option', { value: 'all' }, 'Todos los tipos'),
+                            e('option', { value: 'Entrada' }, 'Entradas'),
+                            e('option', { value: 'Salida' }, 'Salidas'),
+                            e('option', { value: 'Devolucion' }, 'Devoluciones')
+                        ),
+                        e('input', {
+                            type: 'date',
+                            className: 'filter-select',
+                            value: filterDateFrom,
+                            onChange: (ev) => setFilterDateFrom(ev.target.value),
+                            placeholder: 'Desde'
+                        }),
+                        e('input', {
+                            type: 'date',
+                            className: 'filter-select',
+                            value: filterDateTo,
+                            onChange: (ev) => setFilterDateTo(ev.target.value),
+                            placeholder: 'Hasta'
+                        })
+                    ),
+                    e('div', { className: 'toolbar-right' },
+                        e('button', {
+                            className: 'button button-secondary',
+                            onClick: () => {
+                                setSearch('');
+                                setFilterType('all');
+                                setFilterDateFrom('');
+                                setFilterDateTo('');
+                            }
+                        }, '🔄 Limpiar'),
+                        e('button', {
+                            className: 'button button-success',
+                            onClick: () => exportToCSV(filtered, 'historial')
+                        }, '📥 Exportar')
+                    )
+                ),
+                
+                filtered.length > 0 ?
+                    e('table', { className: 'history-table' },
+                        e('thead', null,
+                            e('tr', null,
+                                e('th', { style: { width: '140px' } }, 'Fecha'),
+                                e('th', { style: { width: '100px' } }, 'Tipo'),
+                                e('th', null, 'Producto'),
+                                e('th', { style: { width: '80px' } }, 'Cant.'),
+                                e('th', { style: { width: '120px' } }, 'Ticket'),
+                                e('th', null, 'Usuario'),
+                                e('th', null, 'Técnico'),
+                                e('th', { style: { width: '80px' } }, 'Firma'),
+                                state.isAdmin && e('th', { style: { width: '60px' } }, 'Acción')
+                            )
+                        ),
+                        e('tbody', null,
+                            filtered.map(entry =>
+                                e('tr', { key: entry.id },
+                                    e('td', { style: { fontFamily: 'IBM Plex Mono, monospace', fontSize: '12px' } },
+                                        new Date(entry.fecha).toLocaleString('es-ES')
+                                    ),
+                                    e('td', null,
+                                        e('span', { className: `movement-badge ${entry.tipo}` }, entry.tipo)
+                                    ),
+                                    e('td', { style: { fontWeight: '500' } }, entry.producto),
+                                    e('td', { style: { fontFamily: 'IBM Plex Mono, monospace' } }, entry.cantidad),
+                                    e('td', { style: { color: 'var(--accent-blue)', fontSize: '12px' } }, entry.ticket || '-'),
+                                    e('td', { style: { fontSize: '13px' } }, entry.usuario),
+                                    e('td', { style: { color: 'var(--accent-green)', fontSize: '12px' } }, entry.tecnico),
+                                    e('td', null,
+                                        entry.firma ?
+                                            e('img', {
+                                                src: entry.firma,
+                                                alt: 'Firma',
+                                                className: 'signature-preview',
+                                                title: 'Haz clic para ampliar'
+                                            }) :
+                                            e('span', { style: { color: 'var(--text-secondary)', fontSize: '12px' } }, '-')
+                                    ),
+                                    state.isAdmin && e('td', null,
+                                        e('div', {
+                                            className: 'action-icon danger',
+                                            onClick: () => onOpenModal('eliminar-historial', entry),
+                                            title: 'Eliminar registro'
+                                        }, '🗑️')
+                                    )
+                                )
+                            )
+                        )
+                    ) :
+                    e('div', { className: 'empty-state' },
+                        e('div', { className: 'empty-state-icon' }, '📋'),
+                        e('div', { className: 'empty-state-title' }, 'No se encontraron movimientos'),
+                        e('div', { className: 'empty-state-text' }, 'Intenta ajustar los filtros de búsqueda')
+                    )
+            );
+        }
+
+        function TechniciansView({ state, onRefresh, onOpenModal }) {
+            return e('div', null,
+                e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } },
+                    e('h2', { style: { fontSize: '20px', fontWeight: '600' } }, '👥 Gestión de Técnicos'),
+                    e('button', {
+                        className: 'button button-success',
+                        onClick: () => onOpenModal('tecnico', null)
+                    }, '➕ Añadir Técnico')
+                ),
+                
+                state.technicians.length > 0 ?
+                    e('div', { className: 'inventory-grid' },
+                        state.technicians.map(tech =>
+                            e('div', { key: tech.id, className: 'inventory-card' },
+                                e('div', { className: 'card-header' },
+                                    e('div', null,
+                                        e('div', { className: 'card-title' }, tech.nombre),
+                                        e('div', { className: 'card-category' }, tech.email)
+                                    ),
+                                    e('div', { className: 'card-barcode' }, tech.codigo)
+                                ),
+                                
+                                e('div', { className: 'card-info' },
+                                    e('div', { className: 'info-row' },
+                                        e('span', { className: 'info-label' }, 'Estado'),
+                                        e('span', { className: `stock-badge ${tech.activo ? 'available' : 'out'}` },
+                                            tech.activo ? 'Activo' : 'Inactivo'
+                                        )
+                                    )
+                                ),
+
+                                e('div', { className: 'card-actions' },
+                                    e('button', {
+                                        className: 'button button-primary',
+                                        onClick: () => printTechnicianCard(tech)
+                                    }, '🖨️ Imprimir'),
+                                    e('button', {
+                                        className: `button ${tech.activo ? 'button-warning' : 'button-success'}`,
+                                        onClick: () => onOpenModal('toggle-tecnico', tech)
+                                    }, tech.activo ? '⏸️ Desactivar' : '▶️ Activar')
+                                )
+                            )
+                        )
+                    ) :
+                    e('div', { className: 'empty-state' },
+                        e('div', { className: 'empty-state-icon' }, '👥'),
+                        e('div', { className: 'empty-state-title' }, 'No hay técnicos registrados'),
+                        e('div', { className: 'empty-state-text' }, 'Añade técnicos para comenzar a usar el sistema')
+                    )
+            );
+        }
+
+        function FormModal({ state, modalType, selectedItem, onClose, onSubmit, onRefresh }) {
+            const [formData, setFormData] = useState({
+                nombre: selectedItem?.nombre || '',
+                categoria: selectedItem?.categoria || '',
+                barcode: selectedItem?.barcode || '',
+                stock: selectedItem?.stock || '',
+                stockMinimo: selectedItem?.stockMinimo || '',
+                ubicacion: selectedItem?.ubicacion || '',
+                cantidad: '',
+                ticket: '',
+                usuario: '',
+                nombreTecnico: '',
+                emailTecnico: '',
+                codigoTecnico: ''
+            });
+            const [signature, setSignature] = useState(null);
+            const [isDrawing, setIsDrawing] = useState(false);
+            const [loading, setLoading] = useState(false);
+            const canvasRef = useRef(null);
+
+            useEffect(() => {
+                if (canvasRef.current && modalType === 'salida') {
+                    const canvas = canvasRef.current;
+                    canvas.width = canvas.offsetWidth;
+                    canvas.height = canvas.offsetHeight;
+                }
+            }, [modalType]);
+
+            const startDrawing = (ev) => {
+                setIsDrawing(true);
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const rect = canvas.getBoundingClientRect();
+                const x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+                const y = (ev.touches ? ev.touches[0].clientY : ev.clientY) - rect.top;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+            };
+
+            const draw = (ev) => {
+                if (!isDrawing) return;
+                ev.preventDefault();
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const rect = canvas.getBoundingClientRect();
+                const x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+                const y = (ev.touches ? ev.touches[0].clientY : ev.clientY) - rect.top;
+                ctx.strokeStyle = '#e6edf3';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            };
+
+            const stopDrawing = () => {
+                if (isDrawing) {
+                    setIsDrawing(false);
+                    const canvas = canvasRef.current;
+                    setSignature(canvas.toDataURL());
+                }
+            };
+
+            const clearSignature = () => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                setSignature(null);
+            };
+
+            const handleSubmit = async (ev) => {
+                ev.preventDefault();
+                
+                if (modalType === 'salida' && !signature) {
+                    showToast('La firma es obligatoria', 'error');
+                    return;
+                }
+
+                setLoading(true);
+                try {
+                    if (modalType === 'entrada') {
+                        if (selectedItem) {
+                            // Añadir stock
+                            const nuevoStock = selectedItem.stock + parseInt(formData.cantidad);
+                            await dataManager.updateInventoryItem(selectedItem.id, {
+                                Stock: nuevoStock
+                            });
+                            await dataManager.addToHistory({
+                                tipo: 'Entrada',
+                                producto: selectedItem.nombre,
+                                cantidad: parseInt(formData.cantidad),
+                                tecnico: state.user.name
+                            });
+                            showToast(`${formData.cantidad} unidades añadidas`, 'success');
+                        } else {
+                            // Crear producto nuevo
+                            await dataManager.createInventoryItem({
+                                nombre: formData.nombre,
+                                categoria: formData.categoria,
+                                barcode: formData.barcode,
+                                stock: parseInt(formData.stock),
+                                stockMinimo: parseInt(formData.stockMinimo),
+                                ubicacion: formData.ubicacion
+                            });
+                            await dataManager.addToHistory({
+                                tipo: 'Entrada',
+                                producto: formData.nombre,
+                                cantidad: parseInt(formData.stock),
+                                tecnico: state.user.name
+                            });
+                            showToast(`Producto "${formData.nombre}" añadido`, 'success');
+                        }
+                    } else if (modalType === 'salida') {
+                        const nuevoStock = Math.max(0, selectedItem.stock - parseInt(formData.cantidad));
+                        await dataManager.updateInventoryItem(selectedItem.id, {
+                            Stock: nuevoStock
+                        });
+                        await dataManager.addToHistory({
+                            tipo: 'Salida',
+                            producto: selectedItem.nombre,
+                            cantidad: parseInt(formData.cantidad),
+                            ticket: formData.ticket,
+                            usuario: formData.usuario,
+                            tecnico: state.user.name,
+                            firma: signature
+                        });
+                        showToast('Salida registrada correctamente', 'success');
+                    } else if (modalType === 'editar') {
+                        await dataManager.updateInventoryItem(selectedItem.id, {
+                            Nombre: formData.nombre,
+                            Categoria: formData.categoria,
+                            Stock: parseInt(formData.stock),
+                            StockMinimo: parseInt(formData.stockMinimo),
+                            Ubicacion: formData.ubicacion
+                        });
+                        showToast('Producto actualizado correctamente', 'success');
+                    } else if (modalType === 'tecnico') {
+                        await dataManager.createTechnician({
+                            nombre: formData.nombreTecnico,
+                            codigo: formData.codigoTecnico,
+                            email: formData.emailTecnico
+                        });
+                        showToast('Técnico añadido correctamente', 'success');
+                    }
+
+                    await onRefresh();
+                    onClose();
+                } catch (error) {
+                    console.error('Error:', error);
+                    showToast('Error al guardar. Intenta de nuevo.', 'error');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const getModalTitle = () => {
+                if (modalType === 'entrada') return selectedItem ? 'Añadir Stock' : 'Nuevo Producto';
+                if (modalType === 'salida') return 'Registrar Salida';
+                if (modalType === 'devolucion') return 'Registrar Devolución';
+                if (modalType === 'editar') return 'Editar Producto';
+                if (modalType === 'tecnico') return 'Nuevo Técnico';
+                return 'Formulario';
+            };
+
+            return e('div', { className: 'modal-overlay', onClick: onClose },
+                e('div', { className: 'modal', onClick: (ev) => ev.stopPropagation() },
+                    e('div', { className: 'modal-header' },
+                        e('h2', { className: 'modal-title' }, getModalTitle()),
+                        e('button', { className: 'modal-close', onClick: onClose }, '×')
+                    ),
+                    
+                    e('form', { onSubmit: handleSubmit },
+                        e('div', { className: 'modal-body' },
+                            modalType === 'tecnico' && [
+                                e('div', { key: 'nombre', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Nombre Completo *'),
+                                    e('input', {
+                                        type: 'text',
+                                        className: 'form-input',
+                                        value: formData.nombreTecnico,
+                                        onChange: (ev) => setFormData({...formData, nombreTecnico: ev.target.value}),
+                                        required: true
+                                    })
+                                ),
+                                e('div', { key: 'email', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Email *'),
+                                    e('input', {
+                                        type: 'email',
+                                        className: 'form-input',
+                                        value: formData.emailTecnico,
+                                        onChange: (ev) => setFormData({...formData, emailTecnico: ev.target.value}),
+                                        required: true
+                                    })
+                                ),
+                                e('div', { key: 'codigo', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Código de Técnico *'),
+                                    e('input', {
+                                        type: 'text',
+                                        className: 'form-input',
+                                        placeholder: 'TEC-XXX',
+                                        value: formData.codigoTecnico,
+                                        onChange: (ev) => setFormData({...formData, codigoTecnico: ev.target.value}),
+                                        required: true
+                                    })
+                                )
+                            ],
+
+                            (modalType === 'entrada' || modalType === 'editar') && !selectedItem && [
+                                e('div', { key: 'row1', className: 'form-row' },
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Nombre del Producto *'),
+                                        e('input', {
+                                            type: 'text',
+                                            className: 'form-input',
+                                            value: formData.nombre,
+                                            onChange: (ev) => setFormData({...formData, nombre: ev.target.value}),
+                                            required: true
+                                        })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Categoría *'),
+                                        e('select', {
+                                            className: 'form-select',
+                                            value: formData.categoria,
+                                            onChange: (ev) => setFormData({...formData, categoria: ev.target.value}),
+                                            required: true
+                                        },
+                                            e('option', { value: '' }, 'Seleccionar...'),
+                                            ['Portátiles', 'Smartphones', 'Tablets', 'Periféricos', 'Audio', 'Cables', 'Accesorios'].map(cat =>
+                                                e('option', { key: cat, value: cat }, cat)
+                                            )
+                                        )
+                                    )
+                                ),
+                                e('div', { key: 'row2', className: 'form-row' },
+                                    modalType !== 'editar' && e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Código de Barras *'),
+                                        e('input', {
+                                            type: 'text',
+                                            className: 'form-input',
+                                            value: formData.barcode,
+                                            onChange: (ev) => setFormData({...formData, barcode: ev.target.value}),
+                                            required: true
+                                        })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Ubicación'),
+                                        e('input', {
+                                            type: 'text',
+                                            className: 'form-input',
+                                            placeholder: 'Ej: A1, B2...',
+                                            value: formData.ubicacion,
+                                            onChange: (ev) => setFormData({...formData, ubicacion: ev.target.value})
+                                        })
+                                    )
+                                ),
+                                e('div', { key: 'row3', className: 'form-row' },
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, modalType === 'editar' ? 'Stock Actual *' : 'Stock Inicial *'),
+                                        e('input', {
+                                            type: 'number',
+                                            className: 'form-input',
+                                            min: '0',
+                                            value: formData.stock,
+                                            onChange: (ev) => setFormData({...formData, stock: ev.target.value}),
+                                            required: true
+                                        })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Stock Mínimo *'),
+                                        e('input', {
+                                            type: 'number',
+                                            className: 'form-input',
+                                            min: '0',
+                                            value: formData.stockMinimo,
+                                            onChange: (ev) => setFormData({...formData, stockMinimo: ev.target.value}),
+                                            required: true
+                                        })
+                                    )
+                                )
+                            ],
+
+                            modalType === 'editar' && selectedItem && [
+                                e('div', { key: 'row1', className: 'form-row' },
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Nombre del Producto *'),
+                                        e('input', {
+                                            type: 'text',
+                                            className: 'form-input',
+                                            value: formData.nombre,
+                                            onChange: (ev) => setFormData({...formData, nombre: ev.target.value}),
+                                            required: true
+                                        })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Categoría *'),
+                                        e('select', {
+                                            className: 'form-select',
+                                            value: formData.categoria,
+                                            onChange: (ev) => setFormData({...formData, categoria: ev.target.value}),
+                                            required: true
+                                        },
+                                            e('option', { value: '' }, 'Seleccionar...'),
+                                            ['Portátiles', 'Smartphones', 'Tablets', 'Periféricos', 'Audio', 'Cables', 'Accesorios'].map(cat =>
+                                                e('option', { key: cat, value: cat }, cat)
+                                            )
+                                        )
+                                    )
+                                ),
+                                e('div', { key: 'row2', className: 'form-row' },
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Stock Actual *'),
+                                        e('input', {
+                                            type: 'number',
+                                            className: 'form-input',
+                                            min: '0',
+                                            value: formData.stock,
+                                            onChange: (ev) => setFormData({...formData, stock: ev.target.value}),
+                                            required: true
+                                        })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Stock Mínimo *'),
+                                        e('input', {
+                                            type: 'number',
+                                            className: 'form-input',
+                                            min: '0',
+                                            value: formData.stockMinimo,
+                                            onChange: (ev) => setFormData({...formData, stockMinimo: ev.target.value}),
+                                            required: true
+                                        })
+                                    )
+                                ),
+                                e('div', { key: 'ubicacion', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Ubicación'),
+                                    e('input', {
+                                        type: 'text',
+                                        className: 'form-input',
+                                        placeholder: 'Ej: A1, B2...',
+                                        value: formData.ubicacion,
+                                        onChange: (ev) => setFormData({...formData, ubicacion: ev.target.value})
+                                    })
+                                ),
+                                e('div', { key: 'warning', style: { background: 'rgba(249, 115, 22, 0.1)', padding: '12px', borderRadius: '8px', fontSize: '13px', color: 'var(--accent-orange)', marginTop: '16px' } },
+                                    '⚠️ ', e('strong', null, 'Admin:'), ' Estás editando el stock directamente. Esta acción quedará registrada.'
+                                )
+                            ],
+
+                            modalType === 'entrada' && selectedItem &&
+                                e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Cantidad a Añadir *'),
+                                    e('input', {
+                                        type: 'number',
+                                        className: 'form-input',
+                                        min: '1',
+                                        value: formData.cantidad,
+                                        onChange: (ev) => setFormData({...formData, cantidad: ev.target.value}),
+                                        required: true
+                                    })
+                                ),
+
+                            modalType === 'salida' && [
+                                e('div', { key: 'cantidad', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Cantidad *'),
+                                    e('input', {
+                                        type: 'number',
+                                        className: 'form-input',
+                                        min: '1',
+                                        max: selectedItem?.stock,
+                                        value: formData.cantidad,
+                                        onChange: (ev) => setFormData({...formData, cantidad: ev.target.value}),
+                                        required: true
+                                    }),
+                                    selectedItem && e('p', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' } },
+                                        `Stock disponible: ${selectedItem.stock} unidades`
+                                    )
+                                ),
+                                e('div', { key: 'ticket', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Nº Ticket'),
+                                    e('input', {
+                                        type: 'text',
+                                        className: 'form-input',
+                                        placeholder: 'TKT-2024-XXX',
+                                        value: formData.ticket,
+                                        onChange: (ev) => setFormData({...formData, ticket: ev.target.value})
+                                    })
+                                ),
+                                e('div', { key: 'usuario', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, `Usuario ${!formData.ticket ? '*' : ''}`),
+                                    e('input', {
+                                        type: 'text',
+                                        className: 'form-input',
+                                        placeholder: 'Nombre del usuario',
+                                        value: formData.usuario,
+                                        onChange: (ev) => setFormData({...formData, usuario: ev.target.value}),
+                                        required: !formData.ticket
+                                    })
+                                ),
+                                e('div', { key: 'firma', className: 'signature-container' },
+                                    e('div', { className: 'signature-label' },
+                                        '✍️ Firma del Empleado ', e('span', { className: 'required-asterisk' }, '*')
+                                    ),
+                                    e('canvas', {
+                                        ref: canvasRef,
+                                        className: 'signature-canvas',
+                                        onMouseDown: startDrawing,
+                                        onMouseMove: draw,
+                                        onMouseUp: stopDrawing,
+                                        onMouseLeave: stopDrawing,
+                                        onTouchStart: startDrawing,
+                                        onTouchMove: draw,
+                                        onTouchEnd: stopDrawing
+                                    }),
+                                    e('div', { className: 'signature-actions' },
+                                        e('button', {
+                                            type: 'button',
+                                            className: 'button button-secondary',
+                                            onClick: clearSignature
+                                        }, '🗑️ Limpiar Firma')
+                                    ),
+                                    e('p', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' } },
+                                        '💡 El empleado debe firmar con el dedo o Apple Pencil'
+                                    )
+                                )
+                            ]
+                        ),
+
+                        e('div', { className: 'modal-footer' },
+                            e('button', { type: 'button', className: 'button button-secondary', onClick: onClose }, 'Cancelar'),
+                            e('button', {
+                                type: 'submit',
+                                className: `button ${
+                                    modalType === 'entrada' ? 'button-success' : 
+                                    modalType === 'salida' ? 'button-primary' : 
+                                    modalType === 'devolucion' ? 'button-warning' :
+                                    modalType === 'editar' ? 'button-purple' :
+                                    'button-success'
+                                }`,
+                                disabled: loading
+                            },
+                                loading ? e('span', { className: 'loading-spinner' }) : null,
+                                loading ? ' Guardando...' :
+                                modalType === 'entrada' ? 'Añadir' : 
+                                modalType === 'salida' ? 'Registrar Salida' : 
+                                modalType === 'devolucion' ? 'Registrar Devolución' :
+                                modalType === 'editar' ? 'Guardar Cambios' :
+                                'Crear Técnico'
+                            )
+                        )
+                    )
+                )
+            );
+        }
+
+        function ConfirmModal({ message, onConfirm, onCancel, loading }) {
+            return e('div', { className: 'modal-overlay', onClick: onCancel },
+                e('div', { className: 'modal', style: { maxWidth: '500px' }, onClick: (ev) => ev.stopPropagation() },
+                    e('div', { className: 'modal-header' },
+                        e('h2', { className: 'modal-title' }, '⚠️ Confirmar Acción'),
+                        e('button', { className: 'modal-close', onClick: onCancel }, '×')
+                    ),
+                    
+                    e('div', { className: 'modal-body' },
+                        e('p', { style: { fontSize: '16px', color: 'var(--text-primary)', marginBottom: '24px' } }, message),
+                        e('div', { style: { background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '8px', fontSize: '14px', color: 'var(--accent-red)' } },
+                            '⚠️ Esta acción es permanente y no se puede deshacer'
+                        )
+                    ),
+
+                    e('div', { className: 'modal-footer' },
+                        e('button', { type: 'button', className: 'button button-secondary', onClick: onCancel }, 'Cancelar'),
+                        e('button', {
+                            className: 'button button-danger',
+                            onClick: onConfirm,
+                            disabled: loading
+                        },
+                            loading ? e('span', { className: 'loading-spinner' }) : null,
+                            loading ? ' Eliminando...' : 'Sí, Eliminar'
+                        )
+                    )
+                )
+            );
+        }
+
         function App() {
-            const [state, setState] = React.useState({
+            const [state, setState] = useState({
                 user: null,
                 isAdmin: false,
                 inventory: [],
                 technicians: [],
                 history: [],
                 activeTab: 'dashboard',
-                loading: true
+                loading: true,
+                modalType: null,
+                selectedItem: null,
+                showConfirm: false,
+                confirmAction: null
             });
 
-            React.useEffect(() => {
+            useEffect(() => {
                 initializeApp();
             }, []);
 
             const initializeApp = async () => {
                 try {
                     const msalReady = await initializeMSAL();
-                    if (!msalReady) {
-                        throw new Error('Failed to initialize MSAL');
-                    }
+                    if (!msalReady) throw new Error('Failed to initialize MSAL');
 
                     const accounts = msalInstance.getAllAccounts();
                     if (accounts.length === 0) {
@@ -1475,27 +2315,24 @@
                         return;
                     }
 
-                    const graph = new GraphAPIClient(token);
-                    const currentUser = await graph.getCurrentUser();
+                    graphClient = new GraphAPIClient(token);
+                    dataManager = new DataManager(graphClient);
                     
-                    const dataManager = new DataManager(graph);
+                    const currentUser = await graphClient.getCurrentUser();
                     const data = await dataManager.loadAllData();
 
                     const isAdmin = data.admins.some(a => 
-                        a.Email.toLowerCase() === currentUser.mail.toLowerCase() && 
+                        a.Email && a.Email.toLowerCase() === currentUser.mail.toLowerCase() && 
                         (a.Activo === true || a.Activo === 'Yes')
                     );
 
                     setState({
-                        user: {
-                            name: currentUser.displayName,
-                            email: currentUser.mail
-                        },
+                        ...state,
+                        user: { name: currentUser.displayName, email: currentUser.mail },
                         isAdmin,
                         inventory: data.inventory,
                         technicians: data.technicians,
                         history: data.history,
-                        activeTab: 'dashboard',
                         loading: false
                     });
 
@@ -1525,20 +2362,72 @@
                     technicians: [],
                     history: [],
                     activeTab: 'dashboard',
-                    loading: false
+                    loading: false,
+                    modalType: null,
+                    selectedItem: null
                 });
                 showToast('Sesión cerrada correctamente', 'success');
             };
 
+            const handleOpenModal = (type, item) => {
+                setState({ ...state, modalType: type, selectedItem: item });
+            };
+
+            const handleCloseModal = () => {
+                setState({ ...state, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null });
+            };
+
+            const handleConfirmAction = async () => {
+                const { confirmAction } = state;
+                try {
+                    if (confirmAction.type === 'eliminar-producto') {
+                        await dataManager.deleteInventoryItem(confirmAction.item.id);
+                        showToast('Producto eliminado correctamente', 'success');
+                    } else if (confirmAction.type === 'eliminar-historial') {
+                        await dataManager.deleteHistoryItem(confirmAction.item.id);
+                        showToast('Registro eliminado correctamente', 'success');
+                    } else if (confirmAction.type === 'toggle-tecnico') {
+                        await dataManager.toggleTechnicianStatus(confirmAction.item.id, confirmAction.item.activo);
+                        showToast('Estado actualizado', 'success');
+                    }
+                    await initializeApp();
+                    handleCloseModal();
+                } catch (error) {
+                    showToast('Error al ejecutar la acción', 'error');
+                }
+            };
+
+            const openConfirmModal = (type, item, message) => {
+                setState({
+                    ...state,
+                    showConfirm: true,
+                    confirmAction: { type, item },
+                    modalType: null
+                });
+            };
+
+            useEffect(() => {
+                if (state.modalType === 'eliminar-producto') {
+                    openConfirmModal('eliminar-producto', state.selectedItem, 
+                        `¿Estás seguro de que quieres eliminar "${state.selectedItem.nombre}"?`);
+                } else if (state.modalType === 'eliminar-historial') {
+                    openConfirmModal('eliminar-historial', state.selectedItem,
+                        `¿Estás seguro de que quieres eliminar el registro del ${new Date(state.selectedItem.fecha).toLocaleDateString()}?`);
+                } else if (state.modalType === 'toggle-tecnico') {
+                    openConfirmModal('toggle-tecnico', state.selectedItem,
+                        `¿Estás seguro de que quieres ${state.selectedItem.activo ? 'desactivar' : 'activar'} a ${state.selectedItem.nombre}?`);
+                }
+            }, [state.modalType]);
+
             if (state.loading) {
-                return React.createElement('div', { className: 'loading-state', style: { height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement('div', { className: 'loading-spinner' }),
-                    React.createElement('p', null, 'Cargando sistema...')
+                return e('div', { className: 'loading-state', style: { height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    e('div', { className: 'loading-spinner' }),
+                    e('p', null, 'Cargando sistema...')
                 );
             }
 
             if (!state.user) {
-                return React.createElement(LoginScreen, { onLogin: handleLogin });
+                return e(LoginScreen, { onLogin: handleLogin });
             }
 
             const stats = {
@@ -1550,39 +2439,36 @@
                 ).length
             };
 
-            return React.createElement('div', { className: 'app-container' },
-                React.createElement('header', { className: 'header' },
-                    React.createElement('div', { className: 'header-left' },
-                        React.createElement('h1', null, 'Sistema de Inventario IT'),
-                        React.createElement('div', { className: 'user-badges' },
-                            React.createElement('span', {
-                                className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}`
-                            }, state.isAdmin ? '👑 Admin' : '👤 Técnico', ': ', state.user.name)
+            return e('div', { className: 'app-container' },
+                e('header', { className: 'header' },
+                    e('div', { className: 'header-left' },
+                        e('h1', null, 'Sistema de Inventario IT'),
+                        e('div', { className: 'user-badges' },
+                            e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
+                                state.isAdmin ? '👑 Admin' : '👤 Técnico', ': ', state.user.name
+                            )
                         )
                     ),
-                    React.createElement('div', { className: 'header-stats' },
-                        React.createElement('div', { className: 'stat-item' },
-                            React.createElement('div', { className: 'stat-label' }, 'Productos'),
-                            React.createElement('div', { className: 'stat-value blue' }, stats.totalProductos)
+                    e('div', { className: 'header-stats' },
+                        e('div', { className: 'stat-item' },
+                            e('div', { className: 'stat-label' }, 'Productos'),
+                            e('div', { className: 'stat-value blue' }, stats.totalProductos)
                         ),
-                        React.createElement('div', { className: 'stat-item' },
-                            React.createElement('div', { className: 'stat-label' }, 'Unidades'),
-                            React.createElement('div', { className: 'stat-value green' }, stats.totalUnidades)
+                        e('div', { className: 'stat-item' },
+                            e('div', { className: 'stat-label' }, 'Unidades'),
+                            e('div', { className: 'stat-value green' }, stats.totalUnidades)
                         ),
-                        React.createElement('div', { className: 'stat-item' },
-                            React.createElement('div', { className: 'stat-label' }, 'Stock Bajo'),
-                            React.createElement('div', { className: 'stat-value orange' }, stats.stockBajo)
+                        e('div', { className: 'stat-item' },
+                            e('div', { className: 'stat-label' }, 'Stock Bajo'),
+                            e('div', { className: 'stat-value orange' }, stats.stockBajo)
                         ),
-                        React.createElement('button', {
-                            className: 'button button-secondary',
-                            onClick: handleLogout
-                        }, '🚪 Salir')
+                        e('button', { className: 'button button-secondary', onClick: handleLogout }, '🚪 Salir')
                     )
                 ),
 
-                React.createElement('nav', { className: 'nav-tabs' },
+                e('nav', { className: 'nav-tabs' },
                     ['dashboard', 'inventario', 'historial'].map(tab =>
-                        React.createElement('button', {
+                        e('button', {
                             key: tab,
                             className: `tab-button ${state.activeTab === tab ? 'active' : ''}`,
                             onClick: () => setState({ ...state, activeTab: tab })
@@ -1592,33 +2478,54 @@
                             tab.charAt(0).toUpperCase() + tab.slice(1)
                         )
                     ),
-                    state.isAdmin && React.createElement('button', {
+                    state.isAdmin && e('button', {
                         className: `tab-button ${state.activeTab === 'tecnicos' ? 'active' : ''}`,
                         onClick: () => setState({ ...state, activeTab: 'tecnicos' })
                     }, '👥 Técnicos')
                 ),
 
-                React.createElement('div', { className: 'content-section' },
-                    state.activeTab === 'dashboard' && React.createElement(Dashboard, { state }),
-                    state.activeTab === 'inventario' && React.createElement(InventoryView, { state, onRefresh: initializeApp }),
-                    (state.activeTab === 'historial' || state.activeTab === 'tecnicos') && 
-                        React.createElement('div', { className: 'empty-state' },
-                            React.createElement('div', { className: 'empty-state-icon' }, '🚧'),
-                            React.createElement('div', { className: 'empty-state-title' }, 'Sección en desarrollo'),
-                            React.createElement('div', { className: 'empty-state-text' }, 'Esta funcionalidad estará disponible próximamente')
-                        )
-                )
+                e('div', { className: 'content-section' },
+                    state.activeTab === 'dashboard' && e(Dashboard, { state }),
+                    state.activeTab === 'inventario' && e(InventoryView, { 
+                        state, 
+                        onRefresh: initializeApp,
+                        onOpenModal: handleOpenModal
+                    }),
+                    state.activeTab === 'historial' && e(HistoryView, {
+                        state,
+                        onRefresh: initializeApp,
+                        onOpenModal: handleOpenModal
+                    }),
+                    state.activeTab === 'tecnicos' && state.isAdmin && e(TechniciansView, {
+                        state,
+                        onRefresh: initializeApp,
+                        onOpenModal: handleOpenModal
+                    })
+                ),
+
+                state.modalType && !state.showConfirm && ['entrada', 'salida', 'devolucion', 'editar', 'tecnico'].includes(state.modalType) &&
+                    e(FormModal, {
+                        state,
+                        modalType: state.modalType,
+                        selectedItem: state.selectedItem,
+                        onClose: handleCloseModal,
+                        onRefresh: initializeApp
+                    }),
+
+                state.showConfirm && e(ConfirmModal, {
+                    message: state.confirmAction?.type === 'eliminar-producto' ? 
+                        `¿Estás seguro de que quieres eliminar "${state.selectedItem?.nombre}"?` :
+                        state.confirmAction?.type === 'eliminar-historial' ?
+                        `¿Estás seguro de que quieres eliminar el registro del ${new Date(state.selectedItem?.fecha).toLocaleDateString()}?` :
+                        `¿Estás seguro de que quieres ${state.selectedItem?.activo ? 'desactivar' : 'activar'} a ${state.selectedItem?.nombre}?`,
+                    onConfirm: handleConfirmAction,
+                    onCancel: handleCloseModal,
+                    loading: false
+                })
             );
         }
 
-        // ==========================================
-        // RENDER APP
-        // ==========================================
-        
-        ReactDOM.render(
-            React.createElement(App),
-            document.getElementById('root')
-        );
+        ReactDOM.render(e(App), document.getElementById('root'));
     </script>
 </body>
 </html>
