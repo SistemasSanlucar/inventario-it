@@ -946,12 +946,13 @@
             right: 0;
             bottom: 0;
             background: rgba(0, 0, 0, 0.95);
-            z-index: 10001;
+            z-index: 99999;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             animation: fadeIn 0.3s ease;
+            padding: 20px;
         }
 
         .scanner-container {
@@ -1583,12 +1584,12 @@
             modal.id = 'barcode-scanner-modal';
             modal.className = 'scanner-modal';
             modal.innerHTML = `
-                <div class="scanner-container">
+                <div class="scanner-container" onclick="event.stopPropagation()">
                     <div class="scanner-header">
                         <div class="scanner-title">
                             📷 Escáner de Código de Barras
                         </div>
-                        <button class="modal-close" onclick="stopBarcodeScanner()">×</button>
+                        <button class="modal-close" id="scanner-close-btn">×</button>
                     </div>
                     <div class="scanner-viewport" id="scanner-viewport">
                         <div class="scanner-overlay">
@@ -1606,6 +1607,18 @@
             `;
             
             document.body.appendChild(modal);
+            
+            // Event listener para cerrar al hacer click fuera
+            modal.addEventListener('click', stopBarcodeScanner);
+            
+            // Event listener para el botón cerrar
+            const closeBtn = document.getElementById('scanner-close-btn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    stopBarcodeScanner();
+                });
+            }
             
             // Inicializar Quagga
             setTimeout(() => {
