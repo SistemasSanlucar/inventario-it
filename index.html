@@ -8,7 +8,7 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
@@ -938,7 +938,7 @@
             .modal { margin: 0; max-height: 100vh; border-radius: 0; }
         }
 
-        /* Barcode Scanner Styles */
+        /* Barcode Scanner Styles - SIMPLIFIED */
         .scanner-modal {
             position: fixed;
             top: 0;
@@ -948,21 +948,17 @@
             background: rgba(0, 0, 0, 0.95);
             z-index: 99999;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            animation: fadeIn 0.3s ease;
-            padding: 20px;
         }
 
         .scanner-container {
-            width: 100%;
-            max-width: 640px;
-            position: relative;
+            width: 90%;
+            max-width: 500px;
             background: var(--bg-primary);
             border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 20px 60px var(--shadow);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
         }
 
         .scanner-header {
@@ -975,104 +971,35 @@
         }
 
         .scanner-title {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
         .scanner-viewport {
-            position: relative;
             width: 100%;
-            height: 400px;
+            min-height: 300px;
             background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: relative;
         }
 
-        #scanner-video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .scanner-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            pointer-events: none;
-        }
-
-        .scanner-line {
-            position: absolute;
-            top: 50%;
-            left: 10%;
-            right: 10%;
-            height: 2px;
-            background: var(--accent-green);
-            box-shadow: 0 0 10px var(--accent-green);
-            transform: translateY(-50%);
-            animation: scanLine 2s ease-in-out infinite;
-        }
-
-        @keyframes scanLine {
-            0%, 100% { opacity: 0.5; transform: translateY(-50%) scaleX(0.8); }
-            50% { opacity: 1; transform: translateY(-50%) scaleX(1); }
-        }
-
-        .scanner-corners {
-            position: absolute;
-            top: 20%;
-            left: 10%;
-            right: 10%;
-            bottom: 20%;
-            border: 2px solid var(--accent-blue);
-            border-radius: 12px;
-        }
-
-        .scanner-corners::before,
-        .scanner-corners::after {
-            content: '';
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            border: 3px solid var(--accent-blue);
-        }
-
-        .scanner-corners::before {
-            top: -3px;
-            left: -3px;
-            border-right: none;
-            border-bottom: none;
-            border-top-left-radius: 12px;
-        }
-
-        .scanner-corners::after {
-            bottom: -3px;
-            right: -3px;
-            border-left: none;
-            border-top: none;
-            border-bottom-right-radius: 12px;
+        #scanner-reader {
+            width: 100% !important;
         }
 
         .scanner-info {
-            padding: 24px;
+            padding: 20px;
             text-align: center;
             background: var(--bg-secondary);
         }
 
         .scanner-instruction {
-            font-size: 16px;
+            font-size: 14px;
             color: var(--text-secondary);
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .scanner-result {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
             color: var(--accent-green);
             font-family: 'IBM Plex Mono', monospace;
@@ -1087,28 +1014,33 @@
             background: rgba(239, 68, 68, 0.1);
         }
 
-        .scanner-button {
-            padding: 10px 20px;
-            background: var(--accent-blue);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
+        .scanner-mode-toggle {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
+        .mode-button {
+            padding: 8px 16px;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
         }
 
-        .scanner-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px var(--shadow);
+        .mode-button.active {
+            background: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
         }
 
-        .scanner-button-icon {
-            font-size: 16px;
+        .mode-button:hover:not(.active) {
+            background: var(--bg-tertiary);
         }
 
         /* Scanner close button - High priority */
@@ -1117,14 +1049,19 @@
             z-index: 999999;
             background: var(--accent-red) !important;
             color: white !important;
-            font-size: 32px !important;
-            width: 48px !important;
-            height: 48px !important;
+            font-size: 28px !important;
+            width: 40px !important;
+            height: 40px !important;
             border-radius: 50% !important;
             font-weight: bold !important;
             cursor: pointer !important;
-            border: 3px solid white !important;
+            border: 2px solid white !important;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1 !important;
+            padding: 0 !important;
         }
 
         #scanner-close-btn:hover {
@@ -1590,182 +1527,153 @@
         }
 
         // ==========================================
-        // BARCODE SCANNER
+        // BARCODE & QR CODE SCANNER
         // ==========================================
         
-        let scannerActive = false;
+        let html5QrcodeScanner = null;
         let scannerCallback = null;
+        let currentScanMode = 'barcode';
 
         function startBarcodeScanner(callback) {
-            if (typeof Quagga === 'undefined') {
+            if (typeof Html5Qrcode === 'undefined') {
                 showToast('Escáner no disponible', 'error');
                 return;
             }
 
             scannerCallback = callback;
             
-            // Crear modal del escáner
             const modal = document.createElement('div');
             modal.id = 'barcode-scanner-modal';
             modal.className = 'scanner-modal';
             modal.innerHTML = `
                 <div class="scanner-container" onclick="event.stopPropagation()">
                     <div class="scanner-header">
-                        <div class="scanner-title">
-                            📷 Escáner de Código de Barras
-                        </div>
+                        <div class="scanner-title">📷 Escáner</div>
                         <button class="modal-close" id="scanner-close-btn" type="button">×</button>
                     </div>
                     <div class="scanner-viewport" id="scanner-viewport">
-                        <div class="scanner-overlay">
-                            <div class="scanner-corners"></div>
-                            <div class="scanner-line"></div>
-                        </div>
+                        <div id="scanner-reader"></div>
                     </div>
                     <div class="scanner-info">
-                        <div class="scanner-instruction">
-                            Enfoca el código de barras dentro del recuadro
+                        <div class="scanner-mode-toggle">
+                            <button class="mode-button active" data-mode="barcode">Código de Barras</button>
+                            <button class="mode-button" data-mode="qr">Código QR</button>
                         </div>
-                        <div id="scanner-status">Iniciando cámara...</div>
+                        <div class="scanner-instruction" id="scanner-instruction">
+                            Enfoca el código de barras en la cámara
+                        </div>
+                        <div id="scanner-status"></div>
                     </div>
                 </div>
             `;
             
             document.body.appendChild(modal);
             
-            // Event listener para ESC
-            document.addEventListener('keydown', handleScannerEscape);
+            const escHandler = (e) => { if (e.key === 'Escape') stopBarcodeScanner(); };
+            document.addEventListener('keydown', escHandler);
             
-            // Event listener para cerrar al hacer click fuera - usar setTimeout para asegurar que se registra
             setTimeout(() => {
                 modal.addEventListener('click', (e) => {
-                    if (e.target === modal) {
-                        stopBarcodeScanner();
-                    }
+                    if (e.target === modal) stopBarcodeScanner();
                 });
             }, 100);
             
-            // Event listener para el botón cerrar - con setTimeout para asegurar que existe
             setTimeout(() => {
                 const closeBtn = document.getElementById('scanner-close-btn');
                 if (closeBtn) {
-                    closeBtn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        stopBarcodeScanner();
-                    });
-                    // Backup: también con ontouchstart para móviles
-                    closeBtn.ontouchstart = (e) => {
+                    closeBtn.onclick = (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         stopBarcodeScanner();
                     };
                 }
             }, 100);
-            
-            // Inicializar Quagga
-            setTimeout(() => {
-                Quagga.init({
-                    inputStream: {
-                        name: "Live",
-                        type: "LiveStream",
-                        target: document.querySelector('#scanner-viewport'),
-                        constraints: {
-                            facingMode: "environment",
-                            width: { min: 640 },
-                            height: { min: 480 }
-                        }
-                    },
-                    decoder: {
-                        readers: [
-                            "code_128_reader",
-                            "ean_reader",
-                            "ean_8_reader",
-                            "code_39_reader",
-                            "code_39_vin_reader",
-                            "upc_reader",
-                            "upc_e_reader"
-                        ],
-                        debug: {
-                            drawBoundingBox: true,
-                            showFrequency: true,
-                            drawScanline: true,
-                            showPattern: true
-                        }
-                    },
-                    locator: {
-                        patchSize: "medium",
-                        halfSample: true
-                    },
-                    numOfWorkers: 2,
-                    frequency: 10
-                }, function(err) {
-                    const statusEl = document.getElementById('scanner-status');
-                    
-                    if (err) {
-                        console.error('Scanner init error:', err);
-                        if (statusEl) {
-                            statusEl.innerHTML = '<div class="scanner-result scanner-error">⚠️ Error: ' + (err.message || 'No se pudo acceder a la cámara') + '</div>';
-                        }
-                        return;
-                    }
-                    
-                    if (statusEl) {
-                        statusEl.innerHTML = '<div class="scanner-instruction" style="color: var(--accent-green);">✓ Cámara lista - Escanea tu código de barras</div>';
-                    }
-                    
-                    console.log("✓ Scanner initialized");
-                    Quagga.start();
-                    scannerActive = true;
-                });
 
-                // Detectar códigos
-                Quagga.onDetected(function(result) {
-                    if (!scannerActive) return;
-                    
-                    const code = result.codeResult.code;
-                    console.log("✓ Barcode detected:", code);
-                    
-                    // Mostrar resultado
-                    const statusEl = document.getElementById('scanner-status');
-                    if (statusEl) {
-                        statusEl.innerHTML = '<div class="scanner-result">✓ Código detectado: ' + code + '</div>';
-                    }
-                    
-                    // Sonido de confirmación
-                    try {
-                        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVqzn77BdGAg+ltryy3gvBSh+zPLaizsIGGS57OihUBELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmU=');
-                        audio.play().catch(e => console.log('Audio play blocked'));
-                    } catch (e) {
-                        console.log('Audio not available');
-                    }
-                    
-                    // Vibración en dispositivos móviles
-                    if (navigator.vibrate) {
-                        navigator.vibrate(200);
-                    }
-                    
-                    // Ejecutar callback después de un breve delay
-                    setTimeout(() => {
-                        if (scannerCallback) {
-                            scannerCallback(code);
+            setTimeout(() => {
+                const modeButtons = document.querySelectorAll('.mode-button');
+                modeButtons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        currentScanMode = btn.dataset.mode;
+                        modeButtons.forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        
+                        const instruction = document.getElementById('scanner-instruction');
+                        if (currentScanMode === 'qr') {
+                            instruction.textContent = 'Enfoca el código QR en la cámara';
+                        } else {
+                            instruction.textContent = 'Enfoca el código de barras en la cámara';
                         }
-                        stopBarcodeScanner();
-                    }, 500);
+                    });
                 });
             }, 100);
+            
+            setTimeout(() => {
+                const html5QrCode = new Html5Qrcode("scanner-reader");
+                html5QrcodeScanner = html5QrCode;
+                
+                const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+                
+                html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    (decodedText, decodedResult) => {
+                        console.log(`✓ Code detected: ${decodedText}`);
+                        
+                        const statusEl = document.getElementById('scanner-status');
+                        if (statusEl) {
+                            const modeText = currentScanMode === 'qr' ? 'QR' : 'Barras';
+                            statusEl.innerHTML = `<div class="scanner-result">✓ Código ${modeText} detectado: ${decodedText}</div>`;
+                        }
+                        
+                        try {
+                            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVqzn77BdGAg+ltryy3gvBSh+zPLaizsIGGS57OihUBELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmU=');
+                            audio.play().catch(e => console.log('Audio play blocked'));
+                        } catch (e) {
+                            console.log('Audio not available');
+                        }
+                        
+                        if (navigator.vibrate) {
+                            navigator.vibrate(200);
+                        }
+                        
+                        setTimeout(() => {
+                            if (scannerCallback) {
+                                scannerCallback(decodedText);
+                            }
+                            stopBarcodeScanner();
+                        }, 500);
+                    },
+                    (errorMessage) => {
+                        // Error continuo normal
+                    }
+                ).then(() => {
+                    console.log("✓ Scanner started");
+                    const statusEl = document.getElementById('scanner-status');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<div class="scanner-instruction" style="color: var(--accent-green);">✓ Cámara lista</div>';
+                    }
+                }).catch((err) => {
+                    console.error('Scanner start error:', err);
+                    const statusEl = document.getElementById('scanner-status');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<div class="scanner-result scanner-error">⚠️ Error: ' + err + '</div>';
+                    }
+                });
+            }, 200);
         }
 
         function stopBarcodeScanner() {
             console.log('Stopping scanner...');
             
-            if (scannerActive) {
-                try {
-                    Quagga.stop();
-                } catch (e) {
-                    console.error('Error stopping Quagga:', e);
-                }
-                scannerActive = false;
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    console.log("✓ Scanner stopped");
+                    html5QrcodeScanner.clear();
+                    html5QrcodeScanner = null;
+                }).catch((err) => {
+                    console.error('Error stopping scanner:', err);
+                    html5QrcodeScanner = null;
+                });
             }
             
             const modal = document.getElementById('barcode-scanner-modal');
@@ -1774,15 +1682,6 @@
             }
             
             scannerCallback = null;
-            
-            // Remover event listener de ESC
-            document.removeEventListener('keydown', handleScannerEscape);
-        }
-
-        function handleScannerEscape(e) {
-            if (e.key === 'Escape') {
-                stopBarcodeScanner();
-            }
         }
 
         // ==========================================
@@ -3386,7 +3285,7 @@
                                     fontFamily: 'IBM Plex Mono, monospace',
                                     fontWeight: '600'
                                 } 
-                            }, 'v1.01')
+                            }, 'v1.02')
                         ),
                         e('div', { className: 'user-badges' },
                             e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
