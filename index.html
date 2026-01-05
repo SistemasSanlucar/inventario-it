@@ -1319,7 +1319,10 @@
                     TecnicoResponsable: data.tecnicoResponsable,
                     FechaAsignacion: new Date().toISOString(),
                     Estado: 'Activo',
-                    Observaciones: data.observaciones || ''
+                    Observaciones: data.observaciones || '',
+                    Foto1: data.foto1 || '',
+                    Foto2: data.foto2 || '',
+                    Foto3: data.foto3 || ''
                 });
             }
 
@@ -2293,6 +2296,7 @@
             });
             const [signature, setSignature] = useState(null);
             const [selectedProducts, setSelectedProducts] = useState([]);
+            const [capturedPhotos, setCapturedPhotos] = useState([]);
             const [isDrawing, setIsDrawing] = useState(false);
             const [loading, setLoading] = useState(false);
             const canvasRef = useRef(null);
@@ -2345,6 +2349,84 @@
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 setSignature(null);
+            };
+
+            // Funciones para captura de fotos
+            const capturePhoto = async () => {
+                if (capturedPhotos.length >= 3) {
+                    showToast('Máximo 3 fotos permitidas', 'warning');
+                    return;
+                }
+
+                try {
+                    // Crear input file para capturar foto
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.capture = 'environment'; // Usar cámara trasera en móviles
+                    
+                    input.onchange = async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        
+                        // Comprimir y convertir a Base64
+                        const base64 = await compressImage(file);
+                        setCapturedPhotos([...capturedPhotos, { data: base64, timestamp: new Date() }]);
+                        showToast(`Foto ${capturedPhotos.length + 1}/3 capturada`, 'success');
+                    };
+                    
+                    input.click();
+                } catch (error) {
+                    console.error('Error capturando foto:', error);
+                    showToast('Error al capturar foto', 'error');
+                }
+            };
+
+            const compressImage = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            // Crear canvas para comprimir
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+                            
+                            // Redimensionar si es muy grande (máximo 1200px)
+                            const maxSize = 1200;
+                            if (width > maxSize || height > maxSize) {
+                                if (width > height) {
+                                    height = (height / width) * maxSize;
+                                    width = maxSize;
+                                } else {
+                                    width = (width / height) * maxSize;
+                                    height = maxSize;
+                                }
+                            }
+                            
+                            canvas.width = width;
+                            canvas.height = height;
+                            
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            
+                            // Convertir a Base64 con 70% calidad
+                            const base64 = canvas.toDataURL('image/jpeg', 0.7);
+                            resolve(base64);
+                        };
+                        img.onerror = reject;
+                        img.src = e.target.result;
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            const removePhoto = (index) => {
+                const newPhotos = capturedPhotos.filter((_, i) => i !== index);
+                setCapturedPhotos(newPhotos);
+                showToast('Foto eliminada', 'success');
             };
 
             const handleSubmit = async (ev) => {
@@ -2461,7 +2543,10 @@
                             productosAsignados: selectedProducts,
                             firmaEmpleado: signature,
                             tecnicoResponsable: state.user.name,
-                            observaciones: formData.observaciones
+                            observaciones: formData.observaciones,
+                            foto1: capturedPhotos[0]?.data || null,
+                            foto2: capturedPhotos[1]?.data || null,
+                            foto3: capturedPhotos[2]?.data || null
                         });
 
                         showToast(`Asignación creada para ${formData.nombreEmpleado}`, 'success');
@@ -2907,6 +2992,87 @@
                                     })
                                 ),
 
+                                e('h3', { key: 'header-fotos', style: { fontSize: '16px', fontWeight: '600', margin: '24px 0 16px 0', color: 'var(--accent-purple)' } }, 
+                                    '📸 Fotos del Estado del Material (Opcional)'
+                                ),
+                                e('div', { key: 'fotos-capture', style: { marginBottom: '16px' } },
+                                    e('button', {
+                                        type: 'button',
+                                        className: 'button button-primary',
+                                        onClick: capturePhoto,
+                                        disabled: capturedPhotos.length >= 3
+                                    }, 
+                                        capturedPhotos.length >= 3 ? '✓ 3/3 Fotos' : `📷 Capturar Foto (${capturedPhotos.length}/3)`
+                                    ),
+                                    e('p', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' } },
+                                        '💡 Documenta golpes, daños o estado del equipo (máximo 3 fotos)'
+                                    )
+                                ),
+                                capturedPhotos.length > 0 && e('div', { key: 'fotos-preview', style: {
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                                    gap: '12px',
+                                    marginBottom: '16px',
+                                    padding: '16px',
+                                    background: 'var(--bg-tertiary)',
+                                    borderRadius: '8px'
+                                } },
+                                    capturedPhotos.map((photo, idx) =>
+                                        e('div', {
+                                            key: idx,
+                                            style: {
+                                                position: 'relative',
+                                                borderRadius: '8px',
+                                                overflow: 'hidden',
+                                                border: '2px solid var(--border)',
+                                                background: 'var(--bg-primary)'
+                                            }
+                                        },
+                                            e('img', {
+                                                src: photo.data,
+                                                alt: `Foto ${idx + 1}`,
+                                                style: {
+                                                    width: '100%',
+                                                    height: '150px',
+                                                    objectFit: 'cover',
+                                                    display: 'block'
+                                                }
+                                            }),
+                                            e('button', {
+                                                type: 'button',
+                                                onClick: () => removePhoto(idx),
+                                                style: {
+                                                    position: 'absolute',
+                                                    top: '4px',
+                                                    right: '4px',
+                                                    background: 'var(--accent-red)',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '50%',
+                                                    width: '28px',
+                                                    height: '28px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '18px',
+                                                    fontWeight: 'bold',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                                                }
+                                            }, '×'),
+                                            e('div', {
+                                                style: {
+                                                    padding: '8px',
+                                                    fontSize: '11px',
+                                                    color: 'var(--text-secondary)',
+                                                    textAlign: 'center',
+                                                    background: 'var(--bg-secondary)'
+                                                }
+                                            }, `Foto ${idx + 1}`)
+                                        )
+                                    )
+                                ),
+
                                 e('div', { key: 'firma-asignacion', className: 'signature-container', style: { marginTop: '24px' } },
                                     e('div', { className: 'signature-label' },
                                         '✍️ Firma del Empleado ', e('span', { className: 'required-asterisk' }, '*')
@@ -3030,6 +3196,67 @@
                         assignment.observaciones && e('div', { style: { marginBottom: '24px' } },
                             e('h3', { style: { fontSize: '16px', fontWeight: '700', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' } }, 'OBSERVACIONES'),
                             e('div', { style: { padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '13px' } }, assignment.observaciones)
+                        ),
+
+                        (assignment.foto1 || assignment.foto2 || assignment.foto3) && e('div', { style: { marginBottom: '24px' } },
+                            e('h3', { style: { fontSize: '16px', fontWeight: '700', color: 'var(--accent-purple)', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' } }, '📸 ESTADO DEL MATERIAL'),
+                            e('div', { style: { 
+                                display: 'grid', 
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                                gap: '16px',
+                                padding: '16px',
+                                background: 'var(--bg-tertiary)',
+                                borderRadius: '8px'
+                            } },
+                                assignment.foto1 && e('div', { style: { textAlign: 'center' } },
+                                    e('img', {
+                                        src: assignment.foto1,
+                                        alt: 'Foto 1',
+                                        style: {
+                                            width: '100%',
+                                            height: '200px',
+                                            objectFit: 'cover',
+                                            borderRadius: '8px',
+                                            border: '2px solid var(--border)',
+                                            marginBottom: '8px'
+                                        }
+                                    }),
+                                    e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' } }, 'Foto 1')
+                                ),
+                                assignment.foto2 && e('div', { style: { textAlign: 'center' } },
+                                    e('img', {
+                                        src: assignment.foto2,
+                                        alt: 'Foto 2',
+                                        style: {
+                                            width: '100%',
+                                            height: '200px',
+                                            objectFit: 'cover',
+                                            borderRadius: '8px',
+                                            border: '2px solid var(--border)',
+                                            marginBottom: '8px'
+                                        }
+                                    }),
+                                    e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' } }, 'Foto 2')
+                                ),
+                                assignment.foto3 && e('div', { style: { textAlign: 'center' } },
+                                    e('img', {
+                                        src: assignment.foto3,
+                                        alt: 'Foto 3',
+                                        style: {
+                                            width: '100%',
+                                            height: '200px',
+                                            objectFit: 'cover',
+                                            borderRadius: '8px',
+                                            border: '2px solid var(--border)',
+                                            marginBottom: '8px'
+                                        }
+                                    }),
+                                    e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' } }, 'Foto 3')
+                                )
+                            ),
+                            e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px', textAlign: 'center', fontStyle: 'italic' } },
+                                `Fotos capturadas el ${new Date(assignment.fechaAsignacion).toLocaleDateString('es-ES')}`
+                            )
                         ),
 
                         e('div', { style: { marginTop: '32px', paddingTop: '24px', borderTop: '2px solid var(--border)' } },
@@ -3285,7 +3512,7 @@
                                     fontFamily: 'IBM Plex Mono, monospace',
                                     fontWeight: '600'
                                 } 
-                            }, 'v1.02')
+                            }, 'v1.03')
                         ),
                         e('div', { className: 'user-badges' },
                             e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
