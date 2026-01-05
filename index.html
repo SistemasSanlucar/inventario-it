@@ -8,6 +8,7 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
@@ -936,6 +937,178 @@
             .content-section { padding: 20px; }
             .modal { margin: 0; max-height: 100vh; border-radius: 0; }
         }
+
+        /* Barcode Scanner Styles */
+        .scanner-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 10001;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .scanner-container {
+            width: 100%;
+            max-width: 640px;
+            position: relative;
+            background: var(--bg-primary);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px var(--shadow);
+        }
+
+        .scanner-header {
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .scanner-title {
+            font-size: 20px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .scanner-viewport {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #scanner-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .scanner-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+
+        .scanner-line {
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+            transform: translateY(-50%);
+            animation: scanLine 2s ease-in-out infinite;
+        }
+
+        @keyframes scanLine {
+            0%, 100% { opacity: 0.5; transform: translateY(-50%) scaleX(0.8); }
+            50% { opacity: 1; transform: translateY(-50%) scaleX(1); }
+        }
+
+        .scanner-corners {
+            position: absolute;
+            top: 20%;
+            left: 10%;
+            right: 10%;
+            bottom: 20%;
+            border: 2px solid var(--accent-blue);
+            border-radius: 12px;
+        }
+
+        .scanner-corners::before,
+        .scanner-corners::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--accent-blue);
+        }
+
+        .scanner-corners::before {
+            top: -3px;
+            left: -3px;
+            border-right: none;
+            border-bottom: none;
+            border-top-left-radius: 12px;
+        }
+
+        .scanner-corners::after {
+            bottom: -3px;
+            right: -3px;
+            border-left: none;
+            border-top: none;
+            border-bottom-right-radius: 12px;
+        }
+
+        .scanner-info {
+            padding: 24px;
+            text-align: center;
+            background: var(--bg-secondary);
+        }
+
+        .scanner-instruction {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .scanner-result {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-green);
+            font-family: 'IBM Plex Mono', monospace;
+            padding: 12px;
+            background: rgba(63, 185, 80, 0.1);
+            border-radius: 8px;
+            margin-top: 12px;
+        }
+
+        .scanner-error {
+            color: var(--accent-red);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .scanner-button {
+            padding: 10px 20px;
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .scanner-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .scanner-button-icon {
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -954,7 +1127,8 @@
                     inventario: 'StockControl_InventarioIT',
                     tecnicos: 'StockControl_TecnicosIT',
                     historial: 'StockControl_HistorialIT',
-                    admins: 'StockControl_Admins'
+                    admins: 'StockControl_Admins',
+                    asignaciones: 'StockControl_Asignaciones'
                 }
             },
             msal: {
@@ -1055,11 +1229,12 @@
 
             async loadAllData() {
                 try {
-                    const [inventario, tecnicos, historial, admins] = await Promise.all([
+                    const [inventario, tecnicos, historial, admins, asignaciones] = await Promise.all([
                         this.graph.getListItems(CONFIG.sharepoint.lists.inventario),
                         this.graph.getListItems(CONFIG.sharepoint.lists.tecnicos),
                         this.graph.getListItems(CONFIG.sharepoint.lists.historial),
-                        this.graph.getListItems(CONFIG.sharepoint.lists.admins)
+                        this.graph.getListItems(CONFIG.sharepoint.lists.admins),
+                        this.graph.getListItems(CONFIG.sharepoint.lists.asignaciones).catch(() => [])
                     ]);
 
                     return {
@@ -1090,6 +1265,21 @@
                             tecnico: item.Tecnico || '',
                             firma: item.Firma || null
                         })).sort((a, b) => new Date(b.fecha) - new Date(a.fecha)),
+                        assignments: asignaciones.map(item => ({
+                            id: item.sharePointId,
+                            nombreEmpleado: item.NombreEmpleado,
+                            emailEmpleado: item.EmailEmpleado,
+                            departamento: item.Departamento,
+                            puesto: item.Puesto,
+                            fechaIncorporacion: item.FechaIncorporacion,
+                            productosAsignados: JSON.parse(item.ProductosAsignados || '[]'),
+                            cantidadProductos: parseInt(item.CantidadProductos) || 0,
+                            firmaEmpleado: item.FirmaEmpleado,
+                            tecnicoResponsable: item.TecnicoResponsable,
+                            fechaAsignacion: item.FechaAsignacion,
+                            estado: item.Estado,
+                            observaciones: item.Observaciones || ''
+                        })).sort((a, b) => new Date(b.fechaAsignacion) - new Date(a.fechaAsignacion)),
                         admins: admins
                     };
                 } catch (error) {
@@ -1150,6 +1340,34 @@
 
             async deleteHistoryItem(itemId) {
                 await this.graph.deleteListItem(CONFIG.sharepoint.lists.historial, itemId);
+            }
+
+            async createAssignment(data) {
+                return await this.graph.createListItem(CONFIG.sharepoint.lists.asignaciones, {
+                    Title: `Asignación - ${data.nombreEmpleado} - ${new Date().toLocaleDateString('es-ES')}`,
+                    NombreEmpleado: data.nombreEmpleado,
+                    EmailEmpleado: data.emailEmpleado,
+                    Departamento: data.departamento,
+                    Puesto: data.puesto,
+                    FechaIncorporacion: data.fechaIncorporacion,
+                    ProductosAsignados: JSON.stringify(data.productosAsignados),
+                    CantidadProductos: data.productosAsignados.length,
+                    FirmaEmpleado: data.firmaEmpleado,
+                    TecnicoResponsable: data.tecnicoResponsable,
+                    FechaAsignacion: new Date().toISOString(),
+                    Estado: 'Activo',
+                    Observaciones: data.observaciones || ''
+                });
+            }
+
+            async updateAssignmentStatus(itemId, nuevoEstado) {
+                await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, itemId, {
+                    Estado: nuevoEstado
+                });
+            }
+
+            async deleteAssignment(itemId) {
+                await this.graph.deleteListItem(CONFIG.sharepoint.lists.asignaciones, itemId);
             }
         }
 
@@ -1346,7 +1564,156 @@
         }
 
         // ==========================================
-        // REACT COMPONENTS
+        // BARCODE SCANNER
+        // ==========================================
+        
+        let scannerActive = false;
+        let scannerCallback = null;
+
+        function startBarcodeScanner(callback) {
+            if (typeof Quagga === 'undefined') {
+                showToast('Escáner no disponible', 'error');
+                return;
+            }
+
+            scannerCallback = callback;
+            
+            // Crear modal del escáner
+            const modal = document.createElement('div');
+            modal.id = 'barcode-scanner-modal';
+            modal.className = 'scanner-modal';
+            modal.innerHTML = `
+                <div class="scanner-container">
+                    <div class="scanner-header">
+                        <div class="scanner-title">
+                            📷 Escáner de Código de Barras
+                        </div>
+                        <button class="modal-close" onclick="stopBarcodeScanner()">×</button>
+                    </div>
+                    <div class="scanner-viewport" id="scanner-viewport">
+                        <div class="scanner-overlay">
+                            <div class="scanner-corners"></div>
+                            <div class="scanner-line"></div>
+                        </div>
+                    </div>
+                    <div class="scanner-info">
+                        <div class="scanner-instruction">
+                            Enfoca el código de barras dentro del recuadro
+                        </div>
+                        <div id="scanner-status">Iniciando cámara...</div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Inicializar Quagga
+            setTimeout(() => {
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: document.querySelector('#scanner-viewport'),
+                        constraints: {
+                            facingMode: "environment",
+                            width: { min: 640 },
+                            height: { min: 480 }
+                        }
+                    },
+                    decoder: {
+                        readers: [
+                            "code_128_reader",
+                            "ean_reader",
+                            "ean_8_reader",
+                            "code_39_reader",
+                            "code_39_vin_reader",
+                            "upc_reader",
+                            "upc_e_reader"
+                        ],
+                        debug: {
+                            drawBoundingBox: true,
+                            showFrequency: true,
+                            drawScanline: true,
+                            showPattern: true
+                        }
+                    },
+                    locator: {
+                        patchSize: "medium",
+                        halfSample: true
+                    },
+                    numOfWorkers: 2,
+                    frequency: 10
+                }, function(err) {
+                    const statusEl = document.getElementById('scanner-status');
+                    
+                    if (err) {
+                        console.error('Scanner init error:', err);
+                        if (statusEl) {
+                            statusEl.innerHTML = '<div class="scanner-result scanner-error">⚠️ Error: ' + (err.message || 'No se pudo acceder a la cámara') + '</div>';
+                        }
+                        return;
+                    }
+                    
+                    if (statusEl) {
+                        statusEl.innerHTML = '<div class="scanner-instruction" style="color: var(--accent-green);">✓ Cámara lista - Escanea tu código de barras</div>';
+                    }
+                    
+                    console.log("✓ Scanner initialized");
+                    Quagga.start();
+                    scannerActive = true;
+                });
+
+                // Detectar códigos
+                Quagga.onDetected(function(result) {
+                    if (!scannerActive) return;
+                    
+                    const code = result.codeResult.code;
+                    console.log("✓ Barcode detected:", code);
+                    
+                    // Mostrar resultado
+                    const statusEl = document.getElementById('scanner-status');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<div class="scanner-result">✓ Código detectado: ' + code + '</div>';
+                    }
+                    
+                    // Sonido de confirmación
+                    try {
+                        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVqzn77BdGAg+ltryy3gvBSh+zPLaizsIGGS57OihUBELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmUxELTKXh8bllHAU2jdXzzn0vBSt8yvHaizwJF2K37OmmU=');
+                        audio.play().catch(e => console.log('Audio play blocked'));
+                    } catch (e) {
+                        console.log('Audio not available');
+                    }
+                    
+                    // Vibración en dispositivos móviles
+                    if (navigator.vibrate) {
+                        navigator.vibrate(200);
+                    }
+                    
+                    // Ejecutar callback después de un breve delay
+                    setTimeout(() => {
+                        if (scannerCallback) {
+                            scannerCallback(code);
+                        }
+                        stopBarcodeScanner();
+                    }, 500);
+                });
+            }, 100);
+        }
+
+        function stopBarcodeScanner() {
+            if (scannerActive) {
+                Quagga.stop();
+                scannerActive = false;
+            }
+            
+            const modal = document.getElementById('barcode-scanner-modal');
+            if (modal) {
+                modal.remove();
+            }
+            
+            scannerCallback = null;
+        }
+
         // ==========================================
         // REACT COMPONENTS
         // ==========================================
@@ -1533,6 +1900,16 @@
                             value: search,
                             onChange: (ev) => setSearch(ev.target.value)
                         }),
+                        e('button', {
+                            className: 'button button-primary',
+                            onClick: () => {
+                                startBarcodeScanner((code) => {
+                                    setSearch(code);
+                                    showToast(`Buscando: ${code}`, 'success');
+                                });
+                            },
+                            style: { padding: '12px 20px' }
+                        }, '📷 Escanear'),
                         e('select', {
                             className: 'filter-select',
                             value: filterCategory,
@@ -1545,7 +1922,7 @@
                         )
                     ),
                     e('div', { className: 'toolbar-right' },
-                        state.isAdmin && e('button', {
+                        e('button', {
                             className: 'button button-success',
                             onClick: () => onOpenModal('entrada', null)
                         }, '➕ Nuevo Producto'),
@@ -1601,11 +1978,11 @@
                                         className: 'button button-success',
                                         onClick: () => onOpenModal('entrada', item)
                                     }, '⬇️ Entrada'),
-                                    state.isAdmin && e('button', {
+                                    e('button', {
                                         className: 'button button-secondary',
                                         onClick: () => onOpenModal('editar', item)
                                     }, '✏️'),
-                                    state.isAdmin && e('button', {
+                                    e('button', {
                                         className: 'button button-danger',
                                         onClick: () => onOpenModal('eliminar-producto', item)
                                     }, '🗑️')
@@ -1707,7 +2084,7 @@
                                 e('th', null, 'Usuario'),
                                 e('th', null, 'Técnico'),
                                 e('th', { style: { width: '80px' } }, 'Firma'),
-                                state.isAdmin && e('th', { style: { width: '60px' } }, 'Acción')
+                                e('th', { style: { width: '60px' } }, 'Acción')
                             )
                         ),
                         e('tbody', null,
@@ -1734,7 +2111,7 @@
                                             }) :
                                             e('span', { style: { color: 'var(--text-secondary)', fontSize: '12px' } }, '-')
                                     ),
-                                    state.isAdmin && e('td', null,
+                                    e('td', null,
                                         e('div', {
                                             className: 'action-icon danger',
                                             onClick: () => onOpenModal('eliminar-historial', entry),
@@ -1805,6 +2182,124 @@
             );
         }
 
+        function AssignmentsView({ state, onRefresh, onOpenModal }) {
+            const [search, setSearch] = useState('');
+            const [filterDepartamento, setFilterDepartamento] = useState('all');
+            const [filterEstado, setFilterEstado] = useState('all');
+
+            const filtered = (state.assignments || []).filter(assignment => {
+                const matchesSearch = assignment.nombreEmpleado.toLowerCase().includes(search.toLowerCase()) ||
+                                    assignment.emailEmpleado.toLowerCase().includes(search.toLowerCase()) ||
+                                    assignment.puesto.toLowerCase().includes(search.toLowerCase());
+                const matchesDept = filterDepartamento === 'all' || assignment.departamento === filterDepartamento;
+                const matchesEstado = filterEstado === 'all' || assignment.estado === filterEstado;
+                return matchesSearch && matchesDept && matchesEstado;
+            });
+
+            const departamentos = [...new Set((state.assignments || []).map(a => a.departamento))].filter(Boolean);
+
+            return e('div', null,
+                e('div', { className: 'toolbar' },
+                    e('div', { className: 'toolbar-left' },
+                        e('input', {
+                            type: 'text',
+                            className: 'search-bar',
+                            placeholder: '🔍 Buscar asignaciones...',
+                            value: search,
+                            onChange: (ev) => setSearch(ev.target.value)
+                        }),
+                        e('select', {
+                            className: 'filter-select',
+                            value: filterDepartamento,
+                            onChange: (ev) => setFilterDepartamento(ev.target.value)
+                        },
+                            e('option', { value: 'all' }, 'Todos los departamentos'),
+                            departamentos.map(dept =>
+                                e('option', { key: dept, value: dept }, dept)
+                            )
+                        ),
+                        e('select', {
+                            className: 'filter-select',
+                            value: filterEstado,
+                            onChange: (ev) => setFilterEstado(ev.target.value)
+                        },
+                            e('option', { value: 'all' }, 'Todos los estados'),
+                            e('option', { value: 'Activo' }, 'Activo'),
+                            e('option', { value: 'Devuelto' }, 'Devuelto'),
+                            e('option', { value: 'Parcial' }, 'Parcial')
+                        )
+                    ),
+                    e('div', { className: 'toolbar-right' },
+                        e('button', {
+                            className: 'button button-success',
+                            onClick: () => onOpenModal('nueva-asignacion', null)
+                        }, '➕ Nueva Asignación'),
+                        e('button', {
+                            className: 'button button-secondary',
+                            onClick: () => exportToCSV(filtered, 'asignaciones')
+                        }, '📥 Exportar')
+                    )
+                ),
+                
+                filtered.length > 0 ?
+                    e('table', { className: 'history-table' },
+                        e('thead', null,
+                            e('tr', null,
+                                e('th', { style: { width: '140px' } }, 'Fecha'),
+                                e('th', null, 'Empleado'),
+                                e('th', null, 'Departamento'),
+                                e('th', null, 'Puesto'),
+                                e('th', { style: { width: '100px' } }, 'Productos'),
+                                e('th', { style: { width: '100px' } }, 'Estado'),
+                                e('th', { style: { width: '120px' } }, 'Acciones')
+                            )
+                        ),
+                        e('tbody', null,
+                            filtered.map(assignment =>
+                                e('tr', { key: assignment.id },
+                                    e('td', { style: { fontFamily: 'IBM Plex Mono, monospace', fontSize: '12px' } },
+                                        new Date(assignment.fechaAsignacion).toLocaleDateString('es-ES')
+                                    ),
+                                    e('td', null,
+                                        e('div', { style: { fontWeight: '600' } }, assignment.nombreEmpleado),
+                                        e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, assignment.emailEmpleado)
+                                    ),
+                                    e('td', null, assignment.departamento),
+                                    e('td', null, assignment.puesto),
+                                    e('td', { style: { textAlign: 'center', fontFamily: 'IBM Plex Mono, monospace', fontWeight: '700' } },
+                                        assignment.cantidadProductos
+                                    ),
+                                    e('td', null,
+                                        e('span', {
+                                            className: `movement-badge ${assignment.estado === 'Activo' ? 'Entrada' : assignment.estado === 'Devuelto' ? 'Devolucion' : 'Salida'}`
+                                        }, assignment.estado)
+                                    ),
+                                    e('td', null,
+                                        e('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center' } },
+                                            e('div', {
+                                                className: 'action-icon',
+                                                onClick: () => onOpenModal('ver-asignacion', assignment),
+                                                title: 'Ver documento'
+                                            }, '📄'),
+                                            assignment.estado === 'Activo' && e('div', {
+                                                className: 'action-icon',
+                                                onClick: () => onOpenModal('devolver-material', assignment),
+                                                title: 'Devolver material'
+                                            }, '↩️')
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ) :
+                    e('div', { className: 'empty-state' },
+                        e('div', { className: 'empty-state-icon' }, '📄'),
+                        e('div', { className: 'empty-state-title' }, 'No hay asignaciones'),
+                        e('div', { className: 'empty-state-text' }, 'Crea la primera asignación de material')
+                    )
+            );
+        }
+
         function FormModal({ state, modalType, selectedItem, onClose, onSubmit, onRefresh }) {
             const [formData, setFormData] = useState({
                 nombre: selectedItem?.nombre || '',
@@ -1818,15 +2313,22 @@
                 usuario: '',
                 nombreTecnico: '',
                 emailTecnico: '',
-                codigoTecnico: ''
+                codigoTecnico: '',
+                nombreEmpleado: '',
+                emailEmpleado: '',
+                departamento: '',
+                puesto: '',
+                fechaIncorporacion: '',
+                observaciones: ''
             });
             const [signature, setSignature] = useState(null);
+            const [selectedProducts, setSelectedProducts] = useState([]);
             const [isDrawing, setIsDrawing] = useState(false);
             const [loading, setLoading] = useState(false);
             const canvasRef = useRef(null);
 
             useEffect(() => {
-                if (canvasRef.current && modalType === 'salida') {
+                if (canvasRef.current && (modalType === 'salida' || modalType === 'nueva-asignacion')) {
                     const canvas = canvasRef.current;
                     canvas.width = canvas.offsetWidth;
                     canvas.height = canvas.offsetHeight;
@@ -1948,6 +2450,51 @@
                             email: formData.emailTecnico
                         });
                         showToast('Técnico añadido correctamente', 'success');
+                    } else if (modalType === 'nueva-asignacion') {
+                        if (!signature) {
+                            showToast('La firma del empleado es obligatoria', 'error');
+                            return;
+                        }
+                        if (selectedProducts.length === 0) {
+                            showToast('Debes seleccionar al menos un producto', 'error');
+                            return;
+                        }
+
+                        // Actualizar stock de cada producto
+                        for (const prod of selectedProducts) {
+                            const producto = state.inventory.find(p => p.id === prod.id);
+                            if (producto) {
+                                const nuevoStock = Math.max(0, producto.stock - 1);
+                                await dataManager.updateInventoryItem(producto.id, {
+                                    Stock: nuevoStock
+                                });
+                                
+                                // Registrar en historial
+                                await dataManager.addToHistory({
+                                    tipo: 'Asignacion',
+                                    producto: producto.nombre,
+                                    cantidad: 1,
+                                    usuario: formData.nombreEmpleado,
+                                    tecnico: state.user.name,
+                                    firma: signature
+                                });
+                            }
+                        }
+
+                        // Crear asignación
+                        await dataManager.createAssignment({
+                            nombreEmpleado: formData.nombreEmpleado,
+                            emailEmpleado: formData.emailEmpleado,
+                            departamento: formData.departamento,
+                            puesto: formData.puesto,
+                            fechaIncorporacion: formData.fechaIncorporacion,
+                            productosAsignados: selectedProducts,
+                            firmaEmpleado: signature,
+                            tecnicoResponsable: state.user.name,
+                            observaciones: formData.observaciones
+                        });
+
+                        showToast(`Asignación creada para ${formData.nombreEmpleado}`, 'success');
                     }
 
                     await onRefresh();
@@ -1966,6 +2513,9 @@
                 if (modalType === 'devolucion') return 'Registrar Devolución';
                 if (modalType === 'editar') return 'Editar Producto';
                 if (modalType === 'tecnico') return 'Nuevo Técnico';
+                if (modalType === 'nueva-asignacion') return '📄 Nueva Asignación de Material';
+                if (modalType === 'ver-asignacion') return '📄 Documento de Asignación';
+                if (modalType === 'devolver-material') return '↩️ Devolución de Material';
                 return 'Formulario';
             };
 
@@ -2042,13 +2592,27 @@
                                 e('div', { key: 'row2', className: 'form-row' },
                                     modalType !== 'editar' && e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Código de Barras *'),
-                                        e('input', {
-                                            type: 'text',
-                                            className: 'form-input',
-                                            value: formData.barcode,
-                                            onChange: (ev) => setFormData({...formData, barcode: ev.target.value}),
-                                            required: true
-                                        })
+                                        e('div', { style: { display: 'flex', gap: '8px' } },
+                                            e('input', {
+                                                type: 'text',
+                                                className: 'form-input',
+                                                value: formData.barcode,
+                                                onChange: (ev) => setFormData({...formData, barcode: ev.target.value}),
+                                                required: true,
+                                                style: { flex: 1 }
+                                            }),
+                                            e('button', {
+                                                type: 'button',
+                                                className: 'button button-primary',
+                                                onClick: () => {
+                                                    startBarcodeScanner((code) => {
+                                                        setFormData({...formData, barcode: code});
+                                                        showToast('Código escaneado: ' + code, 'success');
+                                                    });
+                                                },
+                                                style: { padding: '12px 16px', minWidth: 'auto' }
+                                            }, '📷')
+                                        )
                                     ),
                                     e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Ubicación'),
@@ -2229,6 +2793,177 @@
                                         '💡 El empleado debe firmar con el dedo o Apple Pencil'
                                     )
                                 )
+                            ],
+
+                            modalType === 'nueva-asignacion' && [
+                                e('h3', { key: 'header-empleado', style: { fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--accent-blue)' } }, 
+                                    '👤 Datos del Empleado'
+                                ),
+                                e('div', { key: 'row-empleado1', className: 'form-row' },
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Nombre Completo *'),
+                                        e('input', {
+                                            type: 'text',
+                                            className: 'form-input',
+                                            value: formData.nombreEmpleado,
+                                            onChange: (ev) => setFormData({...formData, nombreEmpleado: ev.target.value}),
+                                            required: true
+                                        })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Email Corporativo *'),
+                                        e('input', {
+                                            type: 'email',
+                                            className: 'form-input',
+                                            value: formData.emailEmpleado,
+                                            onChange: (ev) => setFormData({...formData, emailEmpleado: ev.target.value}),
+                                            required: true
+                                        })
+                                    )
+                                ),
+                                e('div', { key: 'row-empleado2', className: 'form-row' },
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Departamento *'),
+                                        e('select', {
+                                            className: 'form-select',
+                                            value: formData.departamento,
+                                            onChange: (ev) => setFormData({...formData, departamento: ev.target.value}),
+                                            required: true
+                                        },
+                                            e('option', { value: '' }, 'Seleccionar...'),
+                                            ['IT', 'RRHH', 'Ventas', 'Marketing', 'Finanzas', 'Operaciones', 'Logística'].map(dept =>
+                                                e('option', { key: dept, value: dept }, dept)
+                                            )
+                                        )
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Puesto *'),
+                                        e('input', {
+                                            type: 'text',
+                                            className: 'form-input',
+                                            value: formData.puesto,
+                                            onChange: (ev) => setFormData({...formData, puesto: ev.target.value}),
+                                            required: true
+                                        })
+                                    )
+                                ),
+                                e('div', { key: 'fecha-incorporacion', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Fecha de Incorporación *'),
+                                    e('input', {
+                                        type: 'date',
+                                        className: 'form-input',
+                                        value: formData.fechaIncorporacion,
+                                        onChange: (ev) => setFormData({...formData, fechaIncorporacion: ev.target.value}),
+                                        required: true
+                                    })
+                                ),
+
+                                e('h3', { key: 'header-productos', style: { fontSize: '16px', fontWeight: '600', margin: '24px 0 16px 0', color: 'var(--accent-green)' } }, 
+                                    '📦 Material Asignado'
+                                ),
+                                e('div', { key: 'productos-selector', style: { marginBottom: '16px' } },
+                                    e('button', {
+                                        type: 'button',
+                                        className: 'button button-primary',
+                                        onClick: () => {
+                                            startBarcodeScanner((code) => {
+                                                const producto = state.inventory.find(p => p.barcode === code);
+                                                if (producto && producto.stock > 0) {
+                                                    if (!selectedProducts.find(p => p.id === producto.id)) {
+                                                        setSelectedProducts([...selectedProducts, producto]);
+                                                        showToast(`${producto.nombre} añadido`, 'success');
+                                                    } else {
+                                                        showToast('Producto ya añadido', 'warning');
+                                                    }
+                                                } else {
+                                                    showToast('Producto no encontrado o sin stock', 'error');
+                                                }
+                                            });
+                                        }
+                                    }, '📷 Escanear Producto')
+                                ),
+                                e('div', { key: 'productos-list', style: { 
+                                    background: 'var(--bg-primary)', 
+                                    border: '2px solid var(--border)', 
+                                    borderRadius: '8px', 
+                                    padding: '16px',
+                                    maxHeight: '200px',
+                                    overflowY: 'auto'
+                                } },
+                                    selectedProducts.length > 0 ?
+                                        selectedProducts.map((prod, idx) =>
+                                            e('div', {
+                                                key: idx,
+                                                style: {
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    padding: '8px 12px',
+                                                    background: 'var(--bg-secondary)',
+                                                    borderRadius: '6px',
+                                                    marginBottom: idx < selectedProducts.length - 1 ? '8px' : '0'
+                                                }
+                                            },
+                                                e('div', null,
+                                                    e('div', { style: { fontWeight: '600', fontSize: '14px' } }, prod.nombre),
+                                                    e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, prod.categoria)
+                                                ),
+                                                e('button', {
+                                                    type: 'button',
+                                                    onClick: () => setSelectedProducts(selectedProducts.filter((_, i) => i !== idx)),
+                                                    style: {
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        color: 'var(--accent-red)',
+                                                        cursor: 'pointer',
+                                                        fontSize: '18px',
+                                                        padding: '4px 8px'
+                                                    }
+                                                }, '×')
+                                            )
+                                        ) :
+                                        e('div', { style: { textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' } },
+                                            '📦 Escanea productos para añadir'
+                                        )
+                                ),
+
+                                e('div', { key: 'observaciones', className: 'form-group', style: { marginTop: '16px' } },
+                                    e('label', { className: 'form-label' }, 'Observaciones'),
+                                    e('textarea', {
+                                        className: 'form-textarea',
+                                        value: formData.observaciones,
+                                        onChange: (ev) => setFormData({...formData, observaciones: ev.target.value}),
+                                        placeholder: 'Notas adicionales...'
+                                    })
+                                ),
+
+                                e('div', { key: 'firma-asignacion', className: 'signature-container', style: { marginTop: '24px' } },
+                                    e('div', { className: 'signature-label' },
+                                        '✍️ Firma del Empleado ', e('span', { className: 'required-asterisk' }, '*')
+                                    ),
+                                    e('canvas', {
+                                        ref: canvasRef,
+                                        className: 'signature-canvas',
+                                        style: { height: '250px' },
+                                        onMouseDown: startDrawing,
+                                        onMouseMove: draw,
+                                        onMouseUp: stopDrawing,
+                                        onMouseLeave: stopDrawing,
+                                        onTouchStart: startDrawing,
+                                        onTouchMove: draw,
+                                        onTouchEnd: stopDrawing
+                                    }),
+                                    e('div', { className: 'signature-actions' },
+                                        e('button', {
+                                            type: 'button',
+                                            className: 'button button-secondary',
+                                            onClick: clearSignature
+                                        }, '🗑️ Limpiar Firma')
+                                    ),
+                                    e('p', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' } },
+                                        '💡 El empleado debe firmar con el dedo o Apple Pencil para confirmar la recepción del material'
+                                    )
+                                )
                             ]
                         ),
 
@@ -2241,6 +2976,7 @@
                                     modalType === 'salida' ? 'button-primary' : 
                                     modalType === 'devolucion' ? 'button-warning' :
                                     modalType === 'editar' ? 'button-purple' :
+                                    modalType === 'nueva-asignacion' ? 'button-success' :
                                     'button-success'
                                 }`,
                                 disabled: loading
@@ -2251,9 +2987,122 @@
                                 modalType === 'salida' ? 'Registrar Salida' : 
                                 modalType === 'devolucion' ? 'Registrar Devolución' :
                                 modalType === 'editar' ? 'Guardar Cambios' :
+                                modalType === 'nueva-asignacion' ? '📄 Crear Asignación' :
                                 'Crear Técnico'
                             )
                         )
+                    )
+                )
+            );
+        }
+
+        function AssignmentDocumentModal({ assignment, onClose }) {
+            if (!assignment) return null;
+
+            return e('div', { className: 'modal-overlay', onClick: onClose },
+                e('div', { className: 'modal', style: { maxWidth: '800px' }, onClick: (ev) => ev.stopPropagation() },
+                    e('div', { className: 'modal-header' },
+                        e('h2', { className: 'modal-title' }, '📄 Documento de Asignación'),
+                        e('button', { className: 'modal-close', onClick: onClose }, '×')
+                    ),
+                    
+                    e('div', { className: 'modal-body', style: { fontSize: '14px', lineHeight: '1.8' } },
+                        e('div', { style: { textAlign: 'center', marginBottom: '32px', paddingBottom: '24px', borderBottom: '2px solid var(--border)' } },
+                            e('h1', { style: { fontSize: '24px', marginBottom: '8px' } }, '🏢 SANLUCAR FRUIT'),
+                            e('h2', { style: { fontSize: '16px', color: 'var(--accent-purple)', fontWeight: '600' } }, 'ACTA DE ASIGNACIÓN DE MATERIAL IT')
+                        ),
+
+                        e('div', { style: { marginBottom: '24px' } },
+                            e('h3', { style: { fontSize: '16px', fontWeight: '700', color: 'var(--accent-blue)', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' } }, 'DATOS DEL EMPLEADO'),
+                            e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } },
+                                e('div', null, e('strong', null, 'Nombre: '), assignment.nombreEmpleado),
+                                e('div', null, e('strong', null, 'Email: '), assignment.emailEmpleado),
+                                e('div', null, e('strong', null, 'Departamento: '), assignment.departamento),
+                                e('div', null, e('strong', null, 'Puesto: '), assignment.puesto),
+                                e('div', null, e('strong', null, 'Fecha Alta: '), new Date(assignment.fechaIncorporacion).toLocaleDateString('es-ES'))
+                            )
+                        ),
+
+                        e('div', { style: { marginBottom: '24px' } },
+                            e('h3', { style: { fontSize: '16px', fontWeight: '700', color: 'var(--accent-green)', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' } }, 'MATERIAL ASIGNADO'),
+                            e('div', { style: { padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } },
+                                assignment.productosAsignados.map((prod, idx) =>
+                                    e('div', {
+                                        key: idx,
+                                        style: {
+                                            padding: '12px',
+                                            background: 'var(--bg-primary)',
+                                            borderRadius: '6px',
+                                            marginBottom: idx < assignment.productosAsignados.length - 1 ? '8px' : '0'
+                                        }
+                                    },
+                                        e('div', { style: { fontWeight: '600' } }, `${idx + 1}. ${prod.nombre}`),
+                                        e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, `Código: ${prod.barcode} | Categoría: ${prod.categoria}`)
+                                    )
+                                )
+                            )
+                        ),
+
+                        e('div', { style: { marginBottom: '24px', padding: '16px', background: 'rgba(249, 115, 22, 0.1)', border: '1px solid var(--accent-orange)', borderRadius: '8px' } },
+                            e('h3', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--accent-orange)', marginBottom: '12px' } }, 'CONDICIONES DE USO'),
+                            e('div', { style: { fontSize: '13px', lineHeight: '1.6' } },
+                                'El empleado declara haber recibido el material en perfecto estado y se compromete a:',
+                                e('ul', { style: { marginTop: '8px', marginLeft: '20px' } },
+                                    e('li', null, 'Hacer un uso adecuado del mismo'),
+                                    e('li', null, 'Mantenerlo en buen estado de conservación'),
+                                    e('li', null, 'Devolverlo cuando finalice su relación laboral'),
+                                    e('li', null, 'Notificar cualquier incidencia o daño'),
+                                    e('li', null, 'No ceder el material a terceros')
+                                )
+                            )
+                        ),
+
+                        assignment.observaciones && e('div', { style: { marginBottom: '24px' } },
+                            e('h3', { style: { fontSize: '16px', fontWeight: '700', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' } }, 'OBSERVACIONES'),
+                            e('div', { style: { padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '13px' } }, assignment.observaciones)
+                        ),
+
+                        e('div', { style: { marginTop: '32px', paddingTop: '24px', borderTop: '2px solid var(--border)' } },
+                            e('h3', { style: { fontSize: '16px', fontWeight: '700', marginBottom: '16px' } }, 'FIRMAS'),
+                            e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' } },
+                                e('div', { style: { textAlign: 'center' } },
+                                    e('div', { style: { marginBottom: '12px' } },
+                                        assignment.firmaEmpleado && e('img', {
+                                            src: assignment.firmaEmpleado,
+                                            alt: 'Firma empleado',
+                                            style: { maxWidth: '200px', maxHeight: '100px', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px', background: 'white' }
+                                        })
+                                    ),
+                                    e('div', { style: { fontWeight: '600' } }, 'Empleado'),
+                                    e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, assignment.nombreEmpleado)
+                                ),
+                                e('div', { style: { textAlign: 'center' } },
+                                    e('div', { style: { marginBottom: '12px', height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                                        e('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--accent-blue)' } }, '✓ Verificado')
+                                    ),
+                                    e('div', { style: { fontWeight: '600' } }, 'Técnico IT'),
+                                    e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, assignment.tecnicoResponsable)
+                                )
+                            ),
+                            e('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '12px', color: 'var(--text-secondary)' } },
+                                `Fecha de asignación: ${new Date(assignment.fechaAsignacion).toLocaleString('es-ES')} | Sanlucar Fruit`
+                            )
+                        )
+                    ),
+
+                    e('div', { className: 'modal-footer' },
+                        e('button', {
+                            type: 'button',
+                            className: 'button button-secondary',
+                            onClick: onClose
+                        }, 'Cerrar'),
+                        e('button', {
+                            type: 'button',
+                            className: 'button button-primary',
+                            onClick: () => {
+                                window.print();
+                            }
+                        }, '🖨️ Imprimir / Guardar PDF')
                     )
                 )
             );
@@ -2296,6 +3145,7 @@
                 inventory: [],
                 technicians: [],
                 history: [],
+                assignments: [],
                 activeTab: 'dashboard',
                 loading: true,
                 modalType: null,
@@ -2343,6 +3193,7 @@
                         inventory: data.inventory,
                         technicians: data.technicians,
                         history: data.history,
+                        assignments: data.assignments,
                         loading: false
                     });
 
@@ -2477,13 +3328,16 @@
                 ),
 
                 e('nav', { className: 'nav-tabs' },
-                    ['dashboard', 'inventario', 'historial'].map(tab =>
+                    ['dashboard', 'inventario', 'asignaciones', 'historial'].map(tab =>
                         e('button', {
                             key: tab,
                             className: `tab-button ${state.activeTab === tab ? 'active' : ''}`,
                             onClick: () => setState({ ...state, activeTab: tab })
                         },
-                            tab === 'dashboard' ? '📊' : tab === 'inventario' ? '📋' : '📜',
+                            tab === 'dashboard' ? '📊' : 
+                            tab === 'inventario' ? '📋' : 
+                            tab === 'asignaciones' ? '📄' :
+                            '📜',
                             ' ',
                             tab.charAt(0).toUpperCase() + tab.slice(1)
                         )
@@ -2501,6 +3355,11 @@
                         onRefresh: initializeApp,
                         onOpenModal: handleOpenModal
                     }),
+                    state.activeTab === 'asignaciones' && e(AssignmentsView, {
+                        state,
+                        onRefresh: initializeApp,
+                        onOpenModal: handleOpenModal
+                    }),
                     state.activeTab === 'historial' && e(HistoryView, {
                         state,
                         onRefresh: initializeApp,
@@ -2513,13 +3372,19 @@
                     })
                 ),
 
-                state.modalType && !state.showConfirm && ['entrada', 'salida', 'devolucion', 'editar', 'tecnico'].includes(state.modalType) &&
+                state.modalType && !state.showConfirm && ['entrada', 'salida', 'devolucion', 'editar', 'tecnico', 'nueva-asignacion'].includes(state.modalType) &&
                     e(FormModal, {
                         state,
                         modalType: state.modalType,
                         selectedItem: state.selectedItem,
                         onClose: handleCloseModal,
                         onRefresh: initializeApp
+                    }),
+
+                state.modalType === 'ver-asignacion' && state.selectedItem &&
+                    e(AssignmentDocumentModal, {
+                        assignment: state.selectedItem,
+                        onClose: handleCloseModal
                     }),
 
                 state.showConfirm && e(ConfirmModal, {
