@@ -1110,6 +1110,31 @@
         .scanner-button-icon {
             font-size: 16px;
         }
+
+        /* Scanner close button - High priority */
+        #scanner-close-btn {
+            position: relative;
+            z-index: 999999;
+            background: var(--accent-red) !important;
+            color: white !important;
+            font-size: 32px !important;
+            width: 48px !important;
+            height: 48px !important;
+            border-radius: 50% !important;
+            font-weight: bold !important;
+            cursor: pointer !important;
+            border: 3px solid white !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+        }
+
+        #scanner-close-btn:hover {
+            background: #dc2626 !important;
+            transform: scale(1.1);
+        }
+
+        #scanner-close-btn:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body>
@@ -1589,7 +1614,7 @@
                         <div class="scanner-title">
                             📷 Escáner de Código de Barras
                         </div>
-                        <button class="modal-close" id="scanner-close-btn">×</button>
+                        <button class="modal-close" id="scanner-close-btn" type="button">×</button>
                     </div>
                     <div class="scanner-viewport" id="scanner-viewport">
                         <div class="scanner-overlay">
@@ -1608,17 +1633,35 @@
             
             document.body.appendChild(modal);
             
-            // Event listener para cerrar al hacer click fuera
-            modal.addEventListener('click', stopBarcodeScanner);
+            // Event listener para ESC
+            document.addEventListener('keydown', handleScannerEscape);
             
-            // Event listener para el botón cerrar
-            const closeBtn = document.getElementById('scanner-close-btn');
-            if (closeBtn) {
-                closeBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    stopBarcodeScanner();
+            // Event listener para cerrar al hacer click fuera - usar setTimeout para asegurar que se registra
+            setTimeout(() => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        stopBarcodeScanner();
+                    }
                 });
-            }
+            }, 100);
+            
+            // Event listener para el botón cerrar - con setTimeout para asegurar que existe
+            setTimeout(() => {
+                const closeBtn = document.getElementById('scanner-close-btn');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        stopBarcodeScanner();
+                    });
+                    // Backup: también con ontouchstart para móviles
+                    closeBtn.ontouchstart = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        stopBarcodeScanner();
+                    };
+                }
+            }, 100);
             
             // Inicializar Quagga
             setTimeout(() => {
@@ -1714,8 +1757,14 @@
         }
 
         function stopBarcodeScanner() {
+            console.log('Stopping scanner...');
+            
             if (scannerActive) {
-                Quagga.stop();
+                try {
+                    Quagga.stop();
+                } catch (e) {
+                    console.error('Error stopping Quagga:', e);
+                }
                 scannerActive = false;
             }
             
@@ -1725,6 +1774,15 @@
             }
             
             scannerCallback = null;
+            
+            // Remover event listener de ESC
+            document.removeEventListener('keydown', handleScannerEscape);
+        }
+
+        function handleScannerEscape(e) {
+            if (e.key === 'Escape') {
+                stopBarcodeScanner();
+            }
         }
 
         // ==========================================
@@ -3316,7 +3374,20 @@
             return e('div', { className: 'app-container' },
                 e('header', { className: 'header' },
                     e('div', { className: 'header-left' },
-                        e('h1', null, 'Sistema de Inventario IT'),
+                        e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
+                            e('h1', null, 'Sistema de Inventario IT'),
+                            e('span', { 
+                                style: { 
+                                    fontSize: '12px', 
+                                    padding: '4px 8px', 
+                                    background: 'rgba(88, 166, 255, 0.15)', 
+                                    color: 'var(--accent-blue)', 
+                                    borderRadius: '6px',
+                                    fontFamily: 'IBM Plex Mono, monospace',
+                                    fontWeight: '600'
+                                } 
+                            }, 'v1.01')
+                        ),
                         e('div', { className: 'user-badges' },
                             e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
                                 state.isAdmin ? '👑 Admin' : '👤 Técnico', ': ', state.user.name
