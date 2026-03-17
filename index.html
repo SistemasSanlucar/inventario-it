@@ -732,6 +732,11 @@
             background: var(--bg-tertiary);
         }
 
+        .user-search-item:hover,
+        .user-search-item:active {
+            background: var(--bg-tertiary) !important;
+        }
+
         .modal-body {
             padding: 32px;
         }
@@ -2658,18 +2663,20 @@
                             showToast(`${formData.cantidad} unidades añadidas`, 'success');
                         } else {
                             // Crear producto nuevo
-                            await dataManager.createInventoryItem({
+                            console.log('Creando producto:', formData);
+                            const newProduct = await dataManager.createInventoryItem({
                                 nombre: formData.nombre,
                                 categoria: formData.categoria,
                                 barcode: formData.barcode,
-                                stock: parseInt(formData.stock),
-                                stockMinimo: parseInt(formData.stockMinimo),
-                                ubicacion: formData.ubicacion
+                                stock: parseInt(formData.stock) || 0,
+                                stockMinimo: parseInt(formData.stockMinimo) || 0,
+                                ubicacion: formData.ubicacion || ''
                             });
+                            console.log('Producto creado:', newProduct);
                             await dataManager.addToHistory({
                                 tipo: 'Entrada',
                                 producto: formData.nombre,
-                                cantidad: parseInt(formData.stock),
+                                cantidad: parseInt(formData.stock) || 0,
                                 tecnico: state.user.name
                             });
                             showToast(`Producto "${formData.nombre}" añadido`, 'success');
@@ -2758,8 +2765,8 @@
                     await onRefresh();
                     onClose();
                 } catch (error) {
-                    console.error('Error:', error);
-                    showToast('Error al guardar. Intenta de nuevo.', 'error');
+                    console.error('Error completo:', error);
+                    showToast(`Error: ${error.message || 'Error desconocido'}`, 'error');
                 } finally {
                     setLoading(false);
                 }
@@ -3130,23 +3137,24 @@
                                                 e('div', {
                                                     key: user.id || idx,
                                                     onClick: () => selectUser(user),
+                                                    onTouchEnd: (ev) => { ev.preventDefault(); selectUser(user); },
+                                                    className: 'user-search-item',
                                                     style: {
                                                         padding: '12px 16px',
                                                         cursor: 'pointer',
                                                         borderBottom: '1px solid var(--border)',
-                                                        transition: 'background 0.2s'
-                                                    },
-                                                    onMouseEnter: (ev) => ev.target.style.background = 'var(--bg-tertiary)',
-                                                    onMouseLeave: (ev) => ev.target.style.background = 'transparent'
+                                                        transition: 'background 0.2s',
+                                                        WebkitTapHighlightColor: 'rgba(88, 166, 255, 0.3)'
+                                                    }
                                                 },
-                                                    e('div', { style: { fontWeight: '600', marginBottom: '4px' } }, 
+                                                    e('div', { style: { fontWeight: '600', marginBottom: '4px', pointerEvents: 'none' } }, 
                                                         '👤 ', user.displayName
                                                     ),
-                                                    e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, 
+                                                    e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', pointerEvents: 'none' } }, 
                                                         user.mail || 'Sin email'
                                                     ),
                                                     (user.department || user.jobTitle) && e('div', { 
-                                                        style: { fontSize: '11px', color: 'var(--accent-blue)', marginTop: '2px' } 
+                                                        style: { fontSize: '11px', color: 'var(--accent-blue)', marginTop: '2px', pointerEvents: 'none' } 
                                                     }, 
                                                         [user.department, user.jobTitle].filter(Boolean).join(' • ')
                                                     )
@@ -3858,7 +3866,7 @@
                                     fontFamily: 'IBM Plex Mono, monospace',
                                     fontWeight: '600'
                                 } 
-                            }, 'v1.4.2')
+                            }, 'v1.4.3')
                         ),
                         e('div', { className: 'user-badges' },
                             e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
