@@ -1191,16 +1191,20 @@
                 try {
                     // Buscar usuarios en Azure AD
                     const endpoint = `/users?$filter=startswith(displayName,'${searchTerm}') or startswith(givenName,'${searchTerm}') or startswith(surname,'${searchTerm}')&$select=id,displayName,mail,department,jobTitle&$top=10`;
+                    console.log('Buscando usuarios con endpoint:', endpoint);
                     const result = await this.request(endpoint);
+                    console.log('Resultados de búsqueda:', JSON.stringify(result.value, null, 2));
                     return result.value || [];
                 } catch (error) {
                     console.error('Error buscando usuarios:', error);
                     // Fallback: buscar con $search si $filter falla
                     try {
                         const searchEndpoint = `/users?$search="displayName:${searchTerm}"&$select=id,displayName,mail,department,jobTitle&$top=10`;
+                        console.log('Usando búsqueda fallback:', searchEndpoint);
                         const searchResult = await this.request(searchEndpoint, {
                             headers: { 'ConsistencyLevel': 'eventual' }
                         });
+                        console.log('Resultados fallback:', JSON.stringify(searchResult.value, null, 2));
                         return searchResult.value || [];
                     } catch (e) {
                         console.error('Error en búsqueda fallback:', e);
@@ -2585,16 +2589,27 @@
 
             // Función para seleccionar un usuario del dropdown
             const selectUser = (user) => {
-                setFormData({
+                console.log('=== USUARIO SELECCIONADO ===');
+                console.log('Datos completos:', JSON.stringify(user, null, 2));
+                console.log('displayName:', user.displayName);
+                console.log('mail:', user.mail);
+                console.log('department:', user.department);
+                console.log('jobTitle:', user.jobTitle);
+                
+                const newFormData = {
                     ...formData,
                     nombreEmpleado: user.displayName || '',
                     emailEmpleado: user.mail || '',
                     departamento: user.department || '',
                     puesto: user.jobTitle || ''
-                });
+                };
+                
+                console.log('Nuevo formData:', newFormData);
+                
+                setFormData(newFormData);
                 setShowUserDropdown(false);
                 setUserSearchResults([]);
-                setUserSelectedFromAD(true); // Marcar que viene del AD
+                setUserSelectedFromAD(true);
 
                 // Cargar material ya asignado a este empleado
                 if (user.mail && state.assignments) {
@@ -3866,7 +3881,7 @@
                                     fontFamily: 'IBM Plex Mono, monospace',
                                     fontWeight: '600'
                                 } 
-                            }, 'v1.4.3')
+                            }, 'v1.4.4')
                         ),
                         e('div', { className: 'user-badges' },
                             e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
