@@ -2404,7 +2404,7 @@
                 emailEmpleado: '',
                 departamento: '',
                 puesto: '',
-                fechaIncorporacion: '',
+                fechaIncorporacion: new Date().toISOString().split('T')[0],
                 observaciones: ''
             });
             const [signature, setSignature] = useState(null);
@@ -3858,7 +3858,7 @@
                                     fontFamily: 'IBM Plex Mono, monospace',
                                     fontWeight: '600'
                                 } 
-                            }, 'v1.04')
+                            }, 'v1.4.2')
                         ),
                         e('div', { className: 'user-badges' },
                             e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
