@@ -2419,6 +2419,7 @@
             const [showUserDropdown, setShowUserDropdown] = useState(false);
             const [searchingUsers, setSearchingUsers] = useState(false);
             const [employeeAssignments, setEmployeeAssignments] = useState({ active: [], returned: [], all: [] });
+            const [userSelectedFromAD, setUserSelectedFromAD] = useState(false);
             const userSearchTimeout = useRef(null);
 
             useEffect(() => {
@@ -2588,11 +2589,30 @@
                 });
                 setShowUserDropdown(false);
                 setUserSearchResults([]);
+                setUserSelectedFromAD(true); // Marcar que viene del AD
 
                 // Cargar material ya asignado a este empleado
                 if (user.mail && state.assignments) {
                     const assignments = dataManager.getEmployeeAssignments(state.assignments, user.mail);
                     setEmployeeAssignments(assignments);
+                }
+            };
+
+            // Resetear selección si el usuario borra el nombre manualmente
+            const handleNameChange = (value) => {
+                setFormData({...formData, nombreEmpleado: value});
+                searchUsers(value);
+                // Si borra o modifica el nombre, resetear la selección del AD
+                if (userSelectedFromAD) {
+                    setUserSelectedFromAD(false);
+                    setFormData(prev => ({
+                        ...prev,
+                        nombreEmpleado: value,
+                        emailEmpleado: '',
+                        departamento: '',
+                        puesto: ''
+                    }));
+                    setEmployeeAssignments({ active: [], returned: [], all: [] });
                 }
             };
 
@@ -2611,6 +2631,12 @@
                 
                 if (modalType === 'salida' && !signature) {
                     showToast('La firma es obligatoria', 'error');
+                    return;
+                }
+
+                // Validación: para asignaciones, el empleado debe venir del AD
+                if (modalType === 'nueva-asignacion' && !userSelectedFromAD) {
+                    showToast('Debes seleccionar un empleado de la lista de Azure AD', 'error');
                     return;
                 }
 
@@ -3031,6 +3057,23 @@
                                 e('h3', { key: 'header-empleado', style: { fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--accent-blue)' } }, 
                                     '👤 Datos del Empleado'
                                 ),
+                                
+                                // Mensaje informativo
+                                e('div', { 
+                                    key: 'info-ad',
+                                    style: { 
+                                        marginBottom: '16px',
+                                        padding: '12px 16px',
+                                        background: 'rgba(88, 166, 255, 0.1)',
+                                        border: '1px solid var(--accent-blue)',
+                                        borderRadius: '8px',
+                                        fontSize: '13px',
+                                        color: 'var(--accent-blue)'
+                                    }
+                                },
+                                    '💡 Escribe el nombre del empleado y selecciónalo de la lista. Los datos se cargarán automáticamente desde Azure AD.'
+                                ),
+
                                 e('div', { key: 'row-empleado1', className: 'form-row' },
                                     e('div', { className: 'form-group', style: { position: 'relative' } },
                                         e('label', { className: 'form-label' }, 'Nombre Completo *'),
@@ -3038,17 +3081,27 @@
                                             type: 'text',
                                             className: 'form-input',
                                             value: formData.nombreEmpleado,
-                                            onChange: (ev) => {
-                                                setFormData({...formData, nombreEmpleado: ev.target.value});
-                                                searchUsers(ev.target.value);
-                                            },
+                                            onChange: (ev) => handleNameChange(ev.target.value),
                                             onFocus: () => {
                                                 if (userSearchResults.length > 0) setShowUserDropdown(true);
                                             },
                                             placeholder: 'Escribe para buscar en Azure AD...',
                                             autoComplete: 'off',
-                                            required: true
+                                            required: true,
+                                            style: userSelectedFromAD ? { 
+                                                borderColor: 'var(--accent-green)',
+                                                background: 'rgba(63, 185, 80, 0.1)'
+                                            } : {}
                                         }),
+                                        userSelectedFromAD && e('div', {
+                                            style: {
+                                                position: 'absolute',
+                                                right: '12px',
+                                                top: '38px',
+                                                fontSize: '14px',
+                                                color: 'var(--accent-green)'
+                                            }
+                                        }, '✅'),
                                         searchingUsers && e('div', {
                                             style: {
                                                 position: 'absolute',
@@ -3107,9 +3160,13 @@
                                             type: 'email',
                                             className: 'form-input',
                                             value: formData.emailEmpleado,
-                                            onChange: (ev) => setFormData({...formData, emailEmpleado: ev.target.value}),
-                                            required: true,
-                                            style: { background: formData.emailEmpleado ? 'var(--bg-tertiary)' : '' }
+                                            readOnly: true,
+                                            placeholder: 'Se rellena automáticamente',
+                                            style: { 
+                                                background: 'var(--bg-tertiary)',
+                                                cursor: 'not-allowed',
+                                                opacity: formData.emailEmpleado ? 1 : 0.6
+                                            }
                                         })
                                     )
                                 ),
@@ -3162,17 +3219,18 @@
                                 e('div', { key: 'row-empleado2', className: 'form-row' },
                                     e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Departamento *'),
-                                        e('select', {
-                                            className: 'form-select',
+                                        e('input', {
+                                            type: 'text',
+                                            className: 'form-input',
                                             value: formData.departamento,
-                                            onChange: (ev) => setFormData({...formData, departamento: ev.target.value}),
-                                            required: true
-                                        },
-                                            e('option', { value: '' }, 'Seleccionar...'),
-                                            ['IT', 'RRHH', 'Ventas', 'Marketing', 'Finanzas', 'Operaciones', 'Logística', 'Producción', 'Calidad', 'Administración', 'Dirección'].map(dept =>
-                                                e('option', { key: dept, value: dept }, dept)
-                                            )
-                                        )
+                                            readOnly: true,
+                                            placeholder: 'Se rellena automáticamente',
+                                            style: { 
+                                                background: 'var(--bg-tertiary)',
+                                                cursor: 'not-allowed',
+                                                opacity: formData.departamento ? 1 : 0.6
+                                            }
+                                        })
                                     ),
                                     e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Puesto *'),
@@ -3180,8 +3238,13 @@
                                             type: 'text',
                                             className: 'form-input',
                                             value: formData.puesto,
-                                            onChange: (ev) => setFormData({...formData, puesto: ev.target.value}),
-                                            required: true
+                                            readOnly: true,
+                                            placeholder: 'Se rellena automáticamente',
+                                            style: { 
+                                                background: 'var(--bg-tertiary)',
+                                                cursor: 'not-allowed',
+                                                opacity: formData.puesto ? 1 : 0.6
+                                            }
                                         })
                                     )
                                 ),
