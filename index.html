@@ -2421,6 +2421,7 @@
             const [capturedPhotos, setCapturedPhotos] = useState([]);
             const [isDrawing, setIsDrawing] = useState(false);
             const [loading, setLoading] = useState(false);
+            const [productFilter, setProductFilter] = useState('');
             const canvasRef = useRef(null);
             
             // Estados para autocompletado de usuarios
@@ -2677,24 +2678,18 @@
                             });
                             showToast(`${formData.cantidad} unidades añadidas`, 'success');
                         } else {
-                            // Crear producto nuevo
+                            // Crear producto nuevo (stock=0, stockMinimo=5 por defecto)
                             console.log('Creando producto:', formData);
                             const newProduct = await dataManager.createInventoryItem({
                                 nombre: formData.nombre,
                                 categoria: formData.categoria,
                                 barcode: formData.barcode,
-                                stock: parseInt(formData.stock) || 0,
-                                stockMinimo: parseInt(formData.stockMinimo) || 0,
-                                ubicacion: formData.ubicacion || ''
+                                stock: 0,
+                                stockMinimo: 5,
+                                ubicacion: ''
                             });
                             console.log('Producto creado:', newProduct);
-                            await dataManager.addToHistory({
-                                tipo: 'Entrada',
-                                producto: formData.nombre,
-                                cantidad: parseInt(formData.stock) || 0,
-                                tecnico: state.user.name
-                            });
-                            showToast(`Producto "${formData.nombre}" añadido`, 'success');
+                            showToast(`Producto "${formData.nombre}" añadido. Usa "Entrada" para añadir stock.`, 'success');
                         }
                     } else if (modalType === 'salida') {
                         const nuevoStock = Math.max(0, selectedItem.stock - parseInt(formData.cantidad));
@@ -2863,71 +2858,49 @@
                                             required: true
                                         },
                                             e('option', { value: '' }, 'Seleccionar...'),
-                                            ['Portátiles', 'Smartphones', 'Tablets', 'Periféricos', 'Audio', 'Cables', 'Accesorios'].map(cat =>
+                                            ['Portátiles', 'Smartphones', 'Tablets', 'Periféricos', 'Audio', 'Cables', 'Accesorios', 'Monitores', 'Teclados', 'Ratones', 'Webcams', 'Auriculares', 'Otro'].map(cat =>
                                                 e('option', { key: cat, value: cat }, cat)
                                             )
                                         )
                                     )
                                 ),
-                                e('div', { key: 'row2', className: 'form-row' },
-                                    modalType !== 'editar' && e('div', { className: 'form-group' },
-                                        e('label', { className: 'form-label' }, 'Código de Barras *'),
-                                        e('div', { style: { display: 'flex', gap: '8px' } },
-                                            e('input', {
-                                                type: 'text',
-                                                className: 'form-input',
-                                                value: formData.barcode,
-                                                onChange: (ev) => setFormData({...formData, barcode: ev.target.value}),
-                                                required: true,
-                                                style: { flex: 1 }
-                                            }),
-                                            e('button', {
-                                                type: 'button',
-                                                className: 'button button-primary',
-                                                onClick: () => {
-                                                    startBarcodeScanner((code) => {
-                                                        setFormData({...formData, barcode: code});
-                                                        showToast('Código escaneado: ' + code, 'success');
-                                                    });
-                                                },
-                                                style: { padding: '12px 16px', minWidth: 'auto' }
-                                            }, '📷')
-                                        )
-                                    ),
-                                    e('div', { className: 'form-group' },
-                                        e('label', { className: 'form-label' }, 'Ubicación'),
+                                e('div', { key: 'row2', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Código de Barras *'),
+                                    e('div', { style: { display: 'flex', gap: '8px' } },
                                         e('input', {
                                             type: 'text',
                                             className: 'form-input',
-                                            placeholder: 'Ej: A1, B2...',
-                                            value: formData.ubicacion,
-                                            onChange: (ev) => setFormData({...formData, ubicacion: ev.target.value})
-                                        })
+                                            value: formData.barcode,
+                                            onChange: (ev) => setFormData({...formData, barcode: ev.target.value}),
+                                            required: true,
+                                            style: { flex: 1 }
+                                        }),
+                                        e('button', {
+                                            type: 'button',
+                                            className: 'button button-primary',
+                                            onClick: () => {
+                                                startBarcodeScanner((code) => {
+                                                    setFormData({...formData, barcode: code});
+                                                    showToast('Código escaneado: ' + code, 'success');
+                                                });
+                                            },
+                                            style: { padding: '12px 16px', minWidth: 'auto' }
+                                        }, '📷')
                                     )
                                 ),
-                                e('div', { key: 'row3', className: 'form-row' },
-                                    e('div', { className: 'form-group' },
-                                        e('label', { className: 'form-label' }, modalType === 'editar' ? 'Stock Actual *' : 'Stock Inicial *'),
-                                        e('input', {
-                                            type: 'number',
-                                            className: 'form-input',
-                                            min: '0',
-                                            value: formData.stock,
-                                            onChange: (ev) => setFormData({...formData, stock: ev.target.value}),
-                                            required: true
-                                        })
-                                    ),
-                                    e('div', { className: 'form-group' },
-                                        e('label', { className: 'form-label' }, 'Stock Mínimo *'),
-                                        e('input', {
-                                            type: 'number',
-                                            className: 'form-input',
-                                            min: '0',
-                                            value: formData.stockMinimo,
-                                            onChange: (ev) => setFormData({...formData, stockMinimo: ev.target.value}),
-                                            required: true
-                                        })
-                                    )
+                                e('div', { 
+                                    key: 'info-stock',
+                                    style: { 
+                                        marginTop: '16px',
+                                        padding: '12px 16px',
+                                        background: 'rgba(63, 185, 80, 0.1)',
+                                        border: '1px solid var(--accent-green)',
+                                        borderRadius: '8px',
+                                        fontSize: '13px',
+                                        color: 'var(--accent-green)'
+                                    }
+                                },
+                                    '💡 El producto se creará con stock 0. Usa "Entrada" para añadir unidades.'
                                 )
                             ],
 
@@ -3283,12 +3256,22 @@
                                 ),
 
                                 e('h3', { key: 'header-productos', style: { fontSize: '16px', fontWeight: '600', margin: '24px 0 16px 0', color: 'var(--accent-green)' } }, 
-                                    '📦 Material a Asignar'
+                                    '📦 Stock Disponible'
                                 ),
-                                e('div', { key: 'productos-selector', style: { marginBottom: '16px' } },
+                                
+                                // Buscador y escáner
+                                e('div', { key: 'stock-search', style: { display: 'flex', gap: '8px', marginBottom: '16px' } },
+                                    e('input', {
+                                        type: 'text',
+                                        className: 'form-input',
+                                        placeholder: '🔍 Buscar producto...',
+                                        value: productFilter,
+                                        onChange: (ev) => setProductFilter(ev.target.value),
+                                        style: { flex: 1 }
+                                    }),
                                     e('button', {
                                         type: 'button',
-                                        className: 'button button-primary',
+                                        className: 'button button-secondary',
                                         onClick: () => {
                                             startBarcodeScanner((code) => {
                                                 const producto = state.inventory.find(p => p.barcode === code);
@@ -3303,52 +3286,207 @@
                                                     showToast('Producto no encontrado o sin stock', 'error');
                                                 }
                                             });
-                                        }
-                                    }, '📷 Escanear Producto')
+                                        },
+                                        style: { padding: '12px 16px', minWidth: 'auto' }
+                                    }, '📷 Escanear')
                                 ),
-                                e('div', { key: 'productos-list', style: { 
-                                    background: 'var(--bg-primary)', 
-                                    border: '2px solid var(--border)', 
-                                    borderRadius: '8px', 
-                                    padding: '16px',
-                                    maxHeight: '200px',
-                                    overflowY: 'auto'
-                                } },
-                                    selectedProducts.length > 0 ?
-                                        selectedProducts.map((prod, idx) =>
-                                            e('div', {
-                                                key: idx,
+
+                                // Grid de productos disponibles
+                                e('div', { 
+                                    key: 'stock-grid',
+                                    style: { 
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                                        gap: '12px',
+                                        maxHeight: '280px',
+                                        overflowY: 'auto',
+                                        padding: '4px',
+                                        marginBottom: '16px'
+                                    }
+                                },
+                                    state.inventory
+                                        .filter(p => p.stock > 0)
+                                        .filter(p => !productFilter || 
+                                            p.nombre.toLowerCase().includes(productFilter.toLowerCase()) ||
+                                            p.categoria.toLowerCase().includes(productFilter.toLowerCase())
+                                        )
+                                        .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                                        .map(prod => {
+                                            const isSelected = selectedProducts.find(p => p.id === prod.id);
+                                            const categoryIcons = {
+                                                'Portátiles': '💻',
+                                                'Smartphones': '📱',
+                                                'Tablets': '📱',
+                                                'Periféricos': '🖱️',
+                                                'Audio': '🎧',
+                                                'Cables': '🔌',
+                                                'Accesorios': '🎒',
+                                                'Monitores': '🖥️',
+                                                'Teclados': '⌨️',
+                                                'Ratones': '🖱️',
+                                                'Webcams': '📷',
+                                                'Auriculares': '🎧',
+                                                'Otro': '📦'
+                                            };
+                                            const icon = categoryIcons[prod.categoria] || '📦';
+                                            
+                                            return e('div', {
+                                                key: prod.id,
+                                                onClick: () => {
+                                                    if (!isSelected) {
+                                                        setSelectedProducts([...selectedProducts, prod]);
+                                                        showToast(`${prod.nombre} añadido`, 'success');
+                                                    }
+                                                },
                                                 style: {
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',
-                                                    padding: '8px 12px',
-                                                    background: 'var(--bg-secondary)',
-                                                    borderRadius: '6px',
-                                                    marginBottom: idx < selectedProducts.length - 1 ? '8px' : '0'
+                                                    background: isSelected ? 'rgba(63, 185, 80, 0.2)' : 'var(--bg-secondary)',
+                                                    border: isSelected ? '2px solid var(--accent-green)' : '2px solid var(--border)',
+                                                    borderRadius: '12px',
+                                                    padding: '16px 12px',
+                                                    textAlign: 'center',
+                                                    cursor: isSelected ? 'default' : 'pointer',
+                                                    transition: 'all 0.2s ease',
+                                                    opacity: isSelected ? 0.7 : 1
                                                 }
                                             },
+                                                e('div', { style: { fontSize: '32px', marginBottom: '8px' } }, icon),
+                                                e('div', { 
+                                                    style: { 
+                                                        fontWeight: '600', 
+                                                        fontSize: '13px', 
+                                                        marginBottom: '4px',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis'
+                                                    } 
+                                                }, prod.nombre),
+                                                e('div', { 
+                                                    style: { 
+                                                        fontSize: '11px', 
+                                                        color: 'var(--text-secondary)',
+                                                        marginBottom: '8px'
+                                                    } 
+                                                }, prod.categoria),
+                                                e('div', { 
+                                                    style: { 
+                                                        fontSize: '12px',
+                                                        fontWeight: '600',
+                                                        color: prod.stock <= 3 ? 'var(--accent-orange)' : 'var(--accent-green)'
+                                                    } 
+                                                }, `Stock: ${prod.stock}`),
+                                                !isSelected && e('div', {
+                                                    style: {
+                                                        marginTop: '8px',
+                                                        background: 'var(--accent-blue)',
+                                                        color: 'white',
+                                                        padding: '4px 12px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '600'
+                                                    }
+                                                }, '+ Añadir'),
+                                                isSelected && e('div', {
+                                                    style: {
+                                                        marginTop: '8px',
+                                                        color: 'var(--accent-green)',
+                                                        fontSize: '12px',
+                                                        fontWeight: '600'
+                                                    }
+                                                }, '✓ Añadido')
+                                            );
+                                        })
+                                ),
+
+                                // Productos seleccionados
+                                selectedProducts.length > 0 && e('div', { 
+                                    key: 'selected-products',
+                                    style: { 
+                                        background: 'rgba(63, 185, 80, 0.1)',
+                                        border: '2px solid var(--accent-green)',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '16px'
+                                    }
+                                },
+                                    e('div', { 
+                                        style: { 
+                                            fontWeight: '700', 
+                                            marginBottom: '12px',
+                                            color: 'var(--accent-green)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }
+                                    }, 
+                                        '✅ Material Seleccionado ',
+                                        e('span', { 
+                                            style: { 
+                                                background: 'var(--accent-green)',
+                                                color: 'white',
+                                                padding: '2px 8px',
+                                                borderRadius: '10px',
+                                                fontSize: '12px'
+                                            }
+                                        }, selectedProducts.length)
+                                    ),
+                                    selectedProducts.map((prod, idx) =>
+                                        e('div', {
+                                            key: idx,
+                                            style: {
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                padding: '10px 12px',
+                                                background: 'var(--bg-secondary)',
+                                                borderRadius: '6px',
+                                                marginBottom: idx < selectedProducts.length - 1 ? '8px' : '0'
+                                            }
+                                        },
+                                            e('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+                                                e('span', { style: { fontSize: '20px' } }, 
+                                                    {'Portátiles': '💻', 'Smartphones': '📱', 'Tablets': '📱', 'Periféricos': '🖱️', 'Audio': '🎧', 'Cables': '🔌', 'Accesorios': '🎒', 'Monitores': '🖥️', 'Teclados': '⌨️', 'Ratones': '🖱️', 'Webcams': '📷', 'Auriculares': '🎧'}[prod.categoria] || '📦'
+                                                ),
                                                 e('div', null,
                                                     e('div', { style: { fontWeight: '600', fontSize: '14px' } }, prod.nombre),
                                                     e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, prod.categoria)
-                                                ),
-                                                e('button', {
-                                                    type: 'button',
-                                                    onClick: () => setSelectedProducts(selectedProducts.filter((_, i) => i !== idx)),
-                                                    style: {
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        color: 'var(--accent-red)',
-                                                        cursor: 'pointer',
-                                                        fontSize: '18px',
-                                                        padding: '4px 8px'
-                                                    }
-                                                }, '×')
-                                            )
-                                        ) :
-                                        e('div', { style: { textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' } },
-                                            '📦 Escanea productos para añadir'
+                                                )
+                                            ),
+                                            e('button', {
+                                                type: 'button',
+                                                onClick: () => {
+                                                    setSelectedProducts(selectedProducts.filter((_, i) => i !== idx));
+                                                    showToast(`${prod.nombre} quitado`, 'success');
+                                                },
+                                                style: {
+                                                    background: 'var(--accent-red)',
+                                                    border: 'none',
+                                                    color: 'white',
+                                                    cursor: 'pointer',
+                                                    fontSize: '12px',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px',
+                                                    fontWeight: '600'
+                                                }
+                                            }, '× Quitar')
                                         )
+                                    )
+                                ),
+
+                                // Mensaje si no hay productos seleccionados
+                                selectedProducts.length === 0 && e('div', { 
+                                    key: 'no-products',
+                                    style: { 
+                                        textAlign: 'center', 
+                                        color: 'var(--text-secondary)', 
+                                        padding: '20px',
+                                        background: 'var(--bg-primary)',
+                                        borderRadius: '8px',
+                                        border: '2px dashed var(--border)',
+                                        marginBottom: '16px'
+                                    }
+                                },
+                                    e('div', { style: { fontSize: '24px', marginBottom: '8px' } }, '👆'),
+                                    'Selecciona productos del stock para asignar'
                                 ),
 
                                 e('div', { key: 'observaciones', className: 'form-group', style: { marginTop: '16px' } },
@@ -3881,7 +4019,7 @@
                                     fontFamily: 'IBM Plex Mono, monospace',
                                     fontWeight: '600'
                                 } 
-                            }, 'v1.4.4')
+                            }, 'v1.4.6')
                         ),
                         e('div', { className: 'user-badges' },
                             e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
