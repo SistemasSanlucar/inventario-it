@@ -85,6 +85,11 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
         .login-box p {
             color: var(--text-secondary);
             margin-bottom: 32px;
@@ -143,6 +148,11 @@
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
 
         .toast-container {
@@ -1274,7 +1284,8 @@
                             tecnicoResponsable: item.TecnicoResponsable,
                             fechaAsignacion: item.FechaAsignacion,
                             estado: item.Estado,
-                            observaciones: item.Observaciones || ''
+                            observaciones: item.Observaciones || '',
+                            esPrestamo: item.EsPrestamo === 'Sí'
                         })).sort((a, b) => new Date(b.fechaAsignacion) - new Date(a.fechaAsignacion)),
                         admins: admins
                     };
@@ -1292,7 +1303,8 @@
                     CodigoBarras: data.barcode,
                     Stock: data.stock,
                     StockMinimo: data.stockMinimo,
-                    Ubicacion: data.ubicacion
+                    Ubicacion: data.ubicacion,
+                    Estado: data.estado || 'Nuevo'
                 });
             }
 
@@ -1339,8 +1351,12 @@
             }
 
             async createAssignment(data) {
+                const titulo = data.esPrestamo 
+                    ? `Préstamo - ${data.nombreEmpleado} - ${new Date().toLocaleDateString('es-ES')}`
+                    : `Asignación - ${data.nombreEmpleado} - ${new Date().toLocaleDateString('es-ES')}`;
+                    
                 return await this.graph.createListItem(CONFIG.sharepoint.lists.asignaciones, {
-                    Title: `Asignación - ${data.nombreEmpleado} - ${new Date().toLocaleDateString('es-ES')}`,
+                    Title: titulo,
                     NombreEmpleado: data.nombreEmpleado,
                     EmailEmpleado: data.emailEmpleado,
                     Departamento: data.departamento,
@@ -1355,7 +1371,8 @@
                     Observaciones: data.observaciones || '',
                     Foto1: data.foto1 || '',
                     Foto2: data.foto2 || '',
-                    Foto3: data.foto3 || ''
+                    Foto3: data.foto3 || '',
+                    EsPrestamo: data.esPrestamo ? 'Sí' : 'No'
                 });
             }
 
@@ -1862,6 +1879,16 @@
         }
 
         function Dashboard({ state }) {
+            // Calcular préstamos vencidos
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            const prestamosVencidos = state.assignments.filter(a => {
+                if (!a.esPrestamo || a.estado !== 'Activo') return false;
+                const fechaAsig = new Date(a.fechaAsignacion);
+                fechaAsig.setHours(0, 0, 0, 0);
+                return fechaAsig < hoy;
+            });
+
             const stats = {
                 totalProductos: state.inventory.length,
                 totalUnidades: state.inventory.reduce((sum, item) => sum + item.stock, 0),
@@ -1870,10 +1897,55 @@
                 movimientosHoy: state.history.filter(h => 
                     new Date(h.fecha).toDateString() === new Date().toDateString()
                 ).length,
-                tecnicosActivos: state.technicians.filter(t => t.activo).length
+                tecnicosActivos: state.technicians.filter(t => t.activo).length,
+                prestamosVencidos: prestamosVencidos.length,
+                prestamosActivos: state.assignments.filter(a => a.esPrestamo && a.estado === 'Activo').length
             };
 
             return e('div', null,
+                // ALERTA DE PRÉSTAMOS VENCIDOS
+                prestamosVencidos.length > 0 && e('div', {
+                    style: {
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '2px solid var(--accent-red)',
+                        borderRadius: '12px',
+                        padding: '20px',
+                        marginBottom: '24px',
+                        animation: 'pulse 2s infinite'
+                    }
+                },
+                    e('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' } },
+                        e('div', { style: { fontSize: '40px' } }, '⚠️'),
+                        e('div', { style: { flex: 1 } },
+                            e('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--accent-red)', marginBottom: '4px' } }, 
+                                `${prestamosVencidos.length} PRÉSTAMO${prestamosVencidos.length > 1 ? 'S' : ''} VENCIDO${prestamosVencidos.length > 1 ? 'S' : ''}`
+                            ),
+                            e('div', { style: { fontSize: '14px', color: 'var(--text-secondary)' } },
+                                'Material pendiente de devolución desde ayer o antes'
+                            )
+                        ),
+                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+                            prestamosVencidos.slice(0, 3).map((p, idx) =>
+                                e('div', { 
+                                    key: idx,
+                                    style: { 
+                                        background: 'var(--bg-secondary)', 
+                                        padding: '8px 12px', 
+                                        borderRadius: '6px',
+                                        fontSize: '13px'
+                                    }
+                                },
+                                    e('strong', null, p.nombreEmpleado),
+                                    ` - ${p.cantidadProductos} producto${p.cantidadProductos > 1 ? 's' : ''}`
+                                )
+                            ),
+                            prestamosVencidos.length > 3 && e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } },
+                                `y ${prestamosVencidos.length - 3} más...`
+                            )
+                        )
+                    )
+                ),
+
                 e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' } },
                     e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, '📊 Dashboard'),
                     e('button', {
@@ -1909,7 +1981,8 @@
                             [
                                 { label: 'Movimientos Hoy', value: stats.movimientosHoy, color: 'var(--accent-purple)' },
                                 { label: 'Total Movimientos', value: state.history.length, color: 'var(--accent-blue)' },
-                                { label: 'Técnicos Activos', value: stats.tecnicosActivos, color: 'var(--accent-green)' }
+                                { label: 'Técnicos Activos', value: stats.tecnicosActivos, color: 'var(--accent-green)' },
+                                { label: 'Préstamos Activos', value: stats.prestamosActivos, color: 'var(--accent-orange)' }
                             ].map((stat, idx) =>
                                 e('div', {
                                     key: idx,
@@ -2281,6 +2354,7 @@
             const [search, setSearch] = useState('');
             const [filterDepartamento, setFilterDepartamento] = useState('all');
             const [filterEstado, setFilterEstado] = useState('all');
+            const [filterTipo, setFilterTipo] = useState('all');
 
             const filtered = (state.assignments || []).filter(assignment => {
                 const matchesSearch = assignment.nombreEmpleado.toLowerCase().includes(search.toLowerCase()) ||
@@ -2288,7 +2362,10 @@
                                     assignment.puesto.toLowerCase().includes(search.toLowerCase());
                 const matchesDept = filterDepartamento === 'all' || assignment.departamento === filterDepartamento;
                 const matchesEstado = filterEstado === 'all' || assignment.estado === filterEstado;
-                return matchesSearch && matchesDept && matchesEstado;
+                const matchesTipo = filterTipo === 'all' || 
+                                   (filterTipo === 'prestamo' && assignment.esPrestamo) ||
+                                   (filterTipo === 'asignacion' && !assignment.esPrestamo);
+                return matchesSearch && matchesDept && matchesEstado && matchesTipo;
             });
 
             const departamentos = [...new Set((state.assignments || []).map(a => a.departamento))].filter(Boolean);
@@ -2303,6 +2380,15 @@
                             value: search,
                             onChange: (ev) => setSearch(ev.target.value)
                         }),
+                        e('select', {
+                            className: 'filter-select',
+                            value: filterTipo,
+                            onChange: (ev) => setFilterTipo(ev.target.value)
+                        },
+                            e('option', { value: 'all' }, 'Todos los tipos'),
+                            e('option', { value: 'asignacion' }, '📄 Asignaciones'),
+                            e('option', { value: 'prestamo' }, '🔄 Préstamos')
+                        ),
                         e('select', {
                             className: 'filter-select',
                             value: filterDepartamento,
@@ -2330,6 +2416,11 @@
                             onClick: () => onOpenModal('nueva-asignacion', null)
                         }, '➕ Nueva Asignación'),
                         e('button', {
+                            className: 'button button-warning',
+                            onClick: () => onOpenModal('nuevo-prestamo', null),
+                            style: { background: 'var(--accent-orange)' }
+                        }, '🔄 Préstamo'),
+                        e('button', {
                             className: 'button button-secondary',
                             onClick: () => exportToCSV(filtered, 'asignaciones')
                         }, '📥 Exportar')
@@ -2340,18 +2431,54 @@
                     e('table', { className: 'history-table' },
                         e('thead', null,
                             e('tr', null,
+                                e('th', { style: { width: '80px' } }, 'Tipo'),
                                 e('th', { style: { width: '140px' } }, 'Fecha'),
                                 e('th', null, 'Empleado'),
                                 e('th', null, 'Departamento'),
-                                e('th', null, 'Puesto'),
-                                e('th', { style: { width: '100px' } }, 'Productos'),
+                                e('th', { style: { width: '80px' } }, 'Productos'),
                                 e('th', { style: { width: '100px' } }, 'Estado'),
-                                e('th', { style: { width: '120px' } }, 'Acciones')
+                                e('th', { style: { width: '100px' } }, 'Acciones')
                             )
                         ),
                         e('tbody', null,
-                            filtered.map(assignment =>
-                                e('tr', { key: assignment.id },
+                            filtered.map(assignment => {
+                                // Verificar si es préstamo vencido (ayer o antes y sigue activo)
+                                const fechaAsignacion = new Date(assignment.fechaAsignacion);
+                                const hoy = new Date();
+                                hoy.setHours(0, 0, 0, 0);
+                                fechaAsignacion.setHours(0, 0, 0, 0);
+                                const esPrestamoVencido = assignment.esPrestamo && assignment.estado === 'Activo' && fechaAsignacion < hoy;
+                                
+                                return e('tr', { 
+                                    key: assignment.id,
+                                    style: esPrestamoVencido ? { 
+                                        background: 'rgba(239, 68, 68, 0.15)', 
+                                        borderLeft: '4px solid var(--accent-red)' 
+                                    } : {}
+                                },
+                                    e('td', { style: { textAlign: 'center' } },
+                                        assignment.esPrestamo ? 
+                                            e('span', { 
+                                                style: { 
+                                                    background: esPrestamoVencido ? 'var(--accent-red)' : 'var(--accent-orange)',
+                                                    color: 'white',
+                                                    padding: '4px 8px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '11px',
+                                                    fontWeight: '700'
+                                                }
+                                            }, esPrestamoVencido ? '⚠️ VENCIDO' : '🔄 Préstamo') :
+                                            e('span', { 
+                                                style: { 
+                                                    background: 'var(--accent-blue)',
+                                                    color: 'white',
+                                                    padding: '4px 8px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '11px',
+                                                    fontWeight: '700'
+                                                }
+                                            }, '📄 Asignación')
+                                    ),
                                     e('td', { style: { fontFamily: 'IBM Plex Mono, monospace', fontSize: '12px' } },
                                         new Date(assignment.fechaAsignacion).toLocaleDateString('es-ES')
                                     ),
@@ -2360,7 +2487,6 @@
                                         e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, assignment.emailEmpleado)
                                     ),
                                     e('td', null, assignment.departamento),
-                                    e('td', null, assignment.puesto),
                                     e('td', { style: { textAlign: 'center', fontFamily: 'IBM Plex Mono, monospace', fontWeight: '700' } },
                                         assignment.cantidadProductos
                                     ),
@@ -2383,8 +2509,8 @@
                                             }, '↩️')
                                         )
                                     )
-                                )
-                            )
+                                );
+                            })
                         )
                     ) :
                     e('div', { className: 'empty-state' },
@@ -2399,10 +2525,13 @@
             const [formData, setFormData] = useState({
                 nombre: selectedItem?.nombre || '',
                 categoria: selectedItem?.categoria || '',
+                categoriaOtro: '',
                 barcode: selectedItem?.barcode || '',
                 stock: selectedItem?.stock || '',
                 stockMinimo: selectedItem?.stockMinimo || '',
                 ubicacion: selectedItem?.ubicacion || '',
+                zona: selectedItem?.zona || '',
+                estado: selectedItem?.estado || 'Nuevo',
                 cantidad: '',
                 ticket: '',
                 usuario: '',
@@ -2414,7 +2543,8 @@
                 departamento: '',
                 puesto: '',
                 fechaIncorporacion: new Date().toISOString().split('T')[0],
-                observaciones: ''
+                observaciones: '',
+                esPrestamo: false
             });
             const [signature, setSignature] = useState(null);
             const [selectedProducts, setSelectedProducts] = useState([]);
@@ -2433,7 +2563,7 @@
             const userSearchTimeout = useRef(null);
 
             useEffect(() => {
-                if (canvasRef.current && (modalType === 'salida' || modalType === 'nueva-asignacion')) {
+                if (canvasRef.current && (modalType === 'salida' || modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo')) {
                     const canvas = canvasRef.current;
                     canvas.width = canvas.offsetWidth;
                     canvas.height = canvas.offsetHeight;
@@ -2656,7 +2786,7 @@
                 }
 
                 // Validación: para asignaciones, el empleado debe venir del AD
-                if (modalType === 'nueva-asignacion' && !userSelectedFromAD) {
+                if ((modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo') && !userSelectedFromAD) {
                     showToast('Debes seleccionar un empleado de la lista de Azure AD', 'error');
                     return;
                 }
@@ -2679,14 +2809,20 @@
                             showToast(`${formData.cantidad} unidades añadidas`, 'success');
                         } else {
                             // Crear producto nuevo (stock=0, stockMinimo=5 por defecto)
+                            // Determinar categoría final
+                            const categoriaFinal = formData.categoria === 'Otro' && formData.categoriaOtro 
+                                ? (state.inventory.find(p => p.categoria.toLowerCase() === formData.categoriaOtro.toLowerCase())?.categoria || formData.categoriaOtro)
+                                : formData.categoria;
+                            
                             console.log('Creando producto:', formData);
                             const newProduct = await dataManager.createInventoryItem({
                                 nombre: formData.nombre,
-                                categoria: formData.categoria,
+                                categoria: categoriaFinal,
                                 barcode: formData.barcode,
                                 stock: 0,
                                 stockMinimo: 5,
-                                ubicacion: ''
+                                ubicacion: formData.zona,
+                                estado: formData.estado
                             });
                             console.log('Producto creado:', newProduct);
                             showToast(`Producto "${formData.nombre}" añadido. Usa "Entrada" para añadir stock.`, 'success');
@@ -2766,10 +2902,62 @@
                             observaciones: formData.observaciones,
                             foto1: capturedPhotos[0]?.data || null,
                             foto2: capturedPhotos[1]?.data || null,
-                            foto3: capturedPhotos[2]?.data || null
+                            foto3: capturedPhotos[2]?.data || null,
+                            esPrestamo: false
                         });
 
                         showToast(`Asignación creada para ${formData.nombreEmpleado}`, 'success');
+                    } else if (modalType === 'nuevo-prestamo') {
+                        if (!signature) {
+                            showToast('La firma del empleado es obligatoria', 'error');
+                            setLoading(false);
+                            return;
+                        }
+                        if (selectedProducts.length === 0) {
+                            showToast('Debes seleccionar al menos un producto', 'error');
+                            setLoading(false);
+                            return;
+                        }
+
+                        // Actualizar stock de cada producto
+                        for (const prod of selectedProducts) {
+                            const producto = state.inventory.find(p => p.id === prod.id);
+                            if (producto) {
+                                const nuevoStock = Math.max(0, producto.stock - 1);
+                                await dataManager.updateInventoryItem(producto.id, {
+                                    Stock: nuevoStock
+                                });
+                                
+                                // Registrar en historial
+                                await dataManager.addToHistory({
+                                    tipo: 'Prestamo',
+                                    producto: producto.nombre,
+                                    cantidad: 1,
+                                    usuario: formData.nombreEmpleado,
+                                    tecnico: state.user.name,
+                                    firma: signature
+                                });
+                            }
+                        }
+
+                        // Crear préstamo (como asignación con flag)
+                        await dataManager.createAssignment({
+                            nombreEmpleado: formData.nombreEmpleado,
+                            emailEmpleado: formData.emailEmpleado,
+                            departamento: formData.departamento,
+                            puesto: formData.puesto,
+                            fechaIncorporacion: new Date().toISOString().split('T')[0],
+                            productosAsignados: selectedProducts,
+                            firmaEmpleado: signature,
+                            tecnicoResponsable: state.user.name,
+                            observaciones: `[PRÉSTAMO] Devolución antes de fin de día. ${formData.observaciones}`,
+                            foto1: capturedPhotos[0]?.data || null,
+                            foto2: capturedPhotos[1]?.data || null,
+                            foto3: capturedPhotos[2]?.data || null,
+                            esPrestamo: true
+                        });
+
+                        showToast(`Préstamo registrado para ${formData.nombreEmpleado}. ⚠️ Devolución HOY`, 'success');
                     }
 
                     await onRefresh();
@@ -2789,6 +2977,7 @@
                 if (modalType === 'editar') return 'Editar Producto';
                 if (modalType === 'tecnico') return 'Nuevo Técnico';
                 if (modalType === 'nueva-asignacion') return '📄 Nueva Asignación de Material';
+                if (modalType === 'nuevo-prestamo') return '🔄 Préstamo de Material (Devolución HOY)';
                 if (modalType === 'ver-asignacion') return '📄 Documento de Asignación';
                 if (modalType === 'devolver-material') return '↩️ Devolución de Material';
                 return 'Formulario';
@@ -2854,7 +3043,7 @@
                                         e('select', {
                                             className: 'form-select',
                                             value: formData.categoria,
-                                            onChange: (ev) => setFormData({...formData, categoria: ev.target.value}),
+                                            onChange: (ev) => setFormData({...formData, categoria: ev.target.value, categoriaOtro: ''}),
                                             required: true
                                         },
                                             e('option', { value: '' }, 'Seleccionar...'),
@@ -2864,6 +3053,33 @@
                                         )
                                     )
                                 ),
+                                
+                                // Campo para categoría "Otro"
+                                formData.categoria === 'Otro' && e('div', { key: 'categoria-otro', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Especificar Categoría *'),
+                                    e('input', {
+                                        type: 'text',
+                                        className: 'form-input',
+                                        placeholder: 'Escribe la categoría...',
+                                        value: formData.categoriaOtro,
+                                        onChange: (ev) => setFormData({...formData, categoriaOtro: ev.target.value}),
+                                        required: true
+                                    }),
+                                    formData.categoriaOtro && state.inventory.some(p => 
+                                        p.categoria.toLowerCase() === formData.categoriaOtro.toLowerCase()
+                                    ) && e('div', {
+                                        style: {
+                                            marginTop: '8px',
+                                            padding: '8px 12px',
+                                            background: 'rgba(88, 166, 255, 0.1)',
+                                            border: '1px solid var(--accent-blue)',
+                                            borderRadius: '6px',
+                                            fontSize: '12px',
+                                            color: 'var(--accent-blue)'
+                                        }
+                                    }, `💡 Ya existe la categoría "${state.inventory.find(p => p.categoria.toLowerCase() === formData.categoriaOtro.toLowerCase())?.categoria}". Se usará esa.`)
+                                ),
+
                                 e('div', { key: 'row2', className: 'form-group' },
                                     e('label', { className: 'form-label' }, 'Código de Barras *'),
                                     e('div', { style: { display: 'flex', gap: '8px' } },
@@ -2873,7 +3089,8 @@
                                             value: formData.barcode,
                                             onChange: (ev) => setFormData({...formData, barcode: ev.target.value}),
                                             required: true,
-                                            style: { flex: 1 }
+                                            style: { flex: 1 },
+                                            placeholder: 'Escanea o escribe...'
                                         }),
                                         e('button', {
                                             type: 'button',
@@ -2885,9 +3102,92 @@
                                                 });
                                             },
                                             style: { padding: '12px 16px', minWidth: 'auto' }
-                                        }, '📷')
+                                        }, '📷'),
+                                        e('button', {
+                                            type: 'button',
+                                            className: 'button button-secondary',
+                                            onClick: () => {
+                                                const noCode = 'NA-' + Date.now().toString().slice(-8);
+                                                setFormData({...formData, barcode: noCode});
+                                                showToast('Código generado: ' + noCode, 'success');
+                                            },
+                                            style: { padding: '12px 12px', minWidth: 'auto', fontSize: '11px' }
+                                        }, 'N/A')
                                     )
                                 ),
+
+                                e('div', { key: 'row3', className: 'form-row' },
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Zona de Almacenamiento *'),
+                                        e('select', {
+                                            className: 'form-select',
+                                            value: formData.zona,
+                                            onChange: (ev) => setFormData({...formData, zona: ev.target.value}),
+                                            required: true
+                                        },
+                                            e('option', { value: '' }, 'Seleccionar...'),
+                                            ['Zona 1', 'Zona 2', 'Zona 3', 'Zona 4', 'Zona 5'].map(zona =>
+                                                e('option', { key: zona, value: zona }, zona)
+                                            )
+                                        )
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Estado del Material *'),
+                                        e('div', { style: { display: 'flex', gap: '12px', marginTop: '8px' } },
+                                            e('label', { 
+                                                style: { 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    gap: '8px',
+                                                    cursor: 'pointer',
+                                                    padding: '10px 16px',
+                                                    background: formData.estado === 'Nuevo' ? 'rgba(63, 185, 80, 0.2)' : 'var(--bg-tertiary)',
+                                                    border: formData.estado === 'Nuevo' ? '2px solid var(--accent-green)' : '2px solid var(--border)',
+                                                    borderRadius: '8px',
+                                                    flex: 1,
+                                                    justifyContent: 'center'
+                                                }
+                                            },
+                                                e('input', {
+                                                    type: 'radio',
+                                                    name: 'estado',
+                                                    value: 'Nuevo',
+                                                    checked: formData.estado === 'Nuevo',
+                                                    onChange: () => setFormData({...formData, estado: 'Nuevo'}),
+                                                    style: { display: 'none' }
+                                                }),
+                                                e('span', { style: { fontSize: '16px' } }, '✨'),
+                                                e('span', { style: { fontWeight: '600' } }, 'Nuevo')
+                                            ),
+                                            e('label', { 
+                                                style: { 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    gap: '8px',
+                                                    cursor: 'pointer',
+                                                    padding: '10px 16px',
+                                                    background: formData.estado === 'Usado' ? 'rgba(249, 115, 22, 0.2)' : 'var(--bg-tertiary)',
+                                                    border: formData.estado === 'Usado' ? '2px solid var(--accent-orange)' : '2px solid var(--border)',
+                                                    borderRadius: '8px',
+                                                    flex: 1,
+                                                    justifyContent: 'center'
+                                                }
+                                            },
+                                                e('input', {
+                                                    type: 'radio',
+                                                    name: 'estado',
+                                                    value: 'Usado',
+                                                    checked: formData.estado === 'Usado',
+                                                    onChange: () => setFormData({...formData, estado: 'Usado'}),
+                                                    style: { display: 'none' }
+                                                }),
+                                                e('span', { style: { fontSize: '16px' } }, '🔄'),
+                                                e('span', { style: { fontWeight: '600' } }, 'Usado')
+                                            )
+                                        )
+                                    )
+                                ),
+
                                 e('div', { 
                                     key: 'info-stock',
                                     style: { 
@@ -3048,9 +3348,29 @@
                                 )
                             ],
 
-                            modalType === 'nueva-asignacion' && [
+                            (modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo') && [
                                 e('h3', { key: 'header-empleado', style: { fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--accent-blue)' } }, 
                                     '👤 Datos del Empleado'
+                                ),
+                                
+                                // Aviso de préstamo
+                                modalType === 'nuevo-prestamo' && e('div', { 
+                                    key: 'aviso-prestamo',
+                                    style: { 
+                                        marginBottom: '16px',
+                                        padding: '16px',
+                                        background: 'rgba(249, 115, 22, 0.15)',
+                                        border: '2px solid var(--accent-orange)',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        color: 'var(--accent-orange)'
+                                    }
+                                },
+                                    e('div', { style: { fontWeight: '700', marginBottom: '8px', fontSize: '16px' } }, '⚠️ PRÉSTAMO TEMPORAL'),
+                                    e('div', null, 'El material debe devolverse HOY antes de finalizar la jornada.'),
+                                    e('div', { style: { marginTop: '8px', fontSize: '12px' } }, 
+                                        '📧 Si no se devuelve, mañana a las 8:00 se enviará email de recordatorio al empleado y a hd.spain@sanlucar.com'
+                                    )
                                 ),
                                 
                                 // Mensaje informativo
@@ -3620,9 +3940,11 @@
                                     modalType === 'devolucion' ? 'button-warning' :
                                     modalType === 'editar' ? 'button-purple' :
                                     modalType === 'nueva-asignacion' ? 'button-success' :
+                                    modalType === 'nuevo-prestamo' ? 'button-warning' :
                                     'button-success'
                                 }`,
-                                disabled: loading
+                                disabled: loading,
+                                style: modalType === 'nuevo-prestamo' ? { background: 'var(--accent-orange)' } : {}
                             },
                                 loading ? e('span', { className: 'loading-spinner' }) : null,
                                 loading ? ' Guardando...' :
@@ -3631,6 +3953,7 @@
                                 modalType === 'devolucion' ? 'Registrar Devolución' :
                                 modalType === 'editar' ? 'Guardar Cambios' :
                                 modalType === 'nueva-asignacion' ? '📄 Crear Asignación' :
+                                modalType === 'nuevo-prestamo' ? '🔄 Registrar Préstamo' :
                                 'Crear Técnico'
                             )
                         )
@@ -3946,7 +4269,9 @@
                 const { confirmAction } = state;
                 try {
                     if (confirmAction.type === 'eliminar-producto') {
+                        console.log('Eliminando producto ID:', confirmAction.item.id);
                         await dataManager.deleteInventoryItem(confirmAction.item.id);
+                        console.log('Producto eliminado correctamente');
                         showToast('Producto eliminado correctamente', 'success');
                     } else if (confirmAction.type === 'eliminar-historial') {
                         await dataManager.deleteHistoryItem(confirmAction.item.id);
@@ -3955,10 +4280,20 @@
                         await dataManager.toggleTechnicianStatus(confirmAction.item.id, confirmAction.item.activo);
                         showToast('Estado actualizado', 'success');
                     }
-                    await initializeApp();
-                    handleCloseModal();
+                    // Cerrar modal primero
+                    setState(prev => ({ ...prev, showConfirm: false, confirmAction: null }));
+                    // Luego recargar datos
+                    const data = await dataManager.loadAllData();
+                    setState(prev => ({
+                        ...prev,
+                        inventory: data.inventory,
+                        history: data.history,
+                        technicians: data.technicians,
+                        assignments: data.assignments
+                    }));
                 } catch (error) {
-                    showToast('Error al ejecutar la acción', 'error');
+                    console.error('Error al eliminar:', error);
+                    showToast('Error al ejecutar la acción: ' + error.message, 'error');
                 }
             };
 
@@ -4019,7 +4354,7 @@
                                     fontFamily: 'IBM Plex Mono, monospace',
                                     fontWeight: '600'
                                 } 
-                            }, 'v1.4.6')
+                            }, 'v1.5.0')
                         ),
                         e('div', { className: 'user-badges' },
                             e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
@@ -4089,7 +4424,7 @@
                     })
                 ),
 
-                state.modalType && !state.showConfirm && ['entrada', 'salida', 'devolucion', 'editar', 'tecnico', 'nueva-asignacion'].includes(state.modalType) &&
+                state.modalType && !state.showConfirm && ['entrada', 'salida', 'devolucion', 'editar', 'tecnico', 'nueva-asignacion', 'nuevo-prestamo'].includes(state.modalType) &&
                     e(FormModal, {
                         state,
                         modalType: state.modalType,
