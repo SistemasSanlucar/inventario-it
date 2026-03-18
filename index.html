@@ -4279,6 +4279,8 @@
                 catalogo: {},
                 activeTab: 'dashboard',
                 loading: true,
+                syncing: false,
+                lastSync: null,
                 modalType: null,
                 selectedItem: null,
                 showConfirm: false,
@@ -4326,7 +4328,9 @@
                         history: data.history,
                         assignments: data.assignments,
                         catalogo: data.catalogo || {},
-                        loading: false
+                        loading: false,
+                        syncing: false,
+                        lastSync: new Date()
                     });
 
                     showToast(`Bienvenido, ${currentUser.displayName}`, 'success');
@@ -4362,7 +4366,56 @@
                 showToast('Sesión cerrada correctamente', 'success');
             };
 
+            // Sincronización silenciosa en segundo plano
+            const syncData = async (showMessage = false) => {
+                if (!dataManager || state.syncing) return;
+                
+                setState(prev => ({ ...prev, syncing: true }));
+                try {
+                    const data = await dataManager.loadAllData();
+                    setState(prev => ({
+                        ...prev,
+                        inventory: data.inventory,
+                        technicians: data.technicians,
+                        history: data.history,
+                        assignments: data.assignments,
+                        catalogo: data.catalogo || {},
+                        syncing: false,
+                        lastSync: new Date()
+                    }));
+                    if (showMessage) {
+                        showToast('✓ Sincronizado', 'success');
+                    }
+                } catch (error) {
+                    console.error('Error sincronizando:', error);
+                    setState(prev => ({ ...prev, syncing: false }));
+                }
+            };
+
+            // Cambio de tab con sincronización
+            const handleTabChange = async (tab) => {
+                setState(prev => ({ ...prev, activeTab: tab }));
+                await syncData(false);
+            };
+
+            // Sincronización manual (botón)
+            const handleManualSync = async () => {
+                await syncData(true);
+            };
+
+            // Formatear tiempo desde última sync
+            const getLastSyncText = () => {
+                if (!state.lastSync) return '';
+                const now = new Date();
+                const diff = Math.floor((now - state.lastSync) / 1000);
+                if (diff < 60) return 'Hace un momento';
+                if (diff < 3600) return `Hace ${Math.floor(diff / 60)} min`;
+                return `Hace ${Math.floor(diff / 3600)}h`;
+            };
+
             const handleOpenModal = (type, item) => {
+                // Sincronizar al abrir modal
+                syncData(false);
                 setState({ ...state, modalType: type, selectedItem: item });
             };
 
@@ -4460,7 +4513,7 @@
                                     fontFamily: 'IBM Plex Mono, monospace',
                                     fontWeight: '600'
                                 } 
-                            }, 'v1.5.1')
+                            }, 'v1.5.2')
                         ),
                         e('div', { className: 'user-badges' },
                             e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
@@ -4481,6 +4534,46 @@
                             e('div', { className: 'stat-label' }, 'Stock Bajo'),
                             e('div', { className: 'stat-value orange' }, stats.stockBajo)
                         ),
+                        // Botón de sincronización
+                        e('div', { 
+                            style: { 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                padding: '8px 12px',
+                                background: 'var(--bg-tertiary)',
+                                borderRadius: '8px',
+                                marginRight: '8px'
+                            }
+                        },
+                            state.lastSync && e('span', { 
+                                style: { 
+                                    fontSize: '11px', 
+                                    color: 'var(--text-secondary)',
+                                    whiteSpace: 'nowrap'
+                                } 
+                            }, getLastSyncText()),
+                            e('button', { 
+                                onClick: handleManualSync,
+                                disabled: state.syncing,
+                                style: {
+                                    background: state.syncing ? 'var(--bg-secondary)' : 'var(--accent-blue)',
+                                    border: 'none',
+                                    color: 'white',
+                                    padding: '6px 12px',
+                                    borderRadius: '6px',
+                                    cursor: state.syncing ? 'wait' : 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }
+                            }, 
+                                state.syncing ? '⏳' : '🔄',
+                                state.syncing ? ' Sync...' : ' Sync'
+                            )
+                        ),
                         e('button', { className: 'button button-secondary', onClick: handleLogout }, '🚪 Salir')
                     )
                 ),
@@ -4490,7 +4583,7 @@
                         e('button', {
                             key: tab,
                             className: `tab-button ${state.activeTab === tab ? 'active' : ''}`,
-                            onClick: () => setState({ ...state, activeTab: tab })
+                            onClick: () => handleTabChange(tab)
                         },
                             tab === 'dashboard' ? '📊' : 
                             tab === 'inventario' ? '📋' : 
@@ -4502,7 +4595,7 @@
                     ),
                     state.isAdmin && e('button', {
                         className: `tab-button ${state.activeTab === 'tecnicos' ? 'active' : ''}`,
-                        onClick: () => setState({ ...state, activeTab: 'tecnicos' })
+                        onClick: () => handleTabChange('tecnicos')
                     }, '👥 Técnicos')
                 ),
 
