@@ -1107,7 +1107,8 @@
                     tecnicos: 'StockControl_TecnicosIT',
                     historial: 'StockControl_HistorialIT',
                     admins: 'StockControl_Admins',
-                    asignaciones: 'StockControl_Asignaciones'
+                    asignaciones: 'StockControl_Asignaciones',
+                    catalogo: 'StockControl_Catalogo'
                 }
             },
             msal: {
@@ -1235,13 +1236,28 @@
 
             async loadAllData() {
                 try {
-                    const [inventario, tecnicos, historial, admins, asignaciones] = await Promise.all([
+                    const [inventario, tecnicos, historial, admins, asignaciones, catalogo] = await Promise.all([
                         this.graph.getListItems(CONFIG.sharepoint.lists.inventario),
                         this.graph.getListItems(CONFIG.sharepoint.lists.tecnicos),
                         this.graph.getListItems(CONFIG.sharepoint.lists.historial),
                         this.graph.getListItems(CONFIG.sharepoint.lists.admins),
-                        this.graph.getListItems(CONFIG.sharepoint.lists.asignaciones).catch(() => [])
+                        this.graph.getListItems(CONFIG.sharepoint.lists.asignaciones).catch(() => []),
+                        this.graph.getListItems(CONFIG.sharepoint.lists.catalogo).catch(() => [])
                     ]);
+
+                    // Procesar catálogo: agrupar modelos por tipo
+                    const catalogoProcessed = {};
+                    catalogo.forEach(item => {
+                        const tipo = item.Title;
+                        const modelo = item.Modelo;
+                        const activo = item.Activo !== false && item.Activo !== 'No';
+                        if (activo && tipo && modelo) {
+                            if (!catalogoProcessed[tipo]) {
+                                catalogoProcessed[tipo] = [];
+                            }
+                            catalogoProcessed[tipo].push(modelo);
+                        }
+                    });
 
                     return {
                         inventory: inventario.map(item => ({
@@ -1251,7 +1267,8 @@
                             barcode: item.CodigoBarras,
                             stock: parseInt(item.Stock) || 0,
                             stockMinimo: parseInt(item.StockMinimo) || 0,
-                            ubicacion: item.Ubicacion || ''
+                            ubicacion: item.Ubicacion || '',
+                            estado: item.Estado || 'Nuevo'
                         })),
                         technicians: tecnicos.map(item => ({
                             id: item.sharePointId,
@@ -1287,7 +1304,8 @@
                             observaciones: item.Observaciones || '',
                             esPrestamo: item.EsPrestamo === 'Sí'
                         })).sort((a, b) => new Date(b.fechaAsignacion) - new Date(a.fechaAsignacion)),
-                        admins: admins
+                        admins: admins,
+                        catalogo: catalogoProcessed
                     };
                 } catch (error) {
                     console.error('Error cargando datos:', error);
@@ -1348,6 +1366,14 @@
 
             async deleteHistoryItem(itemId) {
                 await this.graph.deleteListItem(CONFIG.sharepoint.lists.historial, itemId);
+            }
+
+            async addToCatalog(tipo, modelo) {
+                return await this.graph.createListItem(CONFIG.sharepoint.lists.catalogo, {
+                    Title: tipo,
+                    Modelo: modelo,
+                    Activo: true
+                });
             }
 
             async createAssignment(data) {
@@ -2526,6 +2552,9 @@
                 nombre: selectedItem?.nombre || '',
                 categoria: selectedItem?.categoria || '',
                 categoriaOtro: '',
+                tipoMaterial: '',
+                modelo: '',
+                modeloNuevo: '',
                 barcode: selectedItem?.barcode || '',
                 stock: selectedItem?.stock || '',
                 stockMinimo: selectedItem?.stockMinimo || '',
@@ -2809,15 +2838,30 @@
                             showToast(`${formData.cantidad} unidades añadidas`, 'success');
                         } else {
                             // Crear producto nuevo (stock=0, stockMinimo=5 por defecto)
-                            // Determinar categoría final
-                            const categoriaFinal = formData.categoria === 'Otro' && formData.categoriaOtro 
-                                ? (state.inventory.find(p => p.categoria.toLowerCase() === formData.categoriaOtro.toLowerCase())?.categoria || formData.categoriaOtro)
-                                : formData.categoria;
+                            let tipoFinal = formData.tipoMaterial;
+                            let modeloFinal = formData.modelo;
                             
-                            console.log('Creando producto:', formData);
+                            // Si es nuevo tipo
+                            if (formData.tipoMaterial === '__nuevo__') {
+                                tipoFinal = formData.categoriaOtro;
+                                modeloFinal = formData.modeloNuevo;
+                                // Guardar en catálogo
+                                await dataManager.addToCatalog(tipoFinal, modeloFinal);
+                            } 
+                            // Si es nuevo modelo de tipo existente
+                            else if (formData.modelo === '__nuevo__') {
+                                modeloFinal = formData.modeloNuevo;
+                                // Guardar en catálogo
+                                await dataManager.addToCatalog(tipoFinal, modeloFinal);
+                            }
+                            
+                            // El nombre será "Tipo - Modelo"
+                            const nombreProducto = `${tipoFinal} - ${modeloFinal}`;
+                            
+                            console.log('Creando producto:', { tipo: tipoFinal, modelo: modeloFinal, nombre: nombreProducto });
                             const newProduct = await dataManager.createInventoryItem({
-                                nombre: formData.nombre,
-                                categoria: categoriaFinal,
+                                nombre: nombreProducto,
+                                categoria: tipoFinal,
                                 barcode: formData.barcode,
                                 stock: 0,
                                 stockMinimo: 5,
@@ -2825,7 +2869,7 @@
                                 estado: formData.estado
                             });
                             console.log('Producto creado:', newProduct);
-                            showToast(`Producto "${formData.nombre}" añadido. Usa "Entrada" para añadir stock.`, 'success');
+                            showToast(`"${nombreProducto}" añadido. Usa "Entrada" para añadir stock.`, 'success');
                         }
                     } else if (modalType === 'salida') {
                         const nuevoStock = Math.max(0, selectedItem.stock - parseInt(formData.cantidad));
@@ -2983,7 +3027,10 @@
                 return 'Formulario';
             };
 
-            return e('div', { className: 'modal-overlay', onClick: onClose },
+            return e('div', { 
+                className: 'modal-overlay', 
+                onClick: (ev) => { if (ev.target === ev.currentTarget) onClose(); }
+            },
                 e('div', { className: 'modal', onClick: (ev) => ev.stopPropagation() },
                     e('div', { className: 'modal-header' },
                         e('h2', { className: 'modal-title' }, getModalTitle()),
@@ -3027,59 +3074,108 @@
                             ],
 
                             (modalType === 'entrada' || modalType === 'editar') && !selectedItem && [
+                                // Dropdown Tipo de Material
                                 e('div', { key: 'row1', className: 'form-row' },
                                     e('div', { className: 'form-group' },
-                                        e('label', { className: 'form-label' }, 'Nombre del Producto *'),
-                                        e('input', {
-                                            type: 'text',
-                                            className: 'form-input',
-                                            value: formData.nombre,
-                                            onChange: (ev) => setFormData({...formData, nombre: ev.target.value}),
-                                            required: true
-                                        })
-                                    ),
-                                    e('div', { className: 'form-group' },
-                                        e('label', { className: 'form-label' }, 'Categoría *'),
+                                        e('label', { className: 'form-label' }, 'Tipo de Material *'),
                                         e('select', {
                                             className: 'form-select',
-                                            value: formData.categoria,
-                                            onChange: (ev) => setFormData({...formData, categoria: ev.target.value, categoriaOtro: ''}),
+                                            value: formData.tipoMaterial,
+                                            onChange: (ev) => setFormData({...formData, tipoMaterial: ev.target.value, modelo: '', modeloNuevo: ''}),
                                             required: true
                                         },
-                                            e('option', { value: '' }, 'Seleccionar...'),
-                                            ['Portátiles', 'Smartphones', 'Tablets', 'Periféricos', 'Audio', 'Cables', 'Accesorios', 'Monitores', 'Teclados', 'Ratones', 'Webcams', 'Auriculares', 'Otro'].map(cat =>
-                                                e('option', { key: cat, value: cat }, cat)
-                                            )
+                                            e('option', { value: '' }, 'Seleccionar tipo...'),
+                                            Object.keys(state.catalogo || {}).sort().map(tipo =>
+                                                e('option', { key: tipo, value: tipo }, tipo)
+                                            ),
+                                            e('option', { value: '__nuevo__' }, '➕ Añadir nuevo tipo...')
+                                        )
+                                    ),
+                                    
+                                    // Dropdown Modelo (dependiente)
+                                    formData.tipoMaterial && formData.tipoMaterial !== '__nuevo__' && e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Modelo *'),
+                                        e('select', {
+                                            className: 'form-select',
+                                            value: formData.modelo,
+                                            onChange: (ev) => setFormData({...formData, modelo: ev.target.value, modeloNuevo: ''}),
+                                            required: true
+                                        },
+                                            e('option', { value: '' }, 'Seleccionar modelo...'),
+                                            (state.catalogo[formData.tipoMaterial] || []).sort().map(modelo =>
+                                                e('option', { key: modelo, value: modelo }, modelo)
+                                            ),
+                                            e('option', { value: '__nuevo__' }, '➕ Añadir nuevo modelo...')
                                         )
                                     )
                                 ),
-                                
-                                // Campo para categoría "Otro"
-                                formData.categoria === 'Otro' && e('div', { key: 'categoria-otro', className: 'form-group' },
-                                    e('label', { className: 'form-label' }, 'Especificar Categoría *'),
+
+                                // Campo para nuevo tipo
+                                formData.tipoMaterial === '__nuevo__' && e('div', { key: 'nuevo-tipo', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Nuevo Tipo de Material *'),
                                     e('input', {
                                         type: 'text',
                                         className: 'form-input',
-                                        placeholder: 'Escribe la categoría...',
+                                        placeholder: 'Ej: Impresoras, Docking Stations...',
                                         value: formData.categoriaOtro,
                                         onChange: (ev) => setFormData({...formData, categoriaOtro: ev.target.value}),
                                         required: true
                                     }),
-                                    formData.categoriaOtro && state.inventory.some(p => 
-                                        p.categoria.toLowerCase() === formData.categoriaOtro.toLowerCase()
+                                    formData.categoriaOtro && Object.keys(state.catalogo || {}).some(t => 
+                                        t.toLowerCase() === formData.categoriaOtro.toLowerCase()
                                     ) && e('div', {
                                         style: {
                                             marginTop: '8px',
                                             padding: '8px 12px',
-                                            background: 'rgba(88, 166, 255, 0.1)',
-                                            border: '1px solid var(--accent-blue)',
+                                            background: 'rgba(239, 68, 68, 0.1)',
+                                            border: '1px solid var(--accent-red)',
                                             borderRadius: '6px',
                                             fontSize: '12px',
-                                            color: 'var(--accent-blue)'
+                                            color: 'var(--accent-red)'
                                         }
-                                    }, `💡 Ya existe la categoría "${state.inventory.find(p => p.categoria.toLowerCase() === formData.categoriaOtro.toLowerCase())?.categoria}". Se usará esa.`)
+                                    }, `⚠️ Ya existe el tipo "${Object.keys(state.catalogo).find(t => t.toLowerCase() === formData.categoriaOtro.toLowerCase())}". Selecciónalo del desplegable.`)
                                 ),
 
+                                // Campo para nuevo tipo - modelo
+                                formData.tipoMaterial === '__nuevo__' && e('div', { key: 'nuevo-tipo-modelo', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Modelo del Nuevo Tipo *'),
+                                    e('input', {
+                                        type: 'text',
+                                        className: 'form-input',
+                                        placeholder: 'Ej: HP LaserJet Pro...',
+                                        value: formData.modeloNuevo,
+                                        onChange: (ev) => setFormData({...formData, modeloNuevo: ev.target.value}),
+                                        required: true
+                                    })
+                                ),
+
+                                // Campo para nuevo modelo (cuando tipo existe pero modelo no)
+                                formData.tipoMaterial && formData.tipoMaterial !== '__nuevo__' && formData.modelo === '__nuevo__' && e('div', { key: 'nuevo-modelo', className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Nuevo Modelo *'),
+                                    e('input', {
+                                        type: 'text',
+                                        className: 'form-input',
+                                        placeholder: 'Ej: HP EliteBook G12...',
+                                        value: formData.modeloNuevo,
+                                        onChange: (ev) => setFormData({...formData, modeloNuevo: ev.target.value}),
+                                        required: true
+                                    }),
+                                    formData.modeloNuevo && (state.catalogo[formData.tipoMaterial] || []).some(m => 
+                                        m.toLowerCase() === formData.modeloNuevo.toLowerCase()
+                                    ) && e('div', {
+                                        style: {
+                                            marginTop: '8px',
+                                            padding: '8px 12px',
+                                            background: 'rgba(239, 68, 68, 0.1)',
+                                            border: '1px solid var(--accent-red)',
+                                            borderRadius: '6px',
+                                            fontSize: '12px',
+                                            color: 'var(--accent-red)'
+                                        }
+                                    }, `⚠️ Ya existe el modelo "${(state.catalogo[formData.tipoMaterial] || []).find(m => m.toLowerCase() === formData.modeloNuevo.toLowerCase())}". Selecciónalo del desplegable.`)
+                                ),
+
+                                // Código de barras
                                 e('div', { key: 'row2', className: 'form-group' },
                                     e('label', { className: 'form-label' }, 'Código de Barras *'),
                                     e('div', { style: { display: 'flex', gap: '8px' } },
@@ -3116,6 +3212,7 @@
                                     )
                                 ),
 
+                                // Zona y Estado
                                 e('div', { key: 'row3', className: 'form-row' },
                                     e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Zona de Almacenamiento *'),
@@ -3965,7 +4062,10 @@
         function AssignmentDocumentModal({ assignment, onClose }) {
             if (!assignment) return null;
 
-            return e('div', { className: 'modal-overlay', onClick: onClose },
+            return e('div', { 
+                className: 'modal-overlay', 
+                onClick: (ev) => { if (ev.target === ev.currentTarget) onClose(); }
+            },
                 e('div', { className: 'modal', style: { maxWidth: '800px' }, onClick: (ev) => ev.stopPropagation() },
                     e('div', { className: 'modal-header' },
                         e('h2', { className: 'modal-title' }, '📄 Documento de Asignación'),
@@ -4136,7 +4236,10 @@
         }
 
         function ConfirmModal({ message, onConfirm, onCancel, loading }) {
-            return e('div', { className: 'modal-overlay', onClick: onCancel },
+            return e('div', { 
+                className: 'modal-overlay', 
+                onClick: (ev) => { if (ev.target === ev.currentTarget) onCancel(); }
+            },
                 e('div', { className: 'modal', style: { maxWidth: '500px' }, onClick: (ev) => ev.stopPropagation() },
                     e('div', { className: 'modal-header' },
                         e('h2', { className: 'modal-title' }, '⚠️ Confirmar Acción'),
@@ -4173,6 +4276,7 @@
                 technicians: [],
                 history: [],
                 assignments: [],
+                catalogo: {},
                 activeTab: 'dashboard',
                 loading: true,
                 modalType: null,
@@ -4221,6 +4325,7 @@
                         technicians: data.technicians,
                         history: data.history,
                         assignments: data.assignments,
+                        catalogo: data.catalogo || {},
                         loading: false
                     });
 
@@ -4289,7 +4394,8 @@
                         inventory: data.inventory,
                         history: data.history,
                         technicians: data.technicians,
-                        assignments: data.assignments
+                        assignments: data.assignments,
+                        catalogo: data.catalogo || {}
                     }));
                 } catch (error) {
                     console.error('Error al eliminar:', error);
@@ -4354,7 +4460,7 @@
                                     fontFamily: 'IBM Plex Mono, monospace',
                                     fontWeight: '600'
                                 } 
-                            }, 'v1.5.0')
+                            }, 'v1.5.1')
                         ),
                         e('div', { className: 'user-badges' },
                             e('span', { className: `user-badge ${state.isAdmin ? 'admin' : 'technician'}` },
