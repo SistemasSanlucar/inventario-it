@@ -21,8 +21,8 @@
             --accent-red: #ef4444; --accent-purple: #a855f7; --accent-yellow: #fbbf24;
             --border: #30363d; --shadow: rgba(0,0,0,0.5);
         }
-        body { font-family: 'Inter',-apple-system,BlinkMacSystemFont,sans-serif; background: linear-gradient(135deg,var(--bg-primary) 0%,#0d1117 100%); color: var(--text-primary); min-height: 100vh; overflow-x: hidden; }
-        .login-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; animation:fadeIn .5s ease; }
+        body { font-family: 'Inter',-apple-system,BlinkMacSystemFont,sans-serif; background: linear-gradient(135deg,var(--bg-primary) 0%,#0d1117 100%); color: var(--text-primary); min-height: 100vh; min-height: 100dvh; overflow-x: hidden; }
+        .login-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; min-height:100dvh; padding:20px; animation:fadeIn .5s ease; }
         .login-box { background:var(--bg-secondary); padding:60px 50px; border-radius:20px; border:1px solid var(--border); box-shadow:0 20px 60px var(--shadow); text-align:center; max-width:500px; width:100%; }
         .login-box h1 { font-size:32px; margin-bottom:16px; }
         .login-icon { font-size:64px; margin-bottom:16px; display:block; animation:bounce 2s infinite; }
@@ -30,9 +30,9 @@
         @keyframes fadeIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.7} }
         .login-box p { color:var(--text-secondary); margin-bottom:32px; line-height:1.6; }
-        .button { padding:14px 28px; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; transition:all .2s ease; display:inline-flex; align-items:center; gap:8px; justify-content:center; white-space:nowrap; }
+        .button { padding:14px 28px; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; transition:all .2s ease; display:inline-flex; align-items:center; gap:8px; justify-content:center; white-space:nowrap; -webkit-tap-highlight-color:transparent; min-height:44px; }
         .button:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 24px var(--shadow); }
-        .button:active:not(:disabled) { transform:translateY(0); }
+        .button:active:not(:disabled) { transform:translateY(0); opacity:.85; }
         .button:disabled { opacity:.5; cursor:not-allowed; }
         .button-primary { background:var(--accent-blue); color:white; }
         .button-success { background:var(--accent-green); color:white; }
@@ -72,7 +72,7 @@
         .tab-button:hover:not(:disabled) { background:var(--bg-tertiary); border-color:var(--accent-blue); transform:translateY(-2px); }
         .tab-button.active { background:var(--accent-blue); border-color:var(--accent-blue); color:white; }
         .tab-button:disabled { opacity:.5; cursor:not-allowed; transform:none; }
-        .content-section { background:var(--bg-secondary); padding:32px; border-radius:16px; border:1px solid var(--border); box-shadow:0 8px 24px var(--shadow); min-height:500px; }
+        .content-section { background:var(--bg-secondary); padding:32px; border-radius:16px; border:1px solid var(--border); box-shadow:0 8px 24px var(--shadow); min-height:500px; -webkit-overflow-scrolling:touch; }
         .toolbar { display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap; align-items:center; }
         .toolbar-left { flex:1; display:flex; gap:12px; flex-wrap:wrap; min-width:250px; }
         .toolbar-right { display:flex; gap:12px; }
@@ -131,17 +131,17 @@
         .global-loading .loading-spinner { width:50px; height:50px; border-width:4px; border-color:rgba(88,166,255,.3); border-top-color:var(--accent-blue); }
         .global-loading-text { color:var(--text-secondary); font-size:14px; }
         .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.8); display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px; animation:fadeIn .2s ease; }
-        .modal { background:var(--bg-secondary); border-radius:16px; border:1px solid var(--border); max-width:700px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px var(--shadow); animation:slideUp .3s ease; }
+        .modal { background:var(--bg-secondary); border-radius:16px; border:1px solid var(--border); max-width:700px; width:100%; max-height:90vh; max-height:90dvh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px var(--shadow); animation:slideUp .3s ease; }
         @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-        .modal-header { padding:24px 32px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:var(--bg-secondary); z-index:10; }
+        .modal-header { padding:24px 32px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; background:var(--bg-secondary); z-index:10; }
         .modal-title { font-size:22px; font-weight:700; }
-        .modal-close { background:none; border:none; color:var(--text-secondary); font-size:24px; cursor:pointer; padding:4px; line-height:1; transition:all .2s ease; width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:6px; }
+        .modal-close { background:none; border:none; color:var(--text-secondary); font-size:24px; cursor:pointer; padding:4px; line-height:1; transition:all .2s ease; width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:6px; -webkit-tap-highlight-color:transparent; }
         .modal-close:hover { color:var(--text-primary); background:var(--bg-tertiary); }
-        .modal-body { padding:32px; }
-        .modal-footer { padding:24px 32px; border-top:1px solid var(--border); display:flex; gap:12px; justify-content:flex-end; position:sticky; bottom:0; background:var(--bg-secondary); }
+        .modal-body { padding:32px; overflow-y:auto; -webkit-overflow-scrolling:touch; flex:1; }
+        .modal-footer { padding:24px 32px; border-top:1px solid var(--border); display:flex; gap:12px; justify-content:flex-end; flex-shrink:0; background:var(--bg-secondary); }
         .form-group { margin-bottom:20px; }
         .form-label { display:block; font-size:14px; font-weight:600; color:var(--text-secondary); margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px; }
-        .form-input,.form-select,.form-textarea { width:100%; padding:12px 16px; background:var(--bg-tertiary); border:2px solid var(--border); border-radius:8px; color:var(--text-primary); font-size:15px; transition:all .2s ease; font-family:'Inter',sans-serif; }
+        .form-input,.form-select,.form-textarea { width:100%; padding:12px 16px; background:var(--bg-tertiary); border:2px solid var(--border); border-radius:8px; color:var(--text-primary); font-size:16px; transition:all .2s ease; font-family:'Inter',sans-serif; -webkit-appearance:none; appearance:none; }
         .form-textarea { min-height:100px; resize:vertical; }
         .form-input:focus,.form-select:focus,.form-textarea:focus { outline:none; border-color:var(--accent-blue); box-shadow:0 0 0 4px rgba(88,166,255,.1); }
         .form-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:16px; }
@@ -152,7 +152,7 @@
         .signature-canvas { width:100%; height:200px; background:var(--bg-primary); border:2px solid var(--border); border-radius:8px; cursor:crosshair; touch-action:none; display:block; }
         .signature-actions { display:flex; gap:12px; margin-top:12px; }
         .required-asterisk { color:var(--accent-red); }
-        .action-icon { width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; transition:all .2s ease; background:var(--bg-primary); border:1px solid var(--border); font-size:16px; }
+        .action-icon { width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:8px; cursor:pointer; transition:all .2s ease; background:var(--bg-primary); border:1px solid var(--border); font-size:18px; -webkit-tap-highlight-color:transparent; }
         .action-icon:hover { transform:translateY(-2px); border-color:var(--accent-blue); }
         .action-icon.danger:hover { border-color:var(--accent-red); color:var(--accent-red); }
         .confirm-modal-icon { font-size:64px; text-align:center; margin-bottom:16px; }
@@ -161,11 +161,11 @@
         .tooltip { position:relative; }
         .tooltip::after { content:attr(data-tooltip); position:absolute; bottom:100%; left:50%; transform:translateX(-50%); background:var(--bg-primary); color:var(--text-primary); padding:6px 10px; border-radius:6px; font-size:12px; white-space:nowrap; opacity:0; visibility:hidden; transition:all .2s ease; z-index:1000; border:1px solid var(--border); }
         .tooltip:hover::after { opacity:1; visibility:visible; }
-        .user-search-dropdown { position:absolute; top:100%; left:0; right:0; background:var(--bg-secondary); border:2px solid var(--accent-blue); border-top:none; border-radius:0 0 8px 8px; z-index:2000; max-height:220px; overflow-y:auto; }
-        .user-search-item { padding:12px 16px; cursor:pointer; border-bottom:1px solid var(--border); }
+        .user-search-dropdown { position:absolute; top:100%; left:0; right:0; background:var(--bg-secondary); border:2px solid var(--accent-blue); border-top:none; border-radius:0 0 8px 8px; z-index:2000; max-height:220px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        .user-search-item { padding:14px 16px; cursor:pointer; border-bottom:1px solid var(--border); min-height:44px; display:flex; flex-direction:column; justify-content:center; -webkit-tap-highlight-color:transparent; }
         .user-search-item:hover { background:var(--bg-tertiary); }
         @media (max-width:768px) {
-            .app-container{padding:12px} .header{padding:20px} .header h1{font-size:22px} .inventory-grid{grid-template-columns:1fr} .dashboard-grid{grid-template-columns:1fr} .form-row{grid-template-columns:1fr} .toolbar{flex-direction:column} .toolbar-left,.toolbar-right{width:100%} .content-section{padding:20px} .modal{margin:0;max-height:100vh;border-radius:0}
+            .app-container{padding:12px} .header{padding:20px} .header h1{font-size:22px} .inventory-grid{grid-template-columns:1fr} .dashboard-grid{grid-template-columns:1fr} .form-row{grid-template-columns:1fr} .toolbar{flex-direction:column} .toolbar-left,.toolbar-right{width:100%} .content-section{padding:20px} .modal{margin:0;max-height:100vh;max-height:100dvh;border-radius:0;width:100%} .modal-body{padding:20px} .modal-header{padding:16px 20px} .modal-footer{padding:16px 20px}
         }
         .scanner-modal { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.95); z-index:99999; display:flex; align-items:center; justify-content:center; }
         .scanner-container { width:90%; max-width:500px; background:var(--bg-primary); border-radius:16px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.5); }
@@ -218,7 +218,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '1.7.0'
+        version: '1.8.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -806,22 +806,48 @@
         }
 
         // ==========================================
-        // FORM MODAL - COMPLETO v1.7.0
+        // CONSTANTES GLOBALES
+        // ==========================================
+        const UBICACIONES = [
+            'Puzol - Almacen',
+            'Puzol - Armario 1 pasillo IT',
+            'Puzol - Armario 2 pasillo IT',
+            'Puzol - Armario 1 pasillo CPD',
+            'Puzol - Armario 2 pasillo CPD'
+        ];
+
+        // ==========================================
+        // FORM MODAL - v1.8.0
         // ==========================================
         function FormModal({ state, modalType, selectedItem, onClose, onRefresh }) {
             const [loading, setLoading] = useState(false);
+
+            // Derivar tipo y modelo del nombre guardado (formato "Tipo - Modelo")
+            const deriveTipo = () => {
+                if (!selectedItem) return '';
+                const parts = (selectedItem.nombre || '').split(' - ');
+                return parts[0] || '';
+            };
+            const deriveModelo = () => {
+                if (!selectedItem) return '';
+                const parts = (selectedItem.nombre || '').split(' - ');
+                return parts.slice(1).join(' - ') || '';
+            };
+
             const [formData, setFormData] = useState({
-                nombre: selectedItem ? selectedItem.nombre : '',
-                categoria: selectedItem ? selectedItem.categoria : '',
+                tipo: deriveTipo(),
+                modelo: deriveModelo(),
+                tipoNuevo: '',
+                modeloNuevo: '',
                 barcode: (selectedItem && modalType !== 'duplicar') ? selectedItem.barcode : '',
-                stock: selectedItem ? String(selectedItem.stock) : '1',
+                stock: selectedItem ? String(selectedItem.stock) : '0',
                 stockMinimo: selectedItem ? String(selectedItem.stockMinimo) : '2',
                 ubicacion: selectedItem ? (selectedItem.ubicacion || '') : '',
                 estado: selectedItem ? (selectedItem.estado || 'Nuevo') : 'Nuevo',
                 cantidad: '1',
                 ticket: '',
                 usuario: '',
-                tecnico: (state.technicians.filter(t => t.activo)[0] || {}).nombre || '',
+                emailUsuario: '',
                 nombreEmpleado: '',
                 emailEmpleado: '',
                 departamento: '',
@@ -830,32 +856,54 @@
                 observaciones: '',
                 esPrestamo: modalType === 'nuevo-prestamo',
                 nombreTecnico: '',
-                emailTecnico: ''
+                emailTecnico: '',
+                showAddTipo: false,
+                showAddModelo: false
             });
+
             const [signature, setSignature] = useState(null);
             const [isDrawing, setIsDrawing] = useState(false);
             const [lastPos, setLastPos] = useState(null);
             const [userSearchQuery, setUserSearchQuery] = useState('');
             const [userSearchResults, setUserSearchResults] = useState([]);
             const [userSearchLoading, setUserSearchLoading] = useState(false);
+            const [salidaUserQuery, setSalidaUserQuery] = useState('');
+            const [salidaUserResults, setSalidaUserResults] = useState([]);
+            const [salidaUserLoading, setSalidaUserLoading] = useState(false);
             const [selectedProducts, setSelectedProducts] = useState([]);
             const [barcodeInput, setBarcodeInput] = useState('');
             const [barcodeError, setBarcodeError] = useState('');
             const [returnSelections, setReturnSelections] = useState({});
+            const [savingCatalog, setSavingCatalog] = useState(false);
             const canvasRef = useRef(null);
             const searchTimeoutRef = useRef(null);
+            const salidaSearchRef = useRef(null);
+            const overlayRef = useRef(null);
+            const mouseDownOnOverlay = useRef(false);
+
+            // Técnico = usuario logueado siempre
+            const tecnicoActual = state.user ? state.user.name : '';
 
             useEffect(() => {
                 if (canvasRef.current) {
                     const canvas = canvasRef.current;
                     canvas.width = canvas.offsetWidth || 600;
                     canvas.height = 200;
+                    const opts = { passive: false };
+                    canvas.addEventListener('touchstart', onCanvasDown, opts);
+                    canvas.addEventListener('touchmove', onCanvasMove, opts);
+                    canvas.addEventListener('touchend', onCanvasUp, opts);
+                    return () => {
+                        canvas.removeEventListener('touchstart', onCanvasDown, opts);
+                        canvas.removeEventListener('touchmove', onCanvasMove, opts);
+                        canvas.removeEventListener('touchend', onCanvasUp, opts);
+                    };
                 }
             });
 
             const upd = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
-            // Canvas drawing
+            // Canvas firma
             const getCanvasPos = (ev) => {
                 const canvas = canvasRef.current;
                 if (!canvas) return { x: 0, y: 0 };
@@ -886,15 +934,21 @@
                 setSignature(null);
             };
 
-            // User search AD
+            // Búsqueda AD - asignación
             const handleUserSearch = query => {
                 setUserSearchQuery(query);
                 if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
                 if (!query || query.length < 2) { setUserSearchResults([]); return; }
                 setUserSearchLoading(true);
                 searchTimeoutRef.current = setTimeout(async () => {
-                    try { const results = await dataManager.searchUsers(query); setUserSearchResults(results); }
-                    catch(err) { setUserSearchResults([]); }
+                    try {
+                        const results = await dataManager.searchUsers(query);
+                        setUserSearchResults(results);
+                        setTimeout(() => {
+                            const dropdown = document.querySelector('.user-search-dropdown');
+                            if (dropdown) dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }, 100);
+                    } catch(err) { setUserSearchResults([]); }
                     finally { setUserSearchLoading(false); }
                 }, 400);
             };
@@ -903,7 +957,24 @@
                 setUserSearchQuery(''); setUserSearchResults([]);
             };
 
-            // Products for assignment
+            // Búsqueda AD - salida
+            const handleSalidaUserSearch = query => {
+                setSalidaUserQuery(query);
+                if (salidaSearchRef.current) clearTimeout(salidaSearchRef.current);
+                if (!query || query.length < 2) { setSalidaUserResults([]); return; }
+                setSalidaUserLoading(true);
+                salidaSearchRef.current = setTimeout(async () => {
+                    try { const results = await dataManager.searchUsers(query); setSalidaUserResults(results); }
+                    catch(err) { setSalidaUserResults([]); }
+                    finally { setSalidaUserLoading(false); }
+                }, 400);
+            };
+            const selectSalidaUser = user => {
+                setFormData(prev => ({ ...prev, usuario: user.displayName || '', emailUsuario: user.mail || '' }));
+                setSalidaUserQuery(''); setSalidaUserResults([]);
+            };
+
+            // Productos para asignación
             const addProductByBarcode = barcode => {
                 if (!barcode) return;
                 const item = state.inventory.find(i => i.barcode === barcode);
@@ -915,77 +986,117 @@
                 showToast('Añadido: ' + item.nombre, 'success');
             };
 
-            const genBarcode = () => { const ts = Date.now().toString().slice(-8); const rnd = Math.floor(Math.random()*100).toString().padStart(2,'0'); upd('barcode', 'SL' + ts + rnd); };
+            const genBarcode = () => {
+                const ts = Date.now().toString().slice(-8);
+                const rnd = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+                upd('barcode', 'SL' + ts + rnd);
+            };
+
+            // Guardar nuevo tipo en catálogo (solo admins)
+            const saveTipoNuevo = async () => {
+                if (!formData.tipoNuevo.trim()) return;
+                setSavingCatalog(true);
+                try {
+                    await dataManager.addToCatalog(formData.tipoNuevo.trim(), '');
+                    showToast('Tipo añadido al catálogo', 'success');
+                    upd('tipo', formData.tipoNuevo.trim());
+                    upd('tipoNuevo', '');
+                    upd('showAddTipo', false);
+                    await onRefresh();
+                } catch(e) { showToast('Error guardando tipo', 'error'); }
+                finally { setSavingCatalog(false); }
+            };
+
+            // Guardar nuevo modelo en catálogo (solo admins)
+            const saveModeloNuevo = async () => {
+                if (!formData.tipo || !formData.modeloNuevo.trim()) return;
+                setSavingCatalog(true);
+                try {
+                    await dataManager.addToCatalog(formData.tipo, formData.modeloNuevo.trim());
+                    showToast('Modelo añadido al catálogo', 'success');
+                    upd('modelo', formData.modeloNuevo.trim());
+                    upd('modeloNuevo', '');
+                    upd('showAddModelo', false);
+                    await onRefresh();
+                } catch(e) { showToast('Error guardando modelo', 'error'); }
+                finally { setSavingCatalog(false); }
+            };
 
             // SUBMIT
             const handleSubmit = async () => {
                 setLoading(true);
                 try {
-                    // ---- ENTRADA NUEVO PRODUCTO ----
+                    // Nombre = Tipo + " - " + Modelo
+                    const nombreProducto = formData.tipo && formData.modelo ? formData.tipo + ' - ' + formData.modelo : (formData.tipo || '');
+
+                    // NUEVO PRODUCTO
                     if (modalType === 'entrada' && !selectedItem) {
-                        if (!formData.nombre.trim() || !formData.categoria.trim() || !formData.barcode.trim()) { showToast('Nombre, categoría y código son obligatorios', 'error'); setLoading(false); return; }
+                        if (!formData.tipo || !formData.modelo) { showToast('Selecciona tipo y modelo', 'error'); setLoading(false); return; }
+                        if (!formData.barcode.trim()) { showToast('El código de barras es obligatorio', 'error'); setLoading(false); return; }
+                        if (!formData.ubicacion) { showToast('Selecciona una ubicación', 'error'); setLoading(false); return; }
                         const exists = await dataManager.checkBarcodeExists(formData.barcode);
                         if (exists) { showToast('El código de barras ya existe', 'error'); setLoading(false); return; }
-                        await dataManager.createInventoryItem({ nombre: formData.nombre, categoria: formData.categoria, barcode: formData.barcode, stock: parseInt(formData.stock) || 0, stockMinimo: parseInt(formData.stockMinimo) || 0, ubicacion: formData.ubicacion, estado: formData.estado });
-                        if (parseInt(formData.stock) > 0) await dataManager.addToHistory({ tipo: 'Entrada', producto: formData.nombre, cantidad: parseInt(formData.stock) || 1, ticket: '', usuario: '', tecnico: formData.tecnico, firma: signature || '' });
-                        showToast('Producto creado: ' + formData.nombre, 'success');
+                        await dataManager.createInventoryItem({ nombre: nombreProducto, categoria: formData.tipo, barcode: formData.barcode, stock: parseInt(formData.stock) || 0, stockMinimo: parseInt(formData.stockMinimo) || 0, ubicacion: formData.ubicacion, estado: formData.estado });
+                        if (parseInt(formData.stock) > 0) await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: parseInt(formData.stock) || 1, ticket: '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
+                        showToast('Producto creado: ' + nombreProducto, 'success');
 
-                    // ---- ENTRADA AÑADIR STOCK ----
+                    // AÑADIR STOCK
                     } else if (modalType === 'entrada' && selectedItem) {
                         const addCant = parseInt(formData.cantidad) || 1;
                         const newStock = selectedItem.stock + addCant;
                         await dataManager.updateInventoryItem(selectedItem.id, { Stock: newStock });
-                        await dataManager.addToHistory({ tipo: 'Entrada', producto: selectedItem.nombre, cantidad: addCant, ticket: formData.ticket || '', usuario: '', tecnico: formData.tecnico, firma: signature || '' });
+                        await dataManager.addToHistory({ tipo: 'Entrada', producto: selectedItem.nombre, cantidad: addCant, ticket: formData.ticket || '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
                         showToast('+' + addCant + ' unidades → Stock: ' + newStock, 'success');
 
-                    // ---- SALIDA ----
+                    // SALIDA
                     } else if (modalType === 'salida') {
                         const cant = parseInt(formData.cantidad) || 1;
                         if (selectedItem.stock < cant) { showToast('Stock insuficiente (' + selectedItem.stock + ' disponibles)', 'error'); setLoading(false); return; }
-                        if (!formData.tecnico) { showToast('Selecciona un técnico', 'error'); setLoading(false); return; }
+                        if (!formData.usuario) { showToast('Selecciona el destinatario', 'error'); setLoading(false); return; }
                         await dataManager.updateInventoryItem(selectedItem.id, { Stock: selectedItem.stock - cant });
-                        await dataManager.addToHistory({ tipo: 'Salida', producto: selectedItem.nombre, cantidad: cant, ticket: formData.ticket || '', usuario: formData.usuario || '', tecnico: formData.tecnico, firma: signature || '' });
+                        await dataManager.addToHistory({ tipo: 'Salida', producto: selectedItem.nombre, cantidad: cant, ticket: formData.ticket || '', usuario: formData.usuario, tecnico: tecnicoActual, firma: signature || '' });
                         showToast('Salida: ' + cant + ' x ' + selectedItem.nombre, 'success');
 
-                    // ---- EDITAR ----
+                    // EDITAR
                     } else if (modalType === 'editar') {
-                        if (!formData.nombre.trim()) { showToast('El nombre es obligatorio', 'error'); setLoading(false); return; }
-                        await dataManager.updateInventoryItem(selectedItem.id, { Title: formData.nombre, Nombre: formData.nombre, Categoria: formData.categoria, CodigoBarras: formData.barcode, Stock: parseInt(formData.stock) || 0, StockMinimo: parseInt(formData.stockMinimo) || 0, Ubicacion: formData.ubicacion, Estado: formData.estado });
-                        showToast('Producto actualizado: ' + formData.nombre, 'success');
+                        if (!formData.tipo || !formData.modelo) { showToast('Selecciona tipo y modelo', 'error'); setLoading(false); return; }
+                        if (!formData.ubicacion) { showToast('Selecciona una ubicación', 'error'); setLoading(false); return; }
+                        await dataManager.updateInventoryItem(selectedItem.id, { Title: nombreProducto, Nombre: nombreProducto, Categoria: formData.tipo, CodigoBarras: formData.barcode, Stock: parseInt(formData.stock) || 0, StockMinimo: parseInt(formData.stockMinimo) || 0, Ubicacion: formData.ubicacion, Estado: formData.estado });
+                        showToast('Producto actualizado: ' + nombreProducto, 'success');
 
-                    // ---- DUPLICAR ----
+                    // DUPLICAR
                     } else if (modalType === 'duplicar') {
                         if (!formData.barcode.trim()) { showToast('Genera un nuevo código de barras', 'error'); setLoading(false); return; }
+                        if (!formData.ubicacion) { showToast('Selecciona una ubicación', 'error'); setLoading(false); return; }
                         const dupExists = await dataManager.checkBarcodeExists(formData.barcode);
                         if (dupExists) { showToast('El código ya existe, genera uno nuevo', 'error'); setLoading(false); return; }
-                        await dataManager.createInventoryItem({ nombre: formData.nombre, categoria: formData.categoria, barcode: formData.barcode, stock: parseInt(formData.stock) || 0, stockMinimo: parseInt(formData.stockMinimo) || 0, ubicacion: formData.ubicacion, estado: formData.estado });
+                        await dataManager.createInventoryItem({ nombre: nombreProducto, categoria: formData.tipo, barcode: formData.barcode, stock: parseInt(formData.stock) || 0, stockMinimo: parseInt(formData.stockMinimo) || 0, ubicacion: formData.ubicacion, estado: formData.estado });
                         showToast('Producto duplicado correctamente', 'success');
 
-                    // ---- NUEVO TÉCNICO ----
+                    // NUEVO TÉCNICO
                     } else if (modalType === 'tecnico') {
                         if (!formData.nombreTecnico.trim() || !formData.emailTecnico.trim()) { showToast('Nombre y email son obligatorios', 'error'); setLoading(false); return; }
                         const codigo = 'TEC' + Date.now().toString().slice(-6);
                         await dataManager.createTechnician({ nombre: formData.nombreTecnico, codigo, email: formData.emailTecnico });
                         showToast('Técnico creado. Código: ' + codigo, 'success');
 
-                    // ---- ASIGNACION / PRESTAMO ----
+                    // ASIGNACION / PRESTAMO
                     } else if (modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo') {
                         if (!formData.nombreEmpleado.trim()) { showToast('Selecciona un empleado', 'error'); setLoading(false); return; }
                         if (selectedProducts.length === 0) { showToast('Añade al menos un producto', 'error'); setLoading(false); return; }
-                        if (!formData.tecnico) { showToast('Selecciona un técnico responsable', 'error'); setLoading(false); return; }
                         for (const prod of selectedProducts) {
                             const invItem = state.inventory.find(inv => inv.id === prod.id);
                             if (invItem) await dataManager.updateInventoryItem(invItem.id, { Stock: invItem.stock - 1 });
-                            await dataManager.addToHistory({ tipo: formData.esPrestamo ? 'Prestamo' : 'Asignacion', producto: prod.nombre, cantidad: 1, ticket: '', usuario: formData.nombreEmpleado, tecnico: formData.tecnico, firma: signature || '' });
+                            await dataManager.addToHistory({ tipo: formData.esPrestamo ? 'Prestamo' : 'Asignacion', producto: prod.nombre, cantidad: 1, ticket: '', usuario: formData.nombreEmpleado, tecnico: tecnicoActual, firma: signature || '' });
                         }
-                        await dataManager.createAssignment({ nombreEmpleado: formData.nombreEmpleado, emailEmpleado: formData.emailEmpleado, departamento: formData.departamento, puesto: formData.puesto, fechaIncorporacion: formData.fechaIncorporacion, productosAsignados: selectedProducts, firmaEmpleado: signature || '', tecnicoResponsable: formData.tecnico, observaciones: formData.observaciones, esPrestamo: formData.esPrestamo, foto1: '', foto2: '', foto3: '' });
-                        showToast(formData.esPrestamo ? 'Préstamo registrado correctamente' : 'Asignación creada correctamente', 'success');
+                        await dataManager.createAssignment({ nombreEmpleado: formData.nombreEmpleado, emailEmpleado: formData.emailEmpleado, departamento: formData.departamento, puesto: formData.puesto, fechaIncorporacion: formData.fechaIncorporacion, productosAsignados: selectedProducts, firmaEmpleado: signature || '', tecnicoResponsable: tecnicoActual, observaciones: formData.observaciones, esPrestamo: formData.esPrestamo, foto1: '', foto2: '', foto3: '' });
+                        showToast(formData.esPrestamo ? 'Préstamo registrado' : 'Asignación creada', 'success');
 
-                    // ---- DEVOLUCION ----
+                    // DEVOLUCION
                     } else if (modalType === 'devolver-material') {
                         const toReturn = (selectedItem.productosAsignados || []).filter(p => returnSelections[p.barcode]);
                         if (toReturn.length === 0) { showToast('Selecciona al menos un producto', 'warning'); setLoading(false); return; }
-                        await dataManager.returnMaterial(selectedItem.id, toReturn, selectedItem.productosAsignados || [], formData.observaciones || '', formData.tecnico);
+                        await dataManager.returnMaterial(selectedItem.id, toReturn, selectedItem.productosAsignados || [], formData.observaciones || '', tecnicoActual);
                         showToast('Devolución registrada: ' + toReturn.length + ' producto(s)', 'success');
                     }
                     onClose();
@@ -996,65 +1107,140 @@
                 } finally { setLoading(false); }
             };
 
-            // Helpers render
-            const activeTechs = state.technicians.filter(t => t.activo);
-            const catalogCategories = Object.keys(state.catalogo || {});
-            const defaultCategories = ['Portatiles', 'Ratones', 'Teclados', 'Auriculares', 'iPads', 'iPhones', 'Cables', 'Monitores', 'Webcams', 'Docking Stations', 'Tablets', 'Otros'];
-            const allCategories = catalogCategories.length > 0 ? catalogCategories : defaultCategories;
+            // ---- HELPERS DE RENDER ----
+            const catalogo = state.catalogo || {};
+            const tiposDisponibles = Object.keys(catalogo);
+            const modelosDisponibles = formData.tipo ? (catalogo[formData.tipo] || []) : [];
 
             const fld = (label, input, required) => e('div', { className: 'form-group' },
                 e('label', { className: 'form-label' }, label, required && e('span', { className: 'required-asterisk' }, ' *')),
                 input
             );
-            const inp = (field, placeholder, type) => e('input', { type: type || 'text', className: 'form-input', value: formData[field], placeholder: placeholder || '', onChange: ev => upd(field, ev.target.value) });
-            const catSelect = (fieldName) => e('select', { className: 'form-select', value: formData[fieldName || 'categoria'], onChange: ev => upd(fieldName || 'categoria', ev.target.value) },
-                e('option', { value: '' }, '-- Selecciona categoria --'),
-                allCategories.map(cat => e('option', { key: cat, value: cat }, cat))
+            const inp = (field, placeholder, type) => e('input', {
+                type: type || 'text', className: 'form-input',
+                value: formData[field], placeholder: placeholder || '',
+                onChange: ev => upd(field, ev.target.value)
+            });
+
+            // Selector de ubicación - lista cerrada
+            const ubicacionSelect = () => e('select', {
+                className: 'form-select', value: formData.ubicacion,
+                onChange: ev => upd('ubicacion', ev.target.value)
+            },
+                e('option', { value: '' }, '-- Selecciona ubicacion --'),
+                UBICACIONES.map(u => e('option', { key: u, value: u }, u))
             );
-            const techSelect = () => e('select', { className: 'form-select', value: formData.tecnico, onChange: ev => upd('tecnico', ev.target.value) },
-                e('option', { value: '' }, '-- Selecciona tecnico --'),
-                activeTechs.map(t => e('option', { key: t.id, value: t.nombre }, t.nombre))
+
+            // Selectores de tipo y modelo dependientes con opción + Añadir para admins
+            const tipoModeloFields = () => e('div', null,
+                // TIPO
+                fld('Tipo de Material', e('div', null,
+                    e('div', { style: { display: 'flex', gap: '8px' } },
+                        e('select', {
+                            className: 'form-select', value: formData.tipo, style: { flex: 1 },
+                            onChange: ev => { upd('tipo', ev.target.value); upd('modelo', ''); upd('showAddModelo', false); }
+                        },
+                            e('option', { value: '' }, '-- Selecciona tipo --'),
+                            tiposDisponibles.map(t => e('option', { key: t, value: t }, t))
+                        ),
+                        state.isAdmin && e('button', {
+                            type: 'button', className: 'button button-secondary',
+                            onClick: () => upd('showAddTipo', !formData.showAddTipo),
+                            style: { padding: '10px 14px', fontSize: '18px', lineHeight: 1 }
+                        }, formData.showAddTipo ? '✕' : '+')
+                    ),
+                    state.isAdmin && formData.showAddTipo && e('div', { style: { display: 'flex', gap: '8px', marginTop: '8px' } },
+                        e('input', {
+                            type: 'text', className: 'form-input', placeholder: 'Nombre del nuevo tipo...',
+                            value: formData.tipoNuevo, onChange: ev => upd('tipoNuevo', ev.target.value),
+                            style: { flex: 1 }
+                        }),
+                        e('button', {
+                            type: 'button', className: 'button button-success',
+                            onClick: saveTipoNuevo, disabled: savingCatalog || !formData.tipoNuevo.trim(),
+                            style: { padding: '10px 16px' }
+                        }, savingCatalog ? e('span', { className: 'loading-spinner' }) : '✓ Guardar')
+                    )
+                ), true),
+
+                // MODELO (solo si hay tipo seleccionado)
+                formData.tipo && fld('Modelo', e('div', null,
+                    e('div', { style: { display: 'flex', gap: '8px' } },
+                        e('select', {
+                            className: 'form-select', value: formData.modelo, style: { flex: 1 },
+                            onChange: ev => upd('modelo', ev.target.value)
+                        },
+                            e('option', { value: '' }, '-- Selecciona modelo --'),
+                            modelosDisponibles.map(m => e('option', { key: m, value: m }, m))
+                        ),
+                        state.isAdmin && e('button', {
+                            type: 'button', className: 'button button-secondary',
+                            onClick: () => upd('showAddModelo', !formData.showAddModelo),
+                            style: { padding: '10px 14px', fontSize: '18px', lineHeight: 1 }
+                        }, formData.showAddModelo ? '✕' : '+')
+                    ),
+                    state.isAdmin && formData.showAddModelo && e('div', { style: { display: 'flex', gap: '8px', marginTop: '8px' } },
+                        e('input', {
+                            type: 'text', className: 'form-input', placeholder: 'Nombre del nuevo modelo...',
+                            value: formData.modeloNuevo, onChange: ev => upd('modeloNuevo', ev.target.value),
+                            style: { flex: 1 }
+                        }),
+                        e('button', {
+                            type: 'button', className: 'button button-success',
+                            onClick: saveModeloNuevo, disabled: savingCatalog || !formData.modeloNuevo.trim(),
+                            style: { padding: '10px 16px' }
+                        }, savingCatalog ? e('span', { className: 'loading-spinner' }) : '✓ Guardar')
+                    )
+                ), true)
             );
+
             const signatureBlock = () => e('div', { className: 'signature-container' },
                 e('div', { className: 'signature-label' }, '✍️ Firma'),
                 e('canvas', {
                     ref: canvasRef, className: 'signature-canvas',
                     onMouseDown: onCanvasDown, onMouseMove: onCanvasMove, onMouseUp: onCanvasUp, onMouseLeave: onCanvasUp,
-                    onTouchStart: onCanvasDown, onTouchMove: onCanvasMove, onTouchEnd: onCanvasUp,
-                    style: { cursor: 'crosshair', touchAction: 'none' }
+                    style: { cursor: 'crosshair', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }
                 }),
                 e('div', { className: 'signature-actions' },
-                    e('button', { type: 'button', className: 'button button-secondary', onClick: clearSignature, style: { fontSize: '13px', padding: '8px 16px' } }, '🗑️ Limpiar firma'),
+                    e('button', { type: 'button', className: 'button button-secondary', onClick: clearSignature, style: { fontSize: '13px', padding: '8px 16px' } }, '🗑️ Limpiar'),
                     signature && e('span', { style: { color: 'var(--accent-green)', fontSize: '13px', alignSelf: 'center' } }, '✓ Firma capturada')
                 )
             );
+
             const barcodeField = () => fld('Codigo de Barras',
                 e('div', { style: { display: 'flex', gap: '8px' } },
-                    e('input', { type: 'text', className: 'form-input', value: formData.barcode, placeholder: 'Escanea o introduce manualmente', onChange: ev => upd('barcode', ev.target.value), style: { flex: 1 } }),
+                    e('input', { type: 'text', className: 'form-input', value: formData.barcode, placeholder: 'Escanea o escribe', onChange: ev => upd('barcode', ev.target.value), style: { flex: 1 } }),
                     e('button', { type: 'button', className: 'button button-primary', onClick: () => startBarcodeScanner(code => upd('barcode', code)) }, '📷'),
-                    e('button', { type: 'button', className: 'button button-secondary', onClick: genBarcode, title: 'Generar código automático' }, '⚡ Gen')
+                    e('button', { type: 'button', className: 'button button-secondary', onClick: genBarcode }, '⚡ Gen')
                 ), true);
+
+            // Banner técnico logueado
+            const tecnicoBanner = () => e('div', { className: 'info-banner green', style: { marginBottom: '16px' } },
+                '👤 Técnico: ', e('strong', null, tecnicoActual)
+            );
 
             // ---- RENDER BODY ----
             const renderBody = () => {
 
-                // ENTRADA - NUEVO PRODUCTO
+                // NUEVO PRODUCTO
                 if (modalType === 'entrada' && !selectedItem) return e('div', null,
-                    e('div', { className: 'form-row' }, fld('Nombre del producto', inp('nombre', 'Ej: Laptop Dell XPS 13'), true), fld('Categoria', catSelect(), true)),
+                    tecnicoBanner(),
+                    tipoModeloFields(),
                     barcodeField(),
                     e('div', { className: 'form-row' },
                         fld('Stock Inicial', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stock, onChange: ev => upd('stock', ev.target.value) })),
                         fld('Stock Minimo', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stockMinimo, onChange: ev => upd('stockMinimo', ev.target.value) }))
                     ),
                     e('div', { className: 'form-row' },
-                        fld('Ubicacion', inp('ubicacion', 'Ej: Estanteria A, Cajon 2')),
-                        fld('Estado', e('select', { className: 'form-select', value: formData.estado, onChange: ev => upd('estado', ev.target.value) }, e('option', { value: 'Nuevo' }, 'Nuevo'), e('option', { value: 'Usado' }, 'Usado')))
-                    ),
-                    fld('Tecnico responsable', techSelect())
+                        fld('Ubicacion', ubicacionSelect(), true),
+                        fld('Estado', e('select', { className: 'form-select', value: formData.estado, onChange: ev => upd('estado', ev.target.value) },
+                            e('option', { value: 'Nuevo' }, 'Nuevo'), e('option', { value: 'Usado' }, 'Usado')))
+                    )
                 );
 
-                // ENTRADA - AÑADIR STOCK
+                // AÑADIR STOCK
                 if (modalType === 'entrada' && selectedItem) return e('div', null,
+                    tecnicoBanner(),
                     e('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '8px', marginBottom: '20px' } },
                         e('div', { style: { fontWeight: '700', fontSize: '18px', marginBottom: '8px' } }, selectedItem.nombre),
                         e('div', { style: { display: 'flex', gap: '24px', flexWrap: 'wrap' } },
@@ -1063,65 +1249,85 @@
                         )
                     ),
                     e('div', { className: 'form-row' },
-                        fld('Unidades a anadir', e('input', { type: 'number', min: '1', className: 'form-input', value: formData.cantidad, onChange: ev => upd('cantidad', ev.target.value) }), true),
+                        fld('Unidades a añadir', e('input', { type: 'number', min: '1', className: 'form-input', value: formData.cantidad, onChange: ev => upd('cantidad', ev.target.value) }), true),
                         fld('Ticket (opcional)', inp('ticket', 'Ej: INC-123456'))
                     ),
-                    fld('Tecnico responsable', techSelect()),
                     e('div', { className: 'stock-result' }, '✓ Stock resultante: ' + (selectedItem.stock + (parseInt(formData.cantidad) || 0)) + ' unidades'),
                     signatureBlock()
                 );
 
                 // SALIDA
                 if (modalType === 'salida') return e('div', null,
+                    tecnicoBanner(),
                     e('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '8px', marginBottom: '20px' } },
                         e('div', { style: { fontWeight: '700', fontSize: '18px', marginBottom: '8px' } }, selectedItem.nombre),
                         e('div', { style: { display: 'flex', gap: '24px', flexWrap: 'wrap' } },
                             e('span', null, 'Stock disponible: ', e('strong', { style: { color: selectedItem.stock > 0 ? 'var(--accent-green)' : 'var(--accent-red)' } }, selectedItem.stock + ' uds')),
-                            e('span', null, 'Categoria: ', e('strong', null, selectedItem.categoria))
+                            e('span', null, 'Categoría: ', e('strong', null, selectedItem.categoria))
                         )
                     ),
                     e('div', { className: 'form-row' },
                         fld('Cantidad', e('input', { type: 'number', min: '1', max: String(selectedItem.stock), className: 'form-input', value: formData.cantidad, onChange: ev => upd('cantidad', ev.target.value) }), true),
-                        fld('Numero de Ticket', inp('ticket', 'Ej: INC-123456'))
+                        fld('Ticket', inp('ticket', 'Ej: INC-123456'))
                     ),
-                    e('div', { className: 'form-row' },
-                        fld('Usuario / Destinatario', inp('usuario', 'Nombre del empleado o destino'), true),
-                        fld('Tecnico responsable', techSelect(), true)
+                    // Búsqueda AD destinatario
+                    e('div', { className: 'form-group', style: { position: 'relative' } },
+                        e('label', { className: 'form-label' }, 'Destinatario', e('span', { className: 'required-asterisk' }, ' *')),
+                        e('input', {
+                            type: 'text', className: 'form-input',
+                            value: formData.usuario || salidaUserQuery,
+                            placeholder: 'Buscar empleado en Active Directory...',
+                            onChange: ev => {
+                                if (formData.usuario) setFormData(prev => ({ ...prev, usuario: '', emailUsuario: '' }));
+                                handleSalidaUserSearch(ev.target.value);
+                            }
+                        }),
+                        formData.usuario && e('div', { style: { marginTop: '6px', color: 'var(--accent-green)', fontSize: '13px' } }, '✓ ' + formData.usuario + (formData.emailUsuario ? ' · ' + formData.emailUsuario : '')),
+                        (salidaUserLoading || salidaUserResults.length > 0) && e('div', { className: 'user-search-dropdown' },
+                            salidaUserLoading && e('div', { style: { padding: '12px', color: 'var(--text-secondary)', fontSize: '14px' } }, '⏳ Buscando...'),
+                            salidaUserResults.map(user => e('div', { key: user.id, className: 'user-search-item', onClick: () => selectSalidaUser(user) },
+                                e('div', { style: { fontWeight: '600', fontSize: '14px' } }, user.displayName),
+                                e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, user.mail),
+                                (user.department || user.jobTitle) && e('div', { style: { fontSize: '12px', color: 'var(--accent-blue)' } }, [user.department, user.jobTitle].filter(Boolean).join(' · '))
+                            ))
+                        )
                     ),
                     signatureBlock()
                 );
 
                 // EDITAR
                 if (modalType === 'editar') return e('div', null,
-                    e('div', { className: 'form-row' }, fld('Nombre', inp('nombre', 'Nombre del producto'), true), fld('Categoria', catSelect(), true)),
-                    fld('Codigo de Barras', inp('barcode', 'Codigo de barras'), true),
+                    tipoModeloFields(),
+                    barcodeField(),
                     e('div', { className: 'form-row' },
                         fld('Stock Actual', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stock, onChange: ev => upd('stock', ev.target.value) })),
                         fld('Stock Minimo', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stockMinimo, onChange: ev => upd('stockMinimo', ev.target.value) }))
                     ),
                     e('div', { className: 'form-row' },
-                        fld('Ubicacion', inp('ubicacion', 'Ej: Estanteria A')),
-                        fld('Estado', e('select', { className: 'form-select', value: formData.estado, onChange: ev => upd('estado', ev.target.value) }, e('option', { value: 'Nuevo' }, 'Nuevo'), e('option', { value: 'Usado' }, 'Usado')))
+                        fld('Ubicacion', ubicacionSelect(), true),
+                        fld('Estado', e('select', { className: 'form-select', value: formData.estado, onChange: ev => upd('estado', ev.target.value) },
+                            e('option', { value: 'Nuevo' }, 'Nuevo'), e('option', { value: 'Usado' }, 'Usado')))
                     )
                 );
 
                 // DUPLICAR
                 if (modalType === 'duplicar') return e('div', null,
-                    e('div', { className: 'info-banner blue' }, 'ℹ️ Se creara un nuevo producto basado en "', selectedItem.nombre, '". Asigna un nuevo codigo de barras unico.'),
-                    e('div', { className: 'form-row' }, fld('Nombre', inp('nombre', 'Nombre del producto')), fld('Categoria', catSelect())),
+                    e('div', { className: 'info-banner blue' }, 'ℹ️ Nuevo producto basado en "', selectedItem.nombre, '". Asigna un código de barras único.'),
+                    tipoModeloFields(),
                     fld('Nuevo Codigo de Barras',
                         e('div', { style: { display: 'flex', gap: '8px' } },
-                            e('input', { type: 'text', className: 'form-input', value: formData.barcode, placeholder: 'Nuevo codigo unico', onChange: ev => upd('barcode', ev.target.value), style: { flex: 1 } }),
+                            e('input', { type: 'text', className: 'form-input', value: formData.barcode, placeholder: 'Nuevo código único', onChange: ev => upd('barcode', ev.target.value), style: { flex: 1 } }),
                             e('button', { type: 'button', className: 'button button-primary', onClick: () => startBarcodeScanner(code => upd('barcode', code)) }, '📷'),
-                            e('button', { type: 'button', className: 'button button-secondary', onClick: genBarcode }, '⚡ Generar')
+                            e('button', { type: 'button', className: 'button button-secondary', onClick: genBarcode }, '⚡ Gen')
                         ), true),
                     e('div', { className: 'form-row' },
                         fld('Stock', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stock, onChange: ev => upd('stock', ev.target.value) })),
                         fld('Stock Minimo', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stockMinimo, onChange: ev => upd('stockMinimo', ev.target.value) }))
                     ),
                     e('div', { className: 'form-row' },
-                        fld('Ubicacion', inp('ubicacion', 'Ej: Estanteria A')),
-                        fld('Estado', e('select', { className: 'form-select', value: formData.estado, onChange: ev => upd('estado', ev.target.value) }, e('option', { value: 'Nuevo' }, 'Nuevo'), e('option', { value: 'Usado' }, 'Usado')))
+                        fld('Ubicacion', ubicacionSelect(), true),
+                        fld('Estado', e('select', { className: 'form-select', value: formData.estado, onChange: ev => upd('estado', ev.target.value) },
+                            e('option', { value: 'Nuevo' }, 'Nuevo'), e('option', { value: 'Usado' }, 'Usado')))
                     )
                 );
 
@@ -1131,13 +1337,14 @@
                         fld('Nombre completo', e('input', { type: 'text', className: 'form-input', value: formData.nombreTecnico, placeholder: 'Ej: Juan Garcia', onChange: ev => upd('nombreTecnico', ev.target.value) }), true),
                         fld('Email corporativo', e('input', { type: 'email', className: 'form-input', value: formData.emailTecnico, placeholder: 'juan.garcia@sanlucar.com', onChange: ev => upd('emailTecnico', ev.target.value) }), true)
                     ),
-                    e('div', { className: 'info-banner blue' }, 'ℹ️ El codigo de tecnico se generara automaticamente. Podras imprimir la tarjeta con codigo de barras desde el panel de Tecnicos.')
+                    e('div', { className: 'info-banner blue' }, 'ℹ️ El código de técnico se generará automáticamente. Podrás imprimir la tarjeta con código de barras desde el panel de Técnicos.')
                 );
 
                 // ASIGNACION / PRESTAMO
                 if (modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo') return e('div', null,
-                    formData.esPrestamo && e('div', { className: 'info-banner orange' }, '⏱️ PRESTAMO: Este material debe ser devuelto. Se marcará como vencido si no se devuelve en el dia de hoy.'),
-                    // Employee search
+                    tecnicoBanner(),
+                    formData.esPrestamo && e('div', { className: 'info-banner orange' }, '⏱️ PRÉSTAMO: Este material debe ser devuelto hoy.'),
+                    // Búsqueda empleado AD
                     e('div', { className: 'form-group', style: { position: 'relative' } },
                         e('label', { className: 'form-label' }, 'Empleado', e('span', { className: 'required-asterisk' }, ' *')),
                         e('input', {
@@ -1166,35 +1373,32 @@
                         ),
                         fld('Fecha incorporacion', e('input', { type: 'date', className: 'form-input', value: formData.fechaIncorporacion, onChange: ev => upd('fechaIncorporacion', ev.target.value) }))
                     ),
-                    // Products
+                    // Productos
                     e('div', { style: { marginBottom: '8px' } }, e('label', { className: 'form-label' }, 'Productos', e('span', { className: 'required-asterisk' }, ' *'))),
                     e('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } },
                         e('input', {
                             type: 'text', className: 'form-input', value: barcodeInput,
-                            placeholder: 'Codigo de barras del producto (Enter para añadir)...',
+                            placeholder: 'Código de barras (Enter para añadir)...',
                             style: { flex: 1, fontFamily: 'IBM Plex Mono,monospace' },
                             onChange: ev => { setBarcodeInput(ev.target.value); setBarcodeError(''); },
                             onKeyDown: ev => { if (ev.key === 'Enter') { ev.preventDefault(); addProductByBarcode(barcodeInput.trim()); } }
                         }),
-                        e('button', { type: 'button', className: 'button button-primary', onClick: () => startBarcodeScanner(code => addProductByBarcode(code)) }, '📷 Escanear'),
+                        e('button', { type: 'button', className: 'button button-primary', onClick: () => startBarcodeScanner(code => addProductByBarcode(code)) }, '📷'),
                         e('button', { type: 'button', className: 'button button-success', onClick: () => addProductByBarcode(barcodeInput.trim()) }, '+ Añadir')
                     ),
                     barcodeError && e('div', { style: { color: 'var(--accent-red)', fontSize: '13px', marginBottom: '8px' } }, '⚠️ ' + barcodeError),
                     selectedProducts.length > 0 && e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '8px', padding: '12px', marginBottom: '16px' } },
-                        e('div', { style: { fontWeight: '600', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase' } }, selectedProducts.length + ' producto(s) seleccionado(s)'),
+                        e('div', { style: { fontWeight: '600', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase' } }, selectedProducts.length + ' producto(s)'),
                         selectedProducts.map((prod, idx) => e('div', { key: prod.barcode, className: 'product-row-assigned' },
                             e('div', null,
                                 e('span', { style: { fontWeight: '600', marginRight: '8px' } }, (idx + 1) + '. ' + prod.nombre),
                                 e('span', { style: { color: 'var(--accent-blue)', fontSize: '12px', fontFamily: 'IBM Plex Mono,monospace' } }, prod.barcode)
                             ),
-                            e('button', { type: 'button', style: { background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: '20px', padding: '0 4px', lineHeight: 1 }, onClick: () => setSelectedProducts(prev => prev.filter(p => p.barcode !== prod.barcode)) }, '×')
+                            e('button', { type: 'button', style: { background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: '20px', padding: '0 4px' }, onClick: () => setSelectedProducts(prev => prev.filter(p => p.barcode !== prod.barcode)) }, '×')
                         ))
                     ),
-                    selectedProducts.length === 0 && e('div', { style: { color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, 'Ningún producto añadido todavía. Escanea o escribe el código de barras.'),
-                    e('div', { className: 'form-row' },
-                        fld('Tecnico responsable', techSelect(), true),
-                        fld('Observaciones', inp('observaciones', 'Opcional'))
-                    ),
+                    selectedProducts.length === 0 && e('div', { style: { color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, 'Ningún producto añadido. Escanea o escribe el código de barras.'),
+                    fld('Observaciones', inp('observaciones', 'Opcional')),
                     signatureBlock()
                 );
 
@@ -1209,7 +1413,7 @@
                             e('span', { style: { background: selectedItem.esPrestamo ? 'var(--accent-orange)' : 'var(--accent-blue)', color: 'white', padding: '6px 14px', borderRadius: '6px', fontWeight: '700', fontSize: '13px' } }, selectedItem.esPrestamo ? '⏱️ PRESTAMO' : '📋 ASIGNACION')
                         ),
                         e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' } },
-                            [{ label: 'Departamento', value: selectedItem.departamento }, { label: 'Puesto', value: selectedItem.puesto }, { label: 'Tecnico IT', value: selectedItem.tecnicoResponsable }, { label: 'Fecha asignacion', value: new Date(selectedItem.fechaAsignacion).toLocaleDateString('es-ES') }, { label: 'Estado', value: selectedItem.estado }].map((info, idx) =>
+                            [{ label: 'Departamento', value: selectedItem.departamento }, { label: 'Puesto', value: selectedItem.puesto }, { label: 'Técnico IT', value: selectedItem.tecnicoResponsable }, { label: 'Fecha asignacion', value: new Date(selectedItem.fechaAsignacion).toLocaleDateString('es-ES') }, { label: 'Estado', value: selectedItem.estado }].map((info, idx) =>
                                 e('div', { key: idx }, e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '2px' } }, info.label), e('div', { style: { fontWeight: '600', fontSize: '14px' } }, info.value || '-'))
                             )
                         )
@@ -1238,6 +1442,7 @@
                     const productos = selectedItem.productosAsignados || [];
                     const selected = Object.values(returnSelections).filter(Boolean).length;
                     return e('div', null,
+                        tecnicoBanner(),
                         e('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '8px', marginBottom: '20px' } },
                             e('div', { style: { fontWeight: '700', fontSize: '16px', marginBottom: '4px' } }, selectedItem.nombreEmpleado),
                             e('div', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, selectedItem.emailEmpleado + ' · ' + selectedItem.departamento)
@@ -1260,28 +1465,43 @@
                                 ' de ' + productos.length + ' productos seleccionados'
                             )
                         ),
-                        e('div', { className: 'form-row' },
-                            fld('Tecnico que recibe', techSelect()),
-                            fld('Observaciones', inp('observaciones', 'Estado del material, accesorios...'))
-                        )
+                        fld('Observaciones', inp('observaciones', 'Estado del material, accesorios devueltos...'))
                     );
                 }
 
                 return e('div', { style: { textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' } }, 'Formulario no disponible');
             };
 
-            // Modal title
-            const titles = { 'entrada-new': '📦 Nuevo Producto', 'entrada-add': '➕ Anadir Stock', 'salida': '📤 Registrar Salida', 'editar': '✏️ Editar Producto', 'duplicar': '🔄 Duplicar Producto', 'tecnico': '👤 Nuevo Tecnico', 'nueva-asignacion': '📋 Nueva Asignacion', 'nuevo-prestamo': '⏱️ Prestamo de Material', 'ver-asignacion': '📄 Documento de Asignacion', 'devolver-material': '↩️ Devolucion de Material' };
+            const titles = {
+                'entrada-new': '📦 Nuevo Producto', 'entrada-add': '➕ Añadir Stock',
+                'salida': '📤 Registrar Salida', 'editar': '✏️ Editar Producto',
+                'duplicar': '🔄 Duplicar Producto', 'tecnico': '👤 Nuevo Técnico',
+                'nueva-asignacion': '📋 Nueva Asignacion', 'nuevo-prestamo': '⏱️ Prestamo de Material',
+                'ver-asignacion': '📄 Documento de Asignacion', 'devolver-material': '↩️ Devolucion de Material'
+            };
             const titleKey = modalType === 'entrada' ? (selectedItem ? 'entrada-add' : 'entrada-new') : modalType;
             const modalTitle = titles[titleKey] || 'Formulario';
-
             const isViewOnly = modalType === 'ver-asignacion';
-            const submitLabels = { 'entrada-new': 'Crear Producto', 'entrada-add': 'Anadir Stock', 'salida': 'Registrar Salida', 'editar': 'Guardar Cambios', 'duplicar': 'Duplicar Producto', 'tecnico': 'Crear Tecnico', 'nueva-asignacion': 'Crear Asignacion', 'nuevo-prestamo': 'Registrar Prestamo', 'devolver-material': 'Confirmar Devolucion' };
+            const submitLabels = {
+                'entrada-new': 'Crear Producto', 'entrada-add': 'Añadir Stock',
+                'salida': 'Registrar Salida', 'editar': 'Guardar Cambios',
+                'duplicar': 'Duplicar Producto', 'tecnico': 'Crear Técnico',
+                'nueva-asignacion': 'Crear Asignacion', 'nuevo-prestamo': 'Registrar Prestamo',
+                'devolver-material': 'Confirmar Devolucion'
+            };
             const submitLabel = submitLabels[titleKey] || 'Guardar';
             const submitClass = modalType === 'salida' ? 'button-warning' : modalType === 'devolver-material' ? 'button-success' : 'button-primary';
 
-            return e('div', { className: 'modal-overlay', onClick: ev => { if (ev.target === ev.currentTarget && !loading) onClose(); } },
-                e('div', { className: 'modal', onClick: ev => ev.stopPropagation() },
+            const overlayRef = useRef(null);
+            const mouseDownOnOverlay = useRef(false);
+
+            return e('div', {
+                className: 'modal-overlay',
+                ref: overlayRef,
+                onMouseDown: ev => { mouseDownOnOverlay.current = ev.target === overlayRef.current; },
+                onMouseUp: ev => { if (mouseDownOnOverlay.current && ev.target === overlayRef.current && !loading) onClose(); mouseDownOnOverlay.current = false; }
+            },
+                e('div', { className: 'modal', onMouseDown: ev => ev.stopPropagation() },
                     e('div', { className: 'modal-header' },
                         e('h2', { className: 'modal-title' }, modalTitle),
                         e('button', { className: 'modal-close', onClick: () => { if (!loading) onClose(); }, disabled: loading }, '×')
