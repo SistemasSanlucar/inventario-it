@@ -1700,9 +1700,9 @@
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             
-            const icons = { success: '鉁?, error: '鉁?, warning: '鈿? };
+            const icons = { success: 'OK', error: 'X', warning: '!' };
             toast.innerHTML = `
-                <span class="icon">${icons[type] || '鈥?}</span>
+                <span class="icon">${icons[type] || '*'}</span>
                 <span class="text">${message}</span>
             `;
             
