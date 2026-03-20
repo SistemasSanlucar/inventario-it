@@ -209,7 +209,8 @@
                 historial: 'StockControl_HistorialIT',
                 admins: 'StockControl_Admins',
                 asignaciones: 'StockControl_Asignaciones',
-                catalogo: 'StockControl_Catalogo'
+                catalogo: 'StockControl_Catalogo',
+                ubicaciones: 'StockControl_Ubicaciones'
             }
         },
         msal: {
@@ -218,7 +219,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '1.8.0'
+        version: '1.9.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -292,13 +293,14 @@
         constructor(graphClient) { this.graph = graphClient; }
         async loadAllData() {
             try {
-                const [inventario, tecnicos, historial, admins, asignaciones, catalogo] = await Promise.all([
+                const [inventario, tecnicos, historial, admins, asignaciones, catalogo, ubicacionesRaw] = await Promise.all([
                     this.graph.getListItems(CONFIG.sharepoint.lists.inventario),
                     this.graph.getListItems(CONFIG.sharepoint.lists.tecnicos),
                     this.graph.getListItems(CONFIG.sharepoint.lists.historial),
                     this.graph.getListItems(CONFIG.sharepoint.lists.admins),
                     this.graph.getListItems(CONFIG.sharepoint.lists.asignaciones).catch(() => []),
-                    this.graph.getListItems(CONFIG.sharepoint.lists.catalogo).catch(() => [])
+                    this.graph.getListItems(CONFIG.sharepoint.lists.catalogo).catch(() => []),
+                    this.graph.getListItems(CONFIG.sharepoint.lists.ubicaciones).catch(() => [])
                 ]);
                 const catalogoProcessed = {};
                 catalogo.forEach(item => {
@@ -311,7 +313,10 @@
                     technicians: tecnicos.map(item => ({ id: item.sharePointId, nombre: item.NombreTecnico || item.Title, codigo: item.CodigoTecnico, email: item.Email, activo: item.Activo === true || item.Activo === 'Yes' })),
                     history: historial.map(item => ({ id: item.sharePointId, fecha: item.FechaHora || item.Created, tipo: item.TipoMovimiento, producto: item.Producto, cantidad: parseInt(item.Cantidad) || 0, ticket: item.Ticket || '', usuario: item.Usuario || '', tecnico: item.Tecnico || '', firma: item.Firma || null })).sort((a,b) => new Date(b.fecha) - new Date(a.fecha)),
                     assignments: asignaciones.map(item => ({ id: item.sharePointId, nombreEmpleado: item.NombreEmpleado, emailEmpleado: item.EmailEmpleado, departamento: item.Departamento, puesto: item.Puesto, fechaIncorporacion: item.FechaIncorporacion, productosAsignados: JSON.parse(item.ProductosAsignados || '[]'), cantidadProductos: parseInt(item.CantidadProductos) || 0, firmaEmpleado: item.FirmaEmpleado, tecnicoResponsable: item.TecnicoResponsable, fechaAsignacion: item.FechaAsignacion, estado: item.Estado, observaciones: item.Observaciones || '', esPrestamo: item.EsPrestamo === 'Si' })).sort((a,b) => new Date(b.fechaAsignacion) - new Date(a.fechaAsignacion)),
-                    admins, catalogo: catalogoProcessed
+                    admins, catalogo: catalogoProcessed,
+                    ubicaciones: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === true || item.Activo === 'Yes' || item.Activo === 'Si' })).filter(u => u.activo).sort((a,b) => a.nombre.localeCompare(b.nombre)),
+                    ubicacionesAll: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === true || item.Activo === 'Yes' || item.Activo === 'Si' })),
+                    adminsAll: admins.map(item => ({ id: item.sharePointId, email: item.Email, activo: item.Activo === true || item.Activo === 'Yes' }))
                 };
             } catch(error) { console.error('Error cargando datos:', error); throw error; }
         }
@@ -326,6 +331,20 @@
         async addToHistory(data) {
             await this.graph.createListItem(CONFIG.sharepoint.lists.historial, { Title: data.tipo + ' - ' + data.producto, TipoMovimiento: data.tipo, Producto: data.producto, Cantidad: data.cantidad, Ticket: data.ticket || '', Usuario: data.usuario || '', Tecnico: data.tecnico || '', FechaHora: new Date().toISOString(), Firma: data.firma || '' });
         }
+        // UBICACIONES CRUD
+        async createUbicacion(nombre) { return await this.graph.createListItem(CONFIG.sharepoint.lists.ubicaciones, { Title: nombre, Activo: true }); }
+        async toggleUbicacion(itemId, activo) { await this.graph.updateListItem(CONFIG.sharepoint.lists.ubicaciones, itemId, { Activo: !activo }); }
+        async deleteUbicacion(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.ubicaciones, itemId); }
+        // CATALOGO CRUD completo
+        async deleteCatalogItem(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.catalogo, itemId); }
+        async getCatalogoRaw() {
+            const items = await this.graph.getListItems(CONFIG.sharepoint.lists.catalogo);
+            return items.map(item => ({ id: item.sharePointId, tipo: item.Title, modelo: item.Modelo, activo: item.Activo !== false && item.Activo !== 'No' }));
+        }
+        // ADMINS CRUD
+        async createAdmin(email) { return await this.graph.createListItem(CONFIG.sharepoint.lists.admins, { Title: email, Email: email, Activo: true }); }
+        async toggleAdmin(itemId, activo) { await this.graph.updateListItem(CONFIG.sharepoint.lists.admins, itemId, { Activo: !activo }); }
+        async deleteAdmin(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.admins, itemId); }
         async createTechnician(data) {
             return await this.graph.createListItem(CONFIG.sharepoint.lists.tecnicos, { Title: data.nombre, NombreTecnico: data.nombre, CodigoTecnico: data.codigo, Email: data.email, Activo: true });
         }
@@ -808,16 +827,8 @@
         // ==========================================
         // CONSTANTES GLOBALES
         // ==========================================
-        const UBICACIONES = [
-            'Puzol - Almacen',
-            'Puzol - Armario 1 pasillo IT',
-            'Puzol - Armario 2 pasillo IT',
-            'Puzol - Armario 1 pasillo CPD',
-            'Puzol - Armario 2 pasillo CPD'
-        ];
-
         // ==========================================
-        // FORM MODAL - v1.8.0
+        // FORM MODAL - v1.9.0
         // ==========================================
         function FormModal({ state, modalType, selectedItem, onClose, onRefresh }) {
             const [loading, setLoading] = useState(false);
@@ -841,7 +852,7 @@
                 modeloNuevo: '',
                 barcode: (selectedItem && modalType !== 'duplicar') ? selectedItem.barcode : '',
                 stock: selectedItem ? String(selectedItem.stock) : '0',
-                stockMinimo: selectedItem ? String(selectedItem.stockMinimo) : '2',
+                stockMinimo: selectedItem ? String(selectedItem.stockMinimo) : String(state.stockMinimoDefault || 2),
                 ubicacion: selectedItem ? (selectedItem.ubicacion || '') : '',
                 estado: selectedItem ? (selectedItem.estado || 'Nuevo') : 'Nuevo',
                 cantidad: '1',
@@ -1120,13 +1131,13 @@
                 onChange: ev => upd(field, ev.target.value)
             });
 
-            // Selector de ubicación - lista cerrada
+            // Selector de ubicación - desde SharePoint
             const ubicacionSelect = () => e('select', {
                 className: 'form-select', value: formData.ubicacion,
                 onChange: ev => upd('ubicacion', ev.target.value)
             },
                 e('option', { value: '' }, '-- Selecciona ubicacion --'),
-                UBICACIONES.map(u => e('option', { key: u, value: u }, u))
+                (state.ubicaciones || []).map(u => e('option', { key: u.id, value: u.nombre }, u.nombre))
             );
 
             // Selectores de tipo y modelo dependientes con opción + Añadir para admins
@@ -1517,7 +1528,197 @@
             );
         }
 
-        // ---- ConfirmModal ----
+        // ==========================================
+        // ADMIN PANEL - v1.9.0
+        // ==========================================
+        function AdminPanel({ state, onRefresh, onSetStockMinimo }) {
+            const [activeSection, setActiveSection] = useState('ubicaciones');
+            const [loading, setLoading] = useState(false);
+            const [newUbicacion, setNewUbicacion] = useState('');
+            const [newAdminEmail, setNewAdminEmail] = useState('');
+            const [catalogoRaw, setCatalogoRaw] = useState([]);
+            const [catalogoLoaded, setCatalogoLoaded] = useState(false);
+            const [newTipo, setNewTipo] = useState('');
+            const [newModelo, setNewModelo] = useState('');
+            const [newModeloTipo, setNewModeloTipo] = useState('');
+            const [stockMinimoInput, setStockMinimoInput] = useState(String(state.stockMinimoDefault || 2));
+            const [newTecnicoNombre, setNewTecnicoNombre] = useState('');
+            const [newTecnicoEmail, setNewTecnicoEmail] = useState('');
+
+            const act = async (fn, successMsg) => {
+                setLoading(true);
+                try { await fn(); showToast(successMsg, 'success'); await onRefresh(); }
+                catch(e) { showToast('Error: ' + e.message, 'error'); }
+                finally { setLoading(false); }
+            };
+
+            const loadCatalogo = async () => {
+                if (catalogoLoaded) return;
+                setLoading(true);
+                try { const items = await dataManager.getCatalogoRaw(); setCatalogoRaw(items); setCatalogoLoaded(true); }
+                catch(e) { showToast('Error cargando catálogo', 'error'); }
+                finally { setLoading(false); }
+            };
+
+            useEffect(() => {
+                if (activeSection === 'catalogo') loadCatalogo();
+            }, [activeSection]);
+
+            const sectionBtn = (key, label, icon) => e('button', {
+                onClick: () => setActiveSection(key),
+                style: {
+                    padding: '12px 20px', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '14px',
+                    background: activeSection === key ? 'var(--accent-purple)' : 'var(--bg-tertiary)',
+                    color: activeSection === key ? 'white' : 'var(--text-secondary)',
+                    transition: 'all .2s', minWidth: '160px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px'
+                }
+            }, icon, ' ', label);
+
+            const card = (title, content) => e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' } },
+                e('div', { style: { padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: '700', fontSize: '16px' } }, title),
+                e('div', { style: { padding: '20px' } }, content)
+            );
+
+            const addRow = (placeholder, value, onChange, onAdd, disabled) => e('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px' } },
+                e('input', { type: 'text', className: 'form-input', placeholder, value, onChange: ev => onChange(ev.target.value), style: { flex: 1 }, onKeyDown: ev => { if (ev.key === 'Enter') onAdd(); } }),
+                e('button', { className: 'button button-success', onClick: onAdd, disabled: disabled || loading || !value.trim(), style: { padding: '12px 20px' } }, loading ? e('span', { className: 'loading-spinner' }) : '+ Añadir')
+            );
+
+            const itemRow = (nombre, activo, onToggle, onDelete, extra) => e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '8px', marginBottom: '6px', opacity: activo ? 1 : 0.6 } },
+                e('span', { style: { flex: 1, fontSize: '14px', fontWeight: '500' } }, nombre),
+                extra && e('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, extra),
+                e('button', { className: 'button ' + (activo ? 'button-warning' : 'button-success'), onClick: onToggle, disabled: loading, style: { padding: '6px 12px', fontSize: '12px' } }, activo ? 'Desactivar' : 'Activar'),
+                e('button', { className: 'button button-danger', onClick: onDelete, disabled: loading, style: { padding: '6px 10px', fontSize: '12px' } }, '🗑️')
+            );
+
+            // ---- SECCIONES ----
+
+            const renderUbicaciones = () => card('📍 Ubicaciones',
+                e('div', null,
+                    addRow('Nueva ubicación (ej: Madrid - Almacen)', newUbicacion, setNewUbicacion,
+                        () => act(() => dataManager.createUbicacion(newUbicacion.trim()), 'Ubicación añadida').then(() => setNewUbicacion(''))),
+                    state.ubicacionesAll.length === 0 ?
+                        e('div', { style: { color: 'var(--text-secondary)', fontSize: '14px', textAlign: 'center', padding: '20px' } }, 'No hay ubicaciones todavía') :
+                        state.ubicacionesAll.map(u => itemRow(u.nombre, u.activo,
+                            () => act(() => dataManager.toggleUbicacion(u.id, u.activo), u.activo ? 'Ubicación desactivada' : 'Ubicación activada'),
+                            () => act(() => dataManager.deleteUbicacion(u.id), 'Ubicación eliminada')
+                        ))
+                )
+            );
+
+            const renderCatalogo = () => card('📦 Catálogo de Material',
+                e('div', null,
+                    // Añadir tipo nuevo
+                    e('div', { style: { marginBottom: '20px' } },
+                        e('div', { className: 'form-label', style: { marginBottom: '8px' } }, 'Nuevo Tipo'),
+                        addRow('Nombre del tipo (ej: Docking Stations)', newTipo, setNewTipo,
+                            () => act(async () => { await dataManager.addToCatalog(newTipo.trim(), ''); setCatalogoLoaded(false); }, 'Tipo añadido').then(() => setNewTipo('')))
+                    ),
+                    // Añadir modelo a tipo existente
+                    e('div', { style: { marginBottom: '20px' } },
+                        e('div', { className: 'form-label', style: { marginBottom: '8px' } }, 'Nuevo Modelo'),
+                        e('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } },
+                            e('select', { className: 'form-select', value: newModeloTipo, onChange: ev => setNewModeloTipo(ev.target.value), style: { flex: 1 } },
+                                e('option', { value: '' }, '-- Selecciona tipo --'),
+                                Object.keys(state.catalogo).map(t => e('option', { key: t, value: t }, t))
+                            ),
+                            e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre del modelo', value: newModelo, onChange: ev => setNewModelo(ev.target.value), style: { flex: 2 }, onKeyDown: ev => { if (ev.key === 'Enter' && newModeloTipo && newModelo.trim()) act(async () => { await dataManager.addToCatalog(newModeloTipo, newModelo.trim()); setCatalogoLoaded(false); }, 'Modelo añadido').then(() => setNewModelo('')); } }),
+                            e('button', { className: 'button button-success', onClick: () => act(async () => { await dataManager.addToCatalog(newModeloTipo, newModelo.trim()); setCatalogoLoaded(false); }, 'Modelo añadido').then(() => setNewModelo('')), disabled: loading || !newModeloTipo || !newModelo.trim(), style: { padding: '12px 20px' } }, '+ Añadir')
+                        )
+                    ),
+                    // Lista de catálogo
+                    loading && !catalogoLoaded ? e('div', { style: { textAlign: 'center', padding: '20px' } }, e('span', { className: 'loading-spinner' })) :
+                    catalogoRaw.length === 0 ? e('div', { style: { color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' } }, 'El catálogo está vacío') :
+                    Object.entries(
+                        catalogoRaw.reduce((acc, item) => { if (!acc[item.tipo]) acc[item.tipo] = []; acc[item.tipo].push(item); return acc; }, {})
+                    ).map(([tipo, modelos]) => e('div', { key: tipo, style: { marginBottom: '16px' } },
+                        e('div', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--accent-blue)', textTransform: 'uppercase', marginBottom: '6px', padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' } }, tipo),
+                        modelos.filter(m => m.modelo).map(m => e('div', { key: m.id, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: m.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '6px', marginBottom: '4px', opacity: m.activo ? 1 : 0.6 } },
+                            e('span', { style: { flex: 1, fontSize: '14px' } }, m.modelo),
+                            e('button', { className: 'button button-danger', onClick: () => act(() => { setCatalogoLoaded(false); return dataManager.deleteCatalogItem(m.id); }, 'Modelo eliminado'), disabled: loading, style: { padding: '4px 10px', fontSize: '12px' } }, '🗑️')
+                        ))
+                    ))
+                )
+            );
+
+            const renderTecnicos = () => card('👤 Técnicos',
+                e('div', null,
+                    e('div', { style: { marginBottom: '16px' } },
+                        e('div', { className: 'form-label', style: { marginBottom: '8px' } }, 'Nuevo Técnico'),
+                        e('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } },
+                            e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre completo', value: newTecnicoNombre, onChange: ev => setNewTecnicoNombre(ev.target.value), style: { flex: 1 } }),
+                            e('input', { type: 'email', className: 'form-input', placeholder: 'email@sanlucar.com', value: newTecnicoEmail, onChange: ev => setNewTecnicoEmail(ev.target.value), style: { flex: 1 } }),
+                            e('button', { className: 'button button-success', onClick: () => act(async () => { const codigo = 'TEC' + Date.now().toString().slice(-6); await dataManager.createTechnician({ nombre: newTecnicoNombre.trim(), codigo, email: newTecnicoEmail.trim() }); setNewTecnicoNombre(''); setNewTecnicoEmail(''); }, 'Técnico creado'), disabled: loading || !newTecnicoNombre.trim() || !newTecnicoEmail.trim(), style: { padding: '12px 20px' } }, '+ Añadir')
+                        )
+                    ),
+                    state.technicians.length === 0 ? e('div', { style: { color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' } }, 'No hay técnicos') :
+                    state.technicians.map(t => e('div', { key: t.id, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: t.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '8px', marginBottom: '6px', opacity: t.activo ? 1 : 0.6 } },
+                        e('div', { style: { flex: 1 } },
+                            e('div', { style: { fontWeight: '600', fontSize: '14px' } }, t.nombre),
+                            e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, t.email),
+                            e('div', { style: { fontSize: '11px', color: 'var(--accent-blue)', fontFamily: 'IBM Plex Mono,monospace' } }, t.codigo)
+                        ),
+                        e('button', { className: 'button button-primary', onClick: () => printTechnicianCard(t), style: { padding: '6px 12px', fontSize: '12px' } }, '🖨️'),
+                        e('button', { className: 'button ' + (t.activo ? 'button-warning' : 'button-success'), onClick: () => act(() => dataManager.toggleTechnicianStatus(t.id, t.activo), t.activo ? 'Técnico desactivado' : 'Técnico activado'), disabled: loading, style: { padding: '6px 12px', fontSize: '12px' } }, t.activo ? 'Desactivar' : 'Activar')
+                    ))
+                )
+            );
+
+            const renderAdmins = () => card('🛡️ Administradores',
+                e('div', null,
+                    addRow('Email del nuevo admin (email@sanlucar.com)', newAdminEmail, setNewAdminEmail,
+                        () => act(() => dataManager.createAdmin(newAdminEmail.trim()), 'Admin añadido').then(() => setNewAdminEmail(''))),
+                    e('div', { className: 'info-banner orange', style: { marginBottom: '16px' } }, '⚠️ Ten cuidado al modificar admins. No te elimines a ti mismo.'),
+                    state.adminsAll.length === 0 ?
+                        e('div', { style: { color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' } }, 'No hay admins') :
+                        state.adminsAll.map(a => e('div', { key: a.id, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: a.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '8px', marginBottom: '6px', opacity: a.activo ? 1 : 0.6 } },
+                            e('span', { style: { flex: 1, fontSize: '14px', fontWeight: '500' } }, a.email),
+                            a.email.toLowerCase() === state.user?.email.toLowerCase() && e('span', { style: { fontSize: '11px', color: 'var(--accent-purple)', background: 'rgba(168,85,247,.1)', padding: '2px 8px', borderRadius: '4px' } }, 'Tú'),
+                            e('button', { className: 'button ' + (a.activo ? 'button-warning' : 'button-success'), onClick: () => act(() => dataManager.toggleAdmin(a.id, a.activo), a.activo ? 'Admin desactivado' : 'Admin activado'), disabled: loading || a.email.toLowerCase() === state.user?.email.toLowerCase(), style: { padding: '6px 12px', fontSize: '12px' } }, a.activo ? 'Desactivar' : 'Activar'),
+                            e('button', { className: 'button button-danger', onClick: () => act(() => dataManager.deleteAdmin(a.id), 'Admin eliminado'), disabled: loading || a.email.toLowerCase() === state.user?.email.toLowerCase(), style: { padding: '6px 10px', fontSize: '12px' } }, '🗑️')
+                        ))
+                )
+            );
+
+            const renderAjustes = () => card('⚙️ Ajustes Globales',
+                e('div', null,
+                    e('div', { className: 'form-group' },
+                        e('label', { className: 'form-label' }, 'Stock Mínimo por Defecto'),
+                        e('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+                            e('input', { type: 'number', min: '0', className: 'form-input', value: stockMinimoInput, onChange: ev => setStockMinimoInput(ev.target.value), style: { maxWidth: '120px' } }),
+                            e('button', { className: 'button button-success', onClick: () => { const val = parseInt(stockMinimoInput) || 2; localStorage.setItem('stockMinimoDefault', val); onSetStockMinimo(val); showToast('Stock mínimo por defecto: ' + val, 'success'); }, style: { padding: '12px 20px' } }, '✓ Guardar'),
+                            e('span', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, 'Se aplica al crear nuevos productos')
+                        )
+                    )
+                )
+            );
+
+            return e('div', null,
+                e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } },
+                    e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, '🛠️ Panel de Administración')
+                ),
+                e('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } },
+                    // Sidebar
+                    e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '180px' } },
+                        sectionBtn('ubicaciones', 'Ubicaciones', '📍'),
+                        sectionBtn('catalogo', 'Catálogo', '📦'),
+                        sectionBtn('tecnicos', 'Técnicos', '👤'),
+                        sectionBtn('admins', 'Administradores', '🛡️'),
+                        sectionBtn('ajustes', 'Ajustes', '⚙️')
+                    ),
+                    // Content
+                    e('div', { style: { flex: 1, minWidth: '300px' } },
+                        activeSection === 'ubicaciones' && renderUbicaciones(),
+                        activeSection === 'catalogo' && renderCatalogo(),
+                        activeSection === 'tecnicos' && renderTecnicos(),
+                        activeSection === 'admins' && renderAdmins(),
+                        activeSection === 'ajustes' && renderAjustes()
+                    )
+                )
+            );
+        }
+
+
         function ConfirmModal({ message, onConfirm, onCancel, loading }) {
             return e('div', { className: 'modal-overlay', onClick: ev => { if (ev.target === ev.currentTarget) onCancel(); } },
                 e('div', { className: 'modal', style: { maxWidth: '500px' }, onClick: ev => ev.stopPropagation() },
@@ -1537,7 +1738,7 @@
 
         // ---- App ----
         function App() {
-            const [state, setState] = useState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null });
+            const [state, setState] = useState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, ubicaciones: [], ubicacionesAll: [], adminsAll: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2') });
 
             useEffect(() => { initializeApp(); }, []);
 
@@ -1554,20 +1755,20 @@
                     const currentUser = await graphClient.getCurrentUser();
                     const data = await dataManager.loadAllData();
                     const isAdmin = data.admins.some(a => a.Email && a.Email.toLowerCase() === currentUser.mail.toLowerCase() && (a.Activo === true || a.Activo === 'Yes'));
-                    setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, loading: false, syncing: false, lastSync: new Date() }));
+                    setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], loading: false, syncing: false, lastSync: new Date() }));
                     showToast('Bienvenido, ' + currentUser.displayName, 'success');
                 } catch(error) { console.error('Error inicializando app:', error); showToast('Error cargando la aplicacion', 'error'); setState(s => ({ ...s, loading: false })); }
             };
 
             const handleLogin = async () => { try { await login(); await initializeApp(); } catch(e) { showToast('Error al iniciar sesion', 'error'); } };
-            const handleLogout = async () => { await logout(); setState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, activeTab: 'dashboard', loading: false, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null }); showToast('Sesion cerrada correctamente', 'success'); };
+            const handleLogout = async () => { await logout(); setState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, ubicaciones: [], ubicacionesAll: [], adminsAll: [], activeTab: 'dashboard', loading: false, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: 2 }); showToast('Sesion cerrada correctamente', 'success'); };
 
             const syncData = async (showMsg) => {
                 if (!dataManager || state.syncing) return;
                 setState(s => ({ ...s, syncing: true }));
                 try {
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, syncing: false, lastSync: new Date() }));
+                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], syncing: false, lastSync: new Date() }));
                     if (showMsg) showToast('Sincronizado correctamente', 'success');
                 } catch(e) { setState(s => ({ ...s, syncing: false })); }
             };
@@ -1630,14 +1831,18 @@
                     ['dashboard', 'inventario', 'asignaciones', 'historial'].map(tab =>
                         e('button', { key: tab, className: 'tab-button ' + (state.activeTab === tab ? 'active' : ''), onClick: () => handleTabChange(tab) }, { dashboard: '📊 Dashboard', inventario: '📦 Inventario', asignaciones: '📋 Asignaciones', historial: '📜 Historial' }[tab])
                     ),
-                    state.isAdmin && e('button', { className: 'tab-button ' + (state.activeTab === 'tecnicos' ? 'active' : ''), onClick: () => handleTabChange('tecnicos') }, '👤 Tecnicos')
+                    state.isAdmin && e('button', { className: 'tab-button ' + (state.activeTab === 'admin' ? 'active' : ''), onClick: () => handleTabChange('admin'), style: { background: state.activeTab === 'admin' ? 'var(--accent-purple)' : '', borderColor: state.isAdmin ? 'var(--accent-purple)' : '' } }, '🛠️ Admin')
                 ),
                 e('div', { className: 'content-section' },
                     state.activeTab === 'dashboard' && e(Dashboard, { state }),
                     state.activeTab === 'inventario' && e(InventoryView, { state, onRefresh: initializeApp, onOpenModal: handleOpenModal }),
                     state.activeTab === 'asignaciones' && e(AssignmentsView, { state, onRefresh: initializeApp, onOpenModal: handleOpenModal }),
                     state.activeTab === 'historial' && e(HistoryView, { state, onRefresh: initializeApp, onOpenModal: handleOpenModal }),
-                    state.activeTab === 'tecnicos' && state.isAdmin && e(TechniciansView, { state, onRefresh: initializeApp, onOpenModal: handleOpenModal })
+                    state.activeTab === 'admin' && state.isAdmin && e(AdminPanel, {
+                        state,
+                        onRefresh: initializeApp,
+                        onSetStockMinimo: val => setState(s => ({ ...s, stockMinimoDefault: val }))
+                    })
                 ),
                 state.modalType && !state.showConfirm && formModalTypes.includes(state.modalType) &&
                     e(FormModal, { state, modalType: state.modalType, selectedItem: state.selectedItem, onClose: handleCloseModal, onRefresh: initializeApp }),
@@ -1656,4 +1861,3 @@
     </script>
 </body>
 </html>
-
