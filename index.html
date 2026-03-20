@@ -614,6 +614,120 @@
     // ==========================================
     // REACT COMPONENTS
     // ==========================================
+    // ==========================================
+    // DYMO CONNECT SDK - LabelWriter 550
+    // ==========================================
+    async function printDymoLabel(activo) {
+        const DYMO_URL = 'https://localhost:41951/DYMO/DLS/Printing/';
+        // XML de etiqueta formato 30336 (25x54mm)
+        const label = `<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>Address</Id>
+  <PaperName>30336 Return Address</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="1134" Rx="180" Ry="180"/>
+  </DrawCommands>
+  <ObjectInfo>
+    <BarcodeObject>
+      <Name>BARCODE</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <Text>${activo.idEtiqueta}</Text>
+      <Type>Code128Auto</Type>
+      <Size>Small</Size>
+      <TextPosition>None</TextPosition>
+      <TextFont>
+        <Size>8</Size><Bold>False</Bold><Italic>False</Italic><Underline>False</Underline><Strikeout>False</Strikeout>
+      </TextFont>
+      <CheckSumFont>
+        <Size>8</Size><Bold>False</Bold><Italic>False</Italic><Underline>False</Underline><Strikeout>False</Strikeout>
+      </CheckSumFont>
+      <BarcodeFormat>0</BarcodeFormat>
+      <AspectRatio>0</AspectRatio>
+    </BarcodeObject>
+    <Bounds X="50" Y="50" Width="900" Height="500"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ID</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <Text>${activo.idEtiqueta}</Text>
+      <Font Family="Arial" Size="9" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+    </TextObject>
+    <Bounds X="980" Y="50" Width="2000" Height="200"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>TIPO</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <Text>${activo.tipo} · ${activo.modelo}</Text>
+      <Font Family="Arial" Size="7" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+    </TextObject>
+    <Bounds X="980" Y="260" Width="2000" Height="180"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>NS</Name>
+      <ForeColor Alpha="255" Red="80" Green="80" Blue="80"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <Text>${activo.numSerie ? 'N/S: ' + activo.numSerie : ''}</Text>
+      <Font Family="Arial" Size="6" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+    </TextObject>
+    <Bounds X="980" Y="440" Width="2000" Height="160"/>
+  </ObjectInfo>
+</DieCutLabel>`;
+
+        try {
+            // Obtener impresoras disponibles
+            const printersResp = await fetch(DYMO_URL + 'GetPrinters', { method: 'GET' });
+            if (!printersResp.ok) throw new Error('Dymo Connect no responde');
+            const printersXml = await printersResp.text();
+            // Extraer primera impresora LabelWriter
+            const match = printersXml.match(/<Name>([^<]*LabelWriter[^<]*)<\/Name>/i);
+            const printerName = match ? match[1] : '';
+            if (!printerName) throw new Error('No se encontró ninguna LabelWriter conectada');
+
+            // Imprimir
+            const formData = new FormData();
+            formData.append('printerName', printerName);
+            formData.append('labelXml', label);
+            formData.append('labelSetXml', '');
+            const printResp = await fetch(DYMO_URL + 'PrintLabel', { method: 'POST', body: formData });
+            if (!printResp.ok) throw new Error('Error al enviar a la impresora');
+            showToast('🖨️ Etiqueta enviada a Dymo: ' + activo.idEtiqueta, 'success');
+        } catch(err) {
+            console.error('Dymo error:', err);
+            // Fallback a PDF si Dymo no está disponible
+            showToast('⚠️ Dymo no disponible. Generando PDF...', 'warning');
+            setTimeout(function() { exportEtiquetaPDF([activo]); }, 500);
+        }
+    }
+
     window.addEventListener('load', function() {
         if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
             document.getElementById('root').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:white;"><p>React no se pudo cargar. Recarga la página.</p></div>';
@@ -880,26 +994,49 @@
                     )
                 ),
                 filtered.length > 0 ?
-                    e('table', { className: 'history-table' },
-                        e('thead', null, e('tr', null, e('th', { style: { width: '90px' } }, 'Tipo'), e('th', { style: { width: '100px' } }, 'Fecha'), e('th', null, 'Empleado'), e('th', null, 'Departamento'), e('th', { style: { width: '70px' } }, 'Prods'), e('th', { style: { width: '90px' } }, 'Estado'), e('th', { style: { width: '120px' } }, 'Acciones'))),
-                        e('tbody', null, filtered.map(a => {
-                            const fa = new Date(a.fechaAsignacion); fa.setHours(0,0,0,0);
-                            const vencido = a.esPrestamo && a.estado === 'Activo' && fa < hoy;
-                            return e('tr', { key: a.id, style: vencido ? { background: 'rgba(239,68,68,.1)', borderLeft: '4px solid var(--accent-red)' } : {} },
-                                e('td', { style: { textAlign: 'center' } }, a.esPrestamo ? e('span', { style: { background: vencido ? 'var(--accent-red)' : 'var(--accent-orange)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' } }, vencido ? '⚠ VENCIDO' : 'Prestamo') : e('span', { style: { background: 'var(--accent-blue)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' } }, 'Asignacion')),
-                                e('td', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px' } }, new Date(a.fechaAsignacion).toLocaleDateString('es-ES')),
-                                e('td', null, e('div', { style: { fontWeight: '600' } }, a.nombreEmpleado), e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, a.emailEmpleado)),
-                                e('td', null, a.departamento),
-                                e('td', { style: { textAlign: 'center', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '700' } }, a.cantidadProductos),
-                                e('td', null, e('span', { className: 'movement-badge ' + (a.estado === 'Activo' ? 'Entrada' : a.estado === 'Devuelto' ? 'Devolucion' : 'Salida') }, a.estado)),
-                                e('td', null, e('div', { style: { display: 'flex', gap: '6px', justifyContent: 'center' } },
-                                    e('div', { className: 'action-icon', onClick: () => onOpenModal('ver-asignacion', a), title: 'Ver' }, '📄'),
-                                    e('div', { className: 'action-icon', onClick: () => exportAssignmentToPDF(a), title: 'PDF' }, '📥'),
-                                    a.estado === 'Activo' && e('div', { className: 'action-icon', onClick: () => onOpenModal('devolver-material', a), title: 'Devolver' }, '↩️'),
-                                    e('div', { className: 'action-icon danger', onClick: () => onOpenModal('eliminar-asignacion', a), title: 'Eliminar' }, '🗑️')
-                                ))
+                    e('div', null,
+                        // Resumen préstamos activos
+                        (function() {
+                            const prestamosActivos = (state.assignments || []).filter(a => a.esPrestamo && a.estado === 'Activo');
+                            const hoyTs = new Date(); hoyTs.setHours(0,0,0,0);
+                            const vencidos = prestamosActivos.filter(a => { const f = new Date(a.fechaAsignacion); f.setHours(0,0,0,0); return f < hoyTs; });
+                            if (prestamosActivos.length === 0) return null;
+                            return e('div', { style: { display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' } },
+                                e('div', { style: { padding: '10px 16px', background: 'rgba(249,115,22,.1)', border: '1px solid var(--accent-orange)', borderRadius: '8px', fontSize: '13px' } },
+                                    e('strong', { style: { color: 'var(--accent-orange)' } }, prestamosActivos.length), ' préstamo(s) activo(s)'
+                                ),
+                                vencidos.length > 0 && e('div', { style: { padding: '10px 16px', background: 'rgba(239,68,68,.1)', border: '1px solid var(--accent-red)', borderRadius: '8px', fontSize: '13px', animation: 'pulse 2s infinite' } },
+                                    e('strong', { style: { color: 'var(--accent-red)' } }, '⚠ ' + vencidos.length), ' vencido(s)'
+                                )
                             );
-                        }))
+                        })(),
+                        e('table', { className: 'history-table' },
+                            e('thead', null, e('tr', null, e('th', { style: { width: '90px' } }, 'Tipo'), e('th', { style: { width: '100px' } }, 'Fecha'), e('th', null, 'Empleado'), e('th', null, 'Departamento'), e('th', { style: { width: '70px' } }, 'Prods'), e('th', { style: { width: '90px' } }, 'Estado'), e('th', { style: { width: '120px' } }, 'Acciones'))),
+                            e('tbody', null, filtered.map(a => {
+                                const fa = new Date(a.fechaAsignacion); fa.setHours(0,0,0,0);
+                                const vencido = a.esPrestamo && a.estado === 'Activo' && fa < hoy;
+                                // Contar préstamos activos de este empleado
+                                const prestEmpleado = (state.assignments || []).filter(x => x.emailEmpleado === a.emailEmpleado && x.esPrestamo && x.estado === 'Activo').length;
+                                return e('tr', { key: a.id, style: vencido ? { background: 'rgba(239,68,68,.1)', borderLeft: '4px solid var(--accent-red)' } : {} },
+                                    e('td', { style: { textAlign: 'center' } }, a.esPrestamo ? e('span', { style: { background: vencido ? 'var(--accent-red)' : 'var(--accent-orange)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' } }, vencido ? '⚠ VENCIDO' : 'Prestamo') : e('span', { style: { background: 'var(--accent-blue)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' } }, 'Asignacion')),
+                                    e('td', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px' } }, new Date(a.fechaAsignacion).toLocaleDateString('es-ES')),
+                                    e('td', null,
+                                        e('div', { style: { fontWeight: '600' } }, a.nombreEmpleado),
+                                        e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, a.emailEmpleado),
+                                        prestEmpleado > 0 ? e('div', { style: { fontSize: '11px', color: 'var(--accent-orange)', fontWeight: '600', marginTop: '2px' } }, '⏱ ' + prestEmpleado + ' préstamo(s) activo(s)') : null
+                                    ),
+                                    e('td', null, a.departamento),
+                                    e('td', { style: { textAlign: 'center', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '700' } }, a.cantidadProductos),
+                                    e('td', null, e('span', { className: 'movement-badge ' + (a.estado === 'Activo' ? 'Entrada' : a.estado === 'Devuelto' ? 'Devolucion' : 'Salida') }, a.estado)),
+                                    e('td', null, e('div', { style: { display: 'flex', gap: '6px', justifyContent: 'center' } },
+                                        e('div', { className: 'action-icon', onClick: () => onOpenModal('ver-asignacion', a), title: 'Ver' }, '📄'),
+                                        e('div', { className: 'action-icon', onClick: () => exportAssignmentToPDF(a), title: 'PDF' }, '📥'),
+                                        a.estado === 'Activo' && e('div', { className: 'action-icon', onClick: () => onOpenModal('devolver-material', a), title: 'Devolver' }, '↩️'),
+                                        e('div', { className: 'action-icon danger', onClick: () => onOpenModal('eliminar-asignacion', a), title: 'Eliminar' }, '🗑️')
+                                    ))
+                                );
+                            }))
+                        )
                     ) :
                     e('div', { className: 'empty-state' }, e('div', { className: 'empty-state-icon' }, '📋'), e('div', { className: 'empty-state-title' }, 'No hay asignaciones'), e('div', { className: 'empty-state-text' }, 'Crea la primera asignacion de material'))
             );
@@ -931,6 +1068,7 @@
                 barcode: (selectedItem && modalType !== 'duplicar') ? selectedItem.barcode : '',
                 stock: selectedItem ? String(selectedItem.stock) : '0',
                 stockMinimo: selectedItem ? String(selectedItem.stockMinimo) : String(state.stockMinimoDefault || 2),
+                numSerie: '',
                 ubicacion: selectedItem ? (selectedItem.ubicacion || '') : '',
                 estado: selectedItem ? (selectedItem.estado || 'Nuevo') : 'Nuevo',
                 cantidad: '1',
@@ -1155,13 +1293,24 @@
                         if (!formData.tipo || !formData.modelo) { showToast('Selecciona tipo y modelo', 'error'); setLoading(false); return; }
                         if (!formData.barcode.trim()) { showToast('El código de barras es obligatorio', 'error'); setLoading(false); return; }
                         if (!formData.ubicacion) { showToast('Selecciona una ubicación', 'error'); setLoading(false); return; }
+                        const tipoLlevaEtiqueta = formData.tipo ? ((state.catalogoTipos || {})[formData.tipo] || {}).llevaEtiqueta : false;
+                        if (tipoLlevaEtiqueta && !formData.numSerie.trim()) { showToast('El número de serie es obligatorio para este tipo de material', 'error'); setLoading(false); return; }
                         const exists = await dataManager.checkBarcodeExists(formData.barcode);
                         if (exists) { showToast('El código de barras ya existe', 'error'); setLoading(false); return; }
                         await dataManager.createInventoryItem({ nombre: nombreProducto, categoria: formData.tipo, barcode: formData.barcode, stock: parseInt(formData.stock) || 0, stockMinimo: parseInt(formData.stockMinimo) || 0, ubicacion: formData.ubicacion, estado: formData.estado });
                         if (parseInt(formData.stock) > 0) {
                             await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: parseInt(formData.stock) || 1, ticket: '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
                         }
-                        showToast('Producto creado: ' + nombreProducto, 'success');
+                        // Si lleva etiqueta: generar activo e imprimir Dymo
+                        if (tipoLlevaEtiqueta) {
+                            const idEtiqueta = await dataManager.getNextEtiquetaId();
+                            await dataManager.createActivo({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, ubicacion: formData.ubicacion, numSerie: formData.numSerie, notas: '' });
+                            showToast('Producto creado + Etiqueta: ' + idEtiqueta, 'success');
+                            // Imprimir con Dymo Connect
+                            printDymoLabel({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, numSerie: formData.numSerie });
+                        } else {
+                            showToast('Producto creado: ' + nombreProducto, 'success');
+                        }
 
                     } else if (modalType === 'entrada' && selectedItem) {
                         const addCant = parseInt(formData.cantidad) || 1;
@@ -1305,8 +1454,9 @@
                 );
             };
             const tecnicoBanner = function() {
+                const esAdmin = state.isAdmin;
                 return e('div', { className: 'info-banner green', style: { marginBottom: '16px' } },
-                    '👤 Técnico: ', e('strong', null, tecnicoActual)
+                    esAdmin ? '🛡️ Admin: ' : '🔧 Técnico: ', e('strong', null, tecnicoActual)
                 );
             };
             const adDropdown = function(results, loading2, onSelect) {
@@ -1326,12 +1476,17 @@
                 const available = state.inventory.filter(function(item) {
                     return item.stock > 0 && !selectedProducts.find(function(p) { return p.barcode === item.barcode; });
                 });
+                const [prodSearch, setProdSearch] = useState('');
+                const filtered = prodSearch.trim()
+                    ? available.filter(function(item) { return item.nombre.toLowerCase().includes(prodSearch.toLowerCase()) || item.categoria.toLowerCase().includes(prodSearch.toLowerCase()); })
+                    : available;
                 return e('div', { style: { marginBottom: '16px' } },
+                    e('input', { type: 'text', className: 'form-input', placeholder: '🔍 Buscar producto por nombre (cables, ratones, auriculares...)', value: prodSearch, onChange: function(ev) { setProdSearch(ev.target.value); }, style: { marginBottom: '8px', fontSize: '14px' } }),
                     e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '600' } }, 'Stock disponible — toca para añadir'),
                     e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px', maxHeight: '220px', overflowY: 'auto', padding: '4px' } },
-                        available.length === 0
-                            ? e('div', { style: { color: 'var(--text-secondary)', fontSize: '13px', padding: '12px', gridColumn: '1/-1' } }, 'No hay más productos con stock disponible')
-                            : available.map(function(item) {
+                        filtered.length === 0
+                            ? e('div', { style: { color: 'var(--text-secondary)', fontSize: '13px', padding: '12px', gridColumn: '1/-1' } }, prodSearch ? 'No se encontró "' + prodSearch + '"' : 'No hay más productos con stock disponible')
+                            : filtered.map(function(item) {
                                 return e('div', {
                                     key: item.barcode,
                                     onClick: function() { addProductByBarcode(item.barcode); },
@@ -1355,10 +1510,13 @@
             const renderBody = function() {
                 // NUEVO PRODUCTO
                 if (modalType === 'entrada' && !selectedItem) {
+                    const tipoLlevaEtiqueta = formData.tipo ? ((state.catalogoTipos || {})[formData.tipo] || {}).llevaEtiqueta : false;
                     return e('div', null,
                         tecnicoBanner(),
                         tipoModeloFields(),
                         barcodeField(),
+                        tipoLlevaEtiqueta ? e('div', { className: 'info-banner blue' }, '🏷️ Este tipo lleva etiqueta individual. Se generará un ID ', e('strong', null, 'SLF-SP-' + new Date().getFullYear().toString().slice(-2) + '-XXXXX'), ' al guardar.') : null,
+                        tipoLlevaEtiqueta ? fld('Número de Serie del fabricante', e('input', { type: 'text', className: 'form-input', value: formData.numSerie || '', placeholder: 'Ej: 5CG1234XYZ (bajo el equipo o en la caja)', onChange: function(ev) { upd('numSerie', ev.target.value); } }), true) : null,
                         fld('Stock Inicial', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stock, onChange: function(ev) { upd('stock', ev.target.value); } })),
                         e('div', { className: 'form-row' },
                             fld('Ubicacion', ubicacionSelect(), true),
@@ -1865,16 +2023,30 @@
 
             // ---- SECCIONES ----
 
+            const [editingUbicId, setEditingUbicId] = useState(null);
+            const [editingUbicNombre, setEditingUbicNombre] = useState('');
+
             const renderUbicaciones = () => card('📍 Ubicaciones',
                 e('div', null,
                     addRow('Nueva ubicación (ej: Madrid - Almacen)', newUbicacion, setNewUbicacion,
                         () => act(() => dataManager.createUbicacion(newUbicacion.trim()), 'Ubicación añadida').then(() => setNewUbicacion(''))),
                     state.ubicacionesAll.length === 0 ?
                         e('div', { style: { color: 'var(--text-secondary)', fontSize: '14px', textAlign: 'center', padding: '20px' } }, 'No hay ubicaciones todavía') :
-                        state.ubicacionesAll.map(u => itemRow(u.nombre, u.activo,
-                            () => act(() => dataManager.toggleUbicacion(u.id, u.activo), u.activo ? 'Ubicación desactivada' : 'Ubicación activada'),
-                            () => act(() => dataManager.deleteUbicacion(u.id), 'Ubicación eliminada')
-                        ))
+                        state.ubicacionesAll.map(u => {
+                            const isEditing = editingUbicId === u.id;
+                            return e('div', { key: u.id, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: u.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '8px', marginBottom: '6px', opacity: u.activo ? 1 : 0.6 } },
+                                isEditing
+                                    ? e('input', { type: 'text', className: 'form-input', value: editingUbicNombre, onChange: ev => setEditingUbicNombre(ev.target.value), style: { flex: 1, padding: '6px 10px', fontSize: '14px' }, onKeyDown: ev => { if (ev.key === 'Enter') act(() => dataManager.graph.updateListItem(CONFIG.sharepoint.lists.ubicaciones, u.id, { Title: editingUbicNombre.trim() }), 'Ubicación actualizada').then(() => setEditingUbicId(null)); if (ev.key === 'Escape') setEditingUbicId(null); } })
+                                    : e('span', { style: { flex: 1, fontSize: '14px', fontWeight: '500' } }, u.nombre),
+                                isEditing
+                                    ? e('button', { className: 'button button-success', onClick: () => act(() => dataManager.graph.updateListItem(CONFIG.sharepoint.lists.ubicaciones, u.id, { Title: editingUbicNombre.trim() }), 'Actualizada').then(() => setEditingUbicId(null)), disabled: loading, style: { padding: '6px 12px', fontSize: '12px' } }, '✓ Guardar')
+                                    : e('button', { className: 'button button-secondary', onClick: () => { setEditingUbicId(u.id); setEditingUbicNombre(u.nombre); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✏️'),
+                                isEditing
+                                    ? e('button', { className: 'button button-secondary', onClick: () => setEditingUbicId(null), style: { padding: '6px 10px', fontSize: '12px' } }, '✕')
+                                    : e('button', { className: 'button ' + (u.activo ? 'button-warning' : 'button-success'), onClick: () => act(() => dataManager.toggleUbicacion(u.id, u.activo), u.activo ? 'Desactivada' : 'Activada'), disabled: loading, style: { padding: '6px 12px', fontSize: '12px' } }, u.activo ? 'Desactivar' : 'Activar'),
+                                !isEditing && e('button', { className: 'button button-danger', onClick: () => act(() => dataManager.deleteUbicacion(u.id), 'Eliminada'), disabled: loading, style: { padding: '6px 10px', fontSize: '12px' } }, '🗑️')
+                            );
+                        })
                 )
             );
 
@@ -1884,7 +2056,7 @@
                     e('div', { style: { marginBottom: '20px' } },
                         e('div', { className: 'form-label', style: { marginBottom: '8px' } }, 'Nuevo Tipo'),
                         addRow('Nombre del tipo (ej: Docking Stations)', newTipo, setNewTipo,
-                            () => act(async () => { await dataManager.addToCatalog(newTipo.trim(), ''); setCatalogoLoaded(false); }, 'Tipo añadido').then(() => setNewTipo('')))
+                            () => act(async () => { await dataManager.addToCatalog(newTipo.trim(), ''); setCatalogoLoaded(false); await onRefresh(); }, 'Tipo añadido').then(() => setNewTipo('')))
                     ),
                     // Añadir modelo a tipo existente
                     e('div', { style: { marginBottom: '20px' } },
@@ -2045,7 +2217,8 @@
                         sectionBtn('catalogo', 'Catálogo', '📦'),
                         sectionBtn('tecnicos', 'Técnicos', '👤'),
                         sectionBtn('admins', 'Administradores', '🛡️'),
-                        sectionBtn('ajustes', 'Ajustes', '⚙️')
+                        sectionBtn('ajustes', 'Ajustes', '⚙️'),
+                        sectionBtn('log', 'Log de Acciones', '📋')
                     ),
                     // Content
                     e('div', { style: { flex: 1, minWidth: '300px' } },
@@ -2053,7 +2226,31 @@
                         activeSection === 'catalogo' && renderCatalogo(),
                         activeSection === 'tecnicos' && renderTecnicos(),
                         activeSection === 'admins' && renderAdmins(),
-                        activeSection === 'ajustes' && renderAjustes()
+                        activeSection === 'ajustes' && renderAjustes(),
+                        activeSection === 'log' && e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' } },
+                            e('div', { style: { padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: '700', fontSize: '16px' } }, '📋 Log de Acciones'),
+                            e('div', { style: { padding: '20px' } },
+                                e('div', { style: { display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' } },
+                                    e('select', { className: 'filter-select', style: { flex: 1 }, defaultValue: 'all', onChange: ev => { window._logTecnico = ev.target.value; } },
+                                        e('option', { value: 'all' }, 'Todos los técnicos'),
+                                        state.technicians.map(t => e('option', { key: t.id, value: t.nombre }, t.nombre))
+                                    ),
+                                    e('select', { className: 'filter-select', defaultValue: 'all', onChange: ev => { window._logTipo = ev.target.value; } },
+                                        e('option', { value: 'all' }, 'Todos los tipos'),
+                                        ['Entrada', 'Salida', 'Asignacion', 'Prestamo', 'Devolucion'].map(t => e('option', { key: t, value: t }, t))
+                                    )
+                                ),
+                                e('div', { style: { maxHeight: '500px', overflowY: 'auto' } },
+                                    state.history.slice(0, 100).map(h => e('div', { key: h.id, style: { display: 'flex', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' } },
+                                        e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', minWidth: '120px', fontFamily: 'IBM Plex Mono,monospace' } }, new Date(h.fecha).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
+                                        e('span', { className: 'movement-badge ' + h.tipo, style: { minWidth: '80px', textAlign: 'center' } }, h.tipo),
+                                        e('span', { style: { flex: 1, fontSize: '13px', fontWeight: '500' } }, h.producto),
+                                        e('span', { style: { fontSize: '12px', color: 'var(--accent-green)' } }, h.tecnico || '-'),
+                                        h.usuario ? e('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, '→ ' + h.usuario) : null
+                                    ))
+                                )
+                            )
+                        )
                     )
                 )
             );
