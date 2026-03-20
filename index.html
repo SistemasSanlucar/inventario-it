@@ -210,7 +210,8 @@
                 admins: 'StockControl_Admins',
                 asignaciones: 'StockControl_Asignaciones',
                 catalogo: 'StockControl_Catalogo',
-                ubicaciones: 'StockControl_Ubicaciones'
+                ubicaciones: 'StockControl_Ubicaciones',
+                activos: 'StockControl_Activos'
             }
         },
         msal: {
@@ -218,8 +219,9 @@
             authority: 'https://login.microsoftonline.com/f37778d8-59b2-4e5e-a56b-08eb8ad3c13a',
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
+        etiquetas: { pais: 'SP' },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '1.9.0'
+        version: '2.0.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -293,30 +295,40 @@
         constructor(graphClient) { this.graph = graphClient; }
         async loadAllData() {
             try {
-                const [inventario, tecnicos, historial, admins, asignaciones, catalogo, ubicacionesRaw] = await Promise.all([
+                const [inventario, tecnicos, historial, admins, asignaciones, catalogo, ubicacionesRaw, activosRaw] = await Promise.all([
                     this.graph.getListItems(CONFIG.sharepoint.lists.inventario),
                     this.graph.getListItems(CONFIG.sharepoint.lists.tecnicos),
                     this.graph.getListItems(CONFIG.sharepoint.lists.historial),
                     this.graph.getListItems(CONFIG.sharepoint.lists.admins),
                     this.graph.getListItems(CONFIG.sharepoint.lists.asignaciones).catch(() => []),
                     this.graph.getListItems(CONFIG.sharepoint.lists.catalogo).catch(() => []),
-                    this.graph.getListItems(CONFIG.sharepoint.lists.ubicaciones).catch(() => [])
+                    this.graph.getListItems(CONFIG.sharepoint.lists.ubicaciones).catch(() => []),
+                    this.graph.getListItems(CONFIG.sharepoint.lists.activos).catch(() => [])
                 ]);
+                // Catálogo: modelos por tipo + metadatos del tipo (LlevaEtiqueta)
                 const catalogoProcessed = {};
+                const catalogoTipos = {}; // tipo -> { llevaEtiqueta }
                 catalogo.forEach(item => {
                     const tipo = item.Title, modelo = item.Modelo;
-                    const activo = item.Activo !== false && item.Activo !== 'No';
-                    if (activo && tipo && modelo) { if (!catalogoProcessed[tipo]) catalogoProcessed[tipo] = []; catalogoProcessed[tipo].push(modelo); }
+                    const activo = item.Activo !== 'No' && item.Activo !== false;
+                    const llevaEtiqueta = item.LlevaEtiqueta === 'Si';
+                    if (!catalogoTipos[tipo]) catalogoTipos[tipo] = { llevaEtiqueta };
+                    if (llevaEtiqueta) catalogoTipos[tipo].llevaEtiqueta = true;
+                    if (activo && tipo && modelo) {
+                        if (!catalogoProcessed[tipo]) catalogoProcessed[tipo] = [];
+                        catalogoProcessed[tipo].push(modelo);
+                    }
                 });
                 return {
                     inventory: inventario.map(item => ({ id: item.sharePointId, nombre: item.Nombre || item.Title, categoria: item.Categoria, barcode: item.CodigoBarras, stock: parseInt(item.Stock) || 0, stockMinimo: parseInt(item.StockMinimo) || 0, ubicacion: item.Ubicacion || '', estado: item.Estado || 'Nuevo' })),
-                    technicians: tecnicos.map(item => ({ id: item.sharePointId, nombre: item.NombreTecnico || item.Title, codigo: item.CodigoTecnico, email: item.Email, activo: item.Activo === true || item.Activo === 'Yes' })),
+                    technicians: tecnicos.map(item => ({ id: item.sharePointId, nombre: item.NombreTecnico || item.Title, codigo: item.CodigoTecnico, email: item.Email, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })),
                     history: historial.map(item => ({ id: item.sharePointId, fecha: item.FechaHora || item.Created, tipo: item.TipoMovimiento, producto: item.Producto, cantidad: parseInt(item.Cantidad) || 0, ticket: item.Ticket || '', usuario: item.Usuario || '', tecnico: item.Tecnico || '', firma: item.Firma || null })).sort((a,b) => new Date(b.fecha) - new Date(a.fecha)),
                     assignments: asignaciones.map(item => ({ id: item.sharePointId, nombreEmpleado: item.NombreEmpleado, emailEmpleado: item.EmailEmpleado, departamento: item.Departamento, puesto: item.Puesto, fechaIncorporacion: item.FechaIncorporacion, productosAsignados: JSON.parse(item.ProductosAsignados || '[]'), cantidadProductos: parseInt(item.CantidadProductos) || 0, firmaEmpleado: item.FirmaEmpleado, tecnicoResponsable: item.TecnicoResponsable, fechaAsignacion: item.FechaAsignacion, estado: item.Estado, observaciones: item.Observaciones || '', esPrestamo: item.EsPrestamo === 'Si' })).sort((a,b) => new Date(b.fechaAsignacion) - new Date(a.fechaAsignacion)),
-                    admins, catalogo: catalogoProcessed,
-                    ubicaciones: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === true || item.Activo === 'Yes' || item.Activo === 'Si' })).filter(u => u.activo).sort((a,b) => a.nombre.localeCompare(b.nombre)),
-                    ubicacionesAll: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === true || item.Activo === 'Yes' || item.Activo === 'Si' })),
-                    adminsAll: admins.map(item => ({ id: item.sharePointId, email: item.Email, activo: item.Activo === true || item.Activo === 'Yes' }))
+                    activos: activosRaw.map(item => ({ id: item.sharePointId, idEtiqueta: item.IDEtiqueta || '', tipo: item.TipoMaterial || '', modelo: item.ModeloMaterial || '', estado: item.EstadoActivo || 'Almacen', ubicacion: item.UbicacionActivo || '', numSerie: item.NumSerie || '', notas: item.Notas || '' })),
+                    admins, catalogo: catalogoProcessed, catalogoTipos,
+                    ubicaciones: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })).filter(u => u.activo).sort((a,b) => a.nombre.localeCompare(b.nombre)),
+                    ubicacionesAll: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })),
+                    adminsAll: admins.map(item => ({ id: item.sharePointId, email: item.Email, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' }))
                 };
             } catch(error) { console.error('Error cargando datos:', error); throw error; }
         }
@@ -332,29 +344,64 @@
             await this.graph.createListItem(CONFIG.sharepoint.lists.historial, { Title: data.tipo + ' - ' + data.producto, TipoMovimiento: data.tipo, Producto: data.producto, Cantidad: data.cantidad, Ticket: data.ticket || '', Usuario: data.usuario || '', Tecnico: data.tecnico || '', FechaHora: new Date().toISOString(), Firma: data.firma || '' });
         }
         // UBICACIONES CRUD
-        async createUbicacion(nombre) { return await this.graph.createListItem(CONFIG.sharepoint.lists.ubicaciones, { Title: nombre, Activo: true }); }
-        async toggleUbicacion(itemId, activo) { await this.graph.updateListItem(CONFIG.sharepoint.lists.ubicaciones, itemId, { Activo: !activo }); }
+        async createUbicacion(nombre) { return await this.graph.createListItem(CONFIG.sharepoint.lists.ubicaciones, { Title: nombre, Activo: 'Si' }); }
+        async toggleUbicacion(itemId, activo) { await this.graph.updateListItem(CONFIG.sharepoint.lists.ubicaciones, itemId, { Activo: activo ? 'No' : 'Si' }); }
         async deleteUbicacion(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.ubicaciones, itemId); }
         // CATALOGO CRUD completo
         async deleteCatalogItem(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.catalogo, itemId); }
         async getCatalogoRaw() {
             const items = await this.graph.getListItems(CONFIG.sharepoint.lists.catalogo);
-            return items.map(item => ({ id: item.sharePointId, tipo: item.Title, modelo: item.Modelo, activo: item.Activo !== false && item.Activo !== 'No' }));
+            return items.map(item => ({ id: item.sharePointId, tipo: item.Title, modelo: item.Modelo, activo: item.Activo !== 'No' && item.Activo !== false, llevaEtiqueta: item.LlevaEtiqueta === 'Si' }));
         }
-        // ADMINS CRUD
-        async createAdmin(email) { return await this.graph.createListItem(CONFIG.sharepoint.lists.admins, { Title: email, Email: email, Activo: true }); }
-        async toggleAdmin(itemId, activo) { await this.graph.updateListItem(CONFIG.sharepoint.lists.admins, itemId, { Activo: !activo }); }
-        async deleteAdmin(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.admins, itemId); }
-        async createTechnician(data) {
-            return await this.graph.createListItem(CONFIG.sharepoint.lists.tecnicos, { Title: data.nombre, NombreTecnico: data.nombre, CodigoTecnico: data.codigo, Email: data.email, Activo: true });
-        }
-        async toggleTechnicianStatus(itemId, currentStatus) { await this.graph.updateListItem(CONFIG.sharepoint.lists.tecnicos, itemId, { Activo: !currentStatus }); }
-        async deleteHistoryItem(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.historial, itemId); }
         async addToCatalog(tipo, modelo) {
-            const fields = { Title: tipo, Activo: true };
+            const fields = { Title: tipo, Activo: 'Si' };
             if (modelo && modelo.trim()) fields.Modelo = modelo.trim();
             return await this.graph.createListItem(CONFIG.sharepoint.lists.catalogo, fields);
         }
+        async updateCatalogLlevaEtiqueta(itemId, llevaEtiqueta) {
+            await this.graph.updateListItem(CONFIG.sharepoint.lists.catalogo, itemId, { LlevaEtiqueta: llevaEtiqueta ? 'Si' : 'No' });
+        }
+        // ADMINS CRUD
+        async createAdmin(email) { return await this.graph.createListItem(CONFIG.sharepoint.lists.admins, { Title: email, Email: email, Activo: 'Si' }); }
+        async toggleAdmin(itemId, activo) { await this.graph.updateListItem(CONFIG.sharepoint.lists.admins, itemId, { Activo: activo ? 'No' : 'Si' }); }
+        async deleteAdmin(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.admins, itemId); }
+        async createTechnician(data) {
+            return await this.graph.createListItem(CONFIG.sharepoint.lists.tecnicos, { Title: data.nombre, NombreTecnico: data.nombre, CodigoTecnico: data.codigo, Email: data.email, Activo: 'Si' });
+        }
+        async toggleTechnicianStatus(itemId, currentStatus) { await this.graph.updateListItem(CONFIG.sharepoint.lists.tecnicos, itemId, { Activo: currentStatus ? 'No' : 'Si' }); }
+        async deleteHistoryItem(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.historial, itemId); }
+        // ACTIVOS (etiquetas individuales)
+        async getNextEtiquetaId() {
+            const items = await this.graph.getListItems(CONFIG.sharepoint.lists.activos).catch(() => []);
+            const anyo = new Date().getFullYear().toString().slice(-2);
+            const pais = CONFIG.etiquetas.pais;
+            const prefix = 'SLF-' + pais + '-' + anyo + '-';
+            let maxNum = 0;
+            items.forEach(item => {
+                const id = item.IDEtiqueta || '';
+                if (id.startsWith(prefix)) {
+                    const num = parseInt(id.replace(prefix, '')) || 0;
+                    if (num > maxNum) maxNum = num;
+                }
+            });
+            return prefix + String(maxNum + 1).padStart(5, '0');
+        }
+        async createActivo(data) {
+            return await this.graph.createListItem(CONFIG.sharepoint.lists.activos, {
+                Title: data.idEtiqueta,
+                IDEtiqueta: data.idEtiqueta,
+                TipoMaterial: data.tipo,
+                ModeloMaterial: data.modelo,
+                EstadoActivo: data.estado || 'Almacen',
+                UbicacionActivo: data.ubicacion || '',
+                NumSerie: data.numSerie || '',
+                Notas: data.notas || ''
+            });
+        }
+        async updateActivoEstado(itemId, estado, ubicacion) {
+            await this.graph.updateListItem(CONFIG.sharepoint.lists.activos, itemId, { EstadoActivo: estado, UbicacionActivo: ubicacion || '' });
+        }
+        async deleteActivo(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.activos, itemId); }
         async createAssignment(data) {
             const titulo = data.esPrestamo ? 'Prestamo - ' + data.nombreEmpleado : 'Asignacion - ' + data.nombreEmpleado + ' - ' + new Date().toLocaleDateString('es-ES');
             const detalleProductos = (data.productosAsignados || []).map((p, i) => (i + 1) + '. ' + p.nombre + ' (Cod: ' + p.barcode + ')').join('\n');
@@ -435,6 +482,36 @@
         printWindow.document.write('<!DOCTYPE html><html><head><title>Tecnico - ' + tech.nombre + '</title><style>body{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f0f0f0}.card{background:white;padding:40px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.1);text-align:center;max-width:400px}h1{color:#333;margin-bottom:10px;font-size:24px}.codigo{color:#666;font-size:18px;font-weight:bold;margin-bottom:20px}.email{color:#999;font-size:14px;margin-bottom:30px}img{max-width:100%;height:auto}.footer{margin-top:30px;padding-top:20px;border-top:2px solid #eee;color:#999;font-size:12px}@media print{body{background:white}.card{box-shadow:none}}</style></head><body><div class="card"><h1>' + tech.nombre + '</h1><div class="codigo">Codigo: ' + tech.codigo + '</div><div class="email">' + tech.email + '</div><img src="' + barcodeImage + '" alt="Codigo de barras"><div class="footer">Sistema de Inventario IT<br>Escanea este codigo para identificarte</div></div></body></html>');
         printWindow.document.close();
         setTimeout(() => printWindow.print(), 250);
+    }
+    function exportEtiquetaPDF(activos) {
+        if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF no disponible', 'error'); return; }
+        try {
+            const doc = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: [89, 25] });
+            activos.forEach(function(activo, idx) {
+                if (idx > 0) doc.addPage([89, 25], 'landscape');
+                doc.setFillColor(255, 255, 255);
+                doc.rect(0, 0, 89, 25, 'F');
+                // Código de barras
+                try {
+                    const canvas = document.createElement('canvas');
+                    JsBarcode(canvas, activo.idEtiqueta, { format: 'CODE128', width: 1.2, height: 30, displayValue: false, margin: 0 });
+                    doc.addImage(canvas.toDataURL('image/png'), 'PNG', 1, 1, 30, 10);
+                } catch(e) {}
+                // ID grande
+                doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+                doc.text(activo.idEtiqueta, 1, 16);
+                // Tipo - Modelo
+                doc.setFontSize(6.5); doc.setFont(undefined, 'normal');
+                doc.text(activo.tipo + (activo.modelo ? ' · ' + activo.modelo : ''), 1, 20.5);
+                // N/S si tiene
+                if (activo.numSerie) { doc.setFontSize(5.5); doc.setTextColor(80, 80, 80); doc.text('N/S: ' + activo.numSerie, 1, 24); }
+                // Logo SLF esquina derecha
+                doc.setFontSize(5.5); doc.setTextColor(150, 150, 150);
+                doc.text('SLF', 82, 6); doc.text('IT', 83, 10);
+            });
+            doc.save('Etiquetas_' + new Date().toISOString().split('T')[0] + '.pdf');
+            showToast(activos.length + ' etiqueta(s) generada(s)', 'success');
+        } catch(e) { console.error(e); showToast('Error generando etiquetas', 'error'); }
     }
     function exportAssignmentToPDF(assignment) {
         if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF no disponible', 'error'); return; }
@@ -1282,10 +1359,7 @@
                         tecnicoBanner(),
                         tipoModeloFields(),
                         barcodeField(),
-                        e('div', { className: 'form-row' },
-                            fld('Stock Inicial', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stock, onChange: function(ev) { upd('stock', ev.target.value); } })),
-                            fld('Stock Minimo', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stockMinimo, onChange: function(ev) { upd('stockMinimo', ev.target.value); } }))
-                        ),
+                        fld('Stock Inicial', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stock, onChange: function(ev) { upd('stock', ev.target.value); } })),
                         e('div', { className: 'form-row' },
                             fld('Ubicacion', ubicacionSelect(), true),
                             fld('Estado', estadoSelect())
@@ -1538,6 +1612,175 @@
             );
         }
 
+        // ==========================================
+        // ACTIVOS VIEW - v2.0.0
+        // ==========================================
+        function ActivosView({ state, onRefresh }) {
+            const [search, setSearch] = useState('');
+            const [filterTipo, setFilterTipo] = useState('all');
+            const [filterEstado, setFilterEstado] = useState('all');
+            const [showNewForm, setShowNewForm] = useState(false);
+            const [newForm, setNewForm] = useState({ tipo: '', modelo: '', cantidad: 1, ubicacion: '', numSerie: '', notas: '' });
+            const [creando, setCreando] = useState(false);
+            const [generados, setGenerados] = useState([]);
+            const [showGenerados, setShowGenerados] = useState(false);
+
+            const tiposConEtiqueta = Object.keys(state.catalogoTipos || {}).filter(t => (state.catalogoTipos[t] || {}).llevaEtiqueta);
+            const modelosDelTipo = newForm.tipo ? (state.catalogo[newForm.tipo] || []) : [];
+
+            const filtered = (state.activos || []).filter(function(a) {
+                const matchSearch = a.idEtiqueta.toLowerCase().includes(search.toLowerCase()) || a.modelo.toLowerCase().includes(search.toLowerCase()) || a.tipo.toLowerCase().includes(search.toLowerCase());
+                const matchTipo = filterTipo === 'all' || a.tipo === filterTipo;
+                const matchEstado = filterEstado === 'all' || a.estado === filterEstado;
+                return matchSearch && matchTipo && matchEstado;
+            });
+
+            const tiposUnicos = [...new Set((state.activos || []).map(a => a.tipo))].filter(Boolean);
+            const estadoColor = { 'Almacen': 'var(--accent-green)', 'Asignado': 'var(--accent-blue)', 'Baja': 'var(--accent-red)' };
+            const estadoBg = { 'Almacen': 'rgba(63,185,80,.15)', 'Asignado': 'rgba(88,166,255,.15)', 'Baja': 'rgba(239,68,68,.15)' };
+
+            const handleCrearActivos = async function() {
+                if (!newForm.tipo || !newForm.modelo || !newForm.ubicacion) { showToast('Tipo, modelo y ubicación son obligatorios', 'error'); return; }
+                const cant = parseInt(newForm.cantidad) || 1;
+                if (cant < 1 || cant > 50) { showToast('Cantidad entre 1 y 50', 'error'); return; }
+                setCreando(true);
+                try {
+                    const creados = [];
+                    for (let i = 0; i < cant; i++) {
+                        const idEtiqueta = await dataManager.getNextEtiquetaId();
+                        await dataManager.createActivo({ idEtiqueta, tipo: newForm.tipo, modelo: newForm.modelo, ubicacion: newForm.ubicacion, numSerie: cant === 1 ? newForm.numSerie : '', notas: newForm.notas });
+                        creados.push({ idEtiqueta, tipo: newForm.tipo, modelo: newForm.modelo, numSerie: cant === 1 ? newForm.numSerie : '' });
+                    }
+                    setGenerados(creados);
+                    setShowGenerados(true);
+                    setShowNewForm(false);
+                    setNewForm({ tipo: '', modelo: '', cantidad: 1, ubicacion: '', numSerie: '', notas: '' });
+                    showToast(cant + ' activo(s) creado(s)', 'success');
+                    await onRefresh();
+                } catch(err) { showToast('Error: ' + err.message, 'error'); }
+                finally { setCreando(false); }
+            };
+
+            const upd = function(f, v) { setNewForm(function(p) { return Object.assign({}, p, { [f]: v }); }); };
+
+            return e('div', null,
+                // Toolbar
+                e('div', { className: 'toolbar' },
+                    e('div', { className: 'toolbar-left' },
+                        e('input', { type: 'text', className: 'search-bar', placeholder: 'Buscar por ID, tipo, modelo...', value: search, onChange: function(ev) { setSearch(ev.target.value); } }),
+                        e('select', { className: 'filter-select', value: filterTipo, onChange: function(ev) { setFilterTipo(ev.target.value); } },
+                            e('option', { value: 'all' }, 'Todos los tipos'),
+                            tiposUnicos.map(function(t) { return e('option', { key: t, value: t }, t); })
+                        ),
+                        e('select', { className: 'filter-select', value: filterEstado, onChange: function(ev) { setFilterEstado(ev.target.value); } },
+                            e('option', { value: 'all' }, 'Todos los estados'),
+                            e('option', { value: 'Almacen' }, 'En Almacén'),
+                            e('option', { value: 'Asignado' }, 'Asignado'),
+                            e('option', { value: 'Baja' }, 'Baja')
+                        ),
+                        e('span', { className: 'results-count' }, e('strong', null, filtered.length), ' activos')
+                    ),
+                    e('div', { className: 'toolbar-right' },
+                        generados.length > 0 && e('button', { className: 'button button-success', onClick: function() { exportEtiquetaPDF(generados); } }, '🖨️ Imprimir etiquetas (' + generados.length + ')'),
+                        e('button', { className: 'button button-primary', onClick: function() { setShowNewForm(!showNewForm); setShowGenerados(false); } }, showNewForm ? '✕ Cancelar' : '+ Dar de alta activos')
+                    )
+                ),
+
+                // Formulario nuevo activo
+                showNewForm && e('div', { style: { background: 'var(--bg-tertiary)', padding: '24px', borderRadius: '12px', marginBottom: '24px', border: '2px solid var(--accent-blue)' } },
+                    e('div', { style: { fontWeight: '700', fontSize: '16px', marginBottom: '16px' } }, '📦 Dar de alta nuevos activos con etiqueta'),
+                    tiposConEtiqueta.length === 0 && e('div', { className: 'info-banner orange' }, '⚠️ No hay tipos con etiqueta configurados. Ve al Admin Panel → Catálogo y activa "Lleva etiqueta" en los tipos correspondientes.'),
+                    e('div', { className: 'form-row' },
+                        e('div', { className: 'form-group' },
+                            e('label', { className: 'form-label' }, 'Tipo de material *'),
+                            e('select', { className: 'form-select', value: newForm.tipo, onChange: function(ev) { upd('tipo', ev.target.value); upd('modelo', ''); } },
+                                e('option', { value: '' }, '-- Selecciona tipo --'),
+                                tiposConEtiqueta.map(function(t) { return e('option', { key: t, value: t }, t); })
+                            )
+                        ),
+                        e('div', { className: 'form-group' },
+                            e('label', { className: 'form-label' }, 'Modelo *'),
+                            e('select', { className: 'form-select', value: newForm.modelo, onChange: function(ev) { upd('modelo', ev.target.value); }, disabled: !newForm.tipo },
+                                e('option', { value: '' }, '-- Selecciona modelo --'),
+                                modelosDelTipo.map(function(m) { return e('option', { key: m, value: m }, m); })
+                            )
+                        )
+                    ),
+                    e('div', { className: 'form-row' },
+                        e('div', { className: 'form-group' },
+                            e('label', { className: 'form-label' }, 'Ubicación inicial *'),
+                            e('select', { className: 'form-select', value: newForm.ubicacion, onChange: function(ev) { upd('ubicacion', ev.target.value); } },
+                                e('option', { value: '' }, '-- Selecciona ubicación --'),
+                                (state.ubicaciones || []).map(function(u) { return e('option', { key: u.id, value: u.nombre }, u.nombre); })
+                            )
+                        ),
+                        e('div', { className: 'form-group' },
+                            e('label', { className: 'form-label' }, 'Cantidad de unidades'),
+                            e('input', { type: 'number', min: '1', max: '50', className: 'form-input', value: newForm.cantidad, onChange: function(ev) { upd('cantidad', ev.target.value); } })
+                        )
+                    ),
+                    parseInt(newForm.cantidad) === 1 && e('div', { className: 'form-row' },
+                        e('div', { className: 'form-group' },
+                            e('label', { className: 'form-label' }, 'N/S Fabricante (opcional)'),
+                            e('input', { type: 'text', className: 'form-input', value: newForm.numSerie, placeholder: 'Número de serie del fabricante', onChange: function(ev) { upd('numSerie', ev.target.value); } })
+                        ),
+                        e('div', { className: 'form-group' },
+                            e('label', { className: 'form-label' }, 'Notas'),
+                            e('input', { type: 'text', className: 'form-input', value: newForm.notas, placeholder: 'Observaciones opcionales', onChange: function(ev) { upd('notas', ev.target.value); } })
+                        )
+                    ),
+                    e('div', { className: 'info-banner blue' }, 'ℹ️ Se generarán ', e('strong', null, newForm.cantidad || 1), ' ID(s) únicos con formato ', e('strong', null, 'SLF-SP-' + new Date().getFullYear().toString().slice(-2) + '-XXXXX')),
+                    e('button', { className: 'button button-primary', onClick: handleCrearActivos, disabled: creando || !newForm.tipo || !newForm.modelo || !newForm.ubicacion, style: { marginTop: '8px' } },
+                        creando ? e('span', { className: 'loading-spinner' }) : null,
+                        creando ? ' Creando...' : '✓ Crear y generar IDs'
+                    )
+                ),
+
+                // IDs generados - botón imprimir etiquetas
+                showGenerados && generados.length > 0 && e('div', { style: { background: 'rgba(63,185,80,.1)', border: '2px solid var(--accent-green)', borderRadius: '12px', padding: '20px', marginBottom: '24px' } },
+                    e('div', { style: { fontWeight: '700', color: 'var(--accent-green)', marginBottom: '12px' } }, '✓ ' + generados.length + ' activo(s) creado(s) correctamente'),
+                    e('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' } },
+                        generados.map(function(a) {
+                            return e('span', { key: a.idEtiqueta, style: { background: 'var(--bg-secondary)', border: '1px solid var(--accent-green)', borderRadius: '6px', padding: '6px 12px', fontFamily: 'IBM Plex Mono,monospace', fontSize: '13px', fontWeight: '600' } }, a.idEtiqueta);
+                        })
+                    ),
+                    e('button', { className: 'button button-success', onClick: function() { exportEtiquetaPDF(generados); } }, '🖨️ Imprimir etiquetas PDF'),
+                    e('button', { className: 'button button-secondary', onClick: function() { setShowGenerados(false); setGenerados([]); }, style: { marginLeft: '8px' } }, 'Cerrar')
+                ),
+
+                // Tabla de activos
+                filtered.length > 0 ? e('table', { className: 'history-table' },
+                    e('thead', null, e('tr', null,
+                        e('th', { style: { width: '160px' } }, 'ID Etiqueta'),
+                        e('th', null, 'Tipo'),
+                        e('th', null, 'Modelo'),
+                        e('th', { style: { width: '100px' } }, 'Estado'),
+                        e('th', null, 'Ubicación'),
+                        e('th', { style: { width: '120px' } }, 'N/S'),
+                        e('th', { style: { width: '120px' } }, 'Acciones')
+                    )),
+                    e('tbody', null, filtered.map(function(activo) {
+                        return e('tr', { key: activo.id },
+                            e('td', null, e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', fontWeight: '700', color: 'var(--accent-blue)' } }, activo.idEtiqueta)),
+                            e('td', { style: { fontWeight: '500' } }, activo.tipo),
+                            e('td', null, activo.modelo),
+                            e('td', null, e('span', { style: { background: estadoBg[activo.estado] || 'var(--bg-tertiary)', color: estadoColor[activo.estado] || 'var(--text-primary)', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' } }, activo.estado)),
+                            e('td', { style: { fontSize: '13px' } }, activo.ubicacion || '-'),
+                            e('td', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, activo.numSerie || '-'),
+                            e('td', null, e('div', { style: { display: 'flex', gap: '6px' } },
+                                e('div', { className: 'action-icon', title: 'Imprimir etiqueta', onClick: function() { exportEtiquetaPDF([activo]); } }, '🖨️'),
+                                e('div', { className: 'action-icon danger', title: 'Eliminar', onClick: async function() { if (confirm('¿Eliminar activo ' + activo.idEtiqueta + '?')) { await dataManager.deleteActivo(activo.id); await onRefresh(); showToast('Activo eliminado', 'success'); } } }, '🗑️')
+                            ))
+                        );
+                    }))
+                ) : e('div', { className: 'empty-state' },
+                    e('div', { className: 'empty-state-icon' }, '🏷️'),
+                    e('div', { className: 'empty-state-title' }, 'No hay activos registrados'),
+                    e('div', { className: 'empty-state-text' }, 'Da de alta equipos con etiqueta usando el botón "+ Dar de alta activos"')
+                )
+            );
+        }
+
         // ADMIN PANEL - v1.9.0
         // ==========================================
         function AdminPanel({ state, onRefresh, onSetStockMinimo }) {
@@ -1660,13 +1903,23 @@
                     catalogoRaw.length === 0 ? e('div', { style: { color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' } }, 'El catálogo está vacío') :
                     Object.entries(
                         catalogoRaw.reduce((acc, item) => { if (!acc[item.tipo]) acc[item.tipo] = []; acc[item.tipo].push(item); return acc; }, {})
-                    ).map(([tipo, modelos]) => e('div', { key: tipo, style: { marginBottom: '16px' } },
-                        e('div', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--accent-blue)', textTransform: 'uppercase', marginBottom: '6px', padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' } }, tipo),
-                        modelos.filter(m => m.modelo).map(m => e('div', { key: m.id, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: m.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '6px', marginBottom: '4px', opacity: m.activo ? 1 : 0.6 } },
-                            e('span', { style: { flex: 1, fontSize: '14px' } }, m.modelo),
-                            e('button', { className: 'button button-danger', onClick: () => act(() => { setCatalogoLoaded(false); return dataManager.deleteCatalogItem(m.id); }, 'Modelo eliminado'), disabled: loading, style: { padding: '4px 10px', fontSize: '12px' } }, '🗑️')
-                        ))
-                    ))
+                    ).map(([tipo, modelos]) => {
+                        const tieneEtiqueta = modelos.some(m => m.llevaEtiqueta);
+                        const tipoItem = modelos[0]; // usamos el primer item para toggle
+                        return e('div', { key: tipo, style: { marginBottom: '16px' } },
+                            e('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' } },
+                                e('div', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--accent-blue)', textTransform: 'uppercase', flex: 1 } }, tipo),
+                                e('label', { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: tieneEtiqueta ? 'var(--accent-green)' : 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' } },
+                                    e('input', { type: 'checkbox', checked: tieneEtiqueta, onChange: () => act(async () => { for (const m of modelos) { await dataManager.updateCatalogLlevaEtiqueta(m.id, !tieneEtiqueta); } setCatalogoLoaded(false); }, tieneEtiqueta ? 'Etiqueta desactivada' : 'Etiqueta activada'), style: { width: '16px', height: '16px' } }),
+                                    tieneEtiqueta ? '🏷️ Lleva etiqueta' : 'Sin etiqueta'
+                                )
+                            ),
+                            modelos.filter(m => m.modelo).map(m => e('div', { key: m.id, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: m.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '6px', marginBottom: '4px', opacity: m.activo ? 1 : 0.6 } },
+                                e('span', { style: { flex: 1, fontSize: '14px' } }, m.modelo),
+                                e('button', { className: 'button button-danger', onClick: () => act(() => { setCatalogoLoaded(false); return dataManager.deleteCatalogItem(m.id); }, 'Modelo eliminado'), disabled: loading, style: { padding: '4px 10px', fontSize: '12px' } }, '🗑️')
+                            ))
+                        );
+                    })
                 )
             );
 
@@ -1826,7 +2079,7 @@
 
         // ---- App ----
         function App() {
-            const [state, setState] = useState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, ubicaciones: [], ubicacionesAll: [], adminsAll: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2') });
+            const [state, setState] = useState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2') });
 
             useEffect(() => { initializeApp(); }, []);
 
@@ -1843,7 +2096,7 @@
                     const currentUser = await graphClient.getCurrentUser();
                     const data = await dataManager.loadAllData();
                     const isAdmin = data.admins.some(a => a.Email && a.Email.toLowerCase() === currentUser.mail.toLowerCase() && (a.Activo === true || a.Activo === 'Yes'));
-                    setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], loading: false, syncing: false, lastSync: new Date() }));
+                    setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], loading: false, syncing: false, lastSync: new Date() }));
                     showToast('Bienvenido, ' + currentUser.displayName, 'success');
                 } catch(error) { console.error('Error inicializando app:', error); showToast('Error cargando la aplicacion', 'error'); setState(s => ({ ...s, loading: false })); }
             };
@@ -1855,17 +2108,17 @@
                 if (!dataManager) return;
                 try {
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], lastSync: new Date() }));
+                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], lastSync: new Date() }));
                 } catch(e) { console.error('Error refreshing:', e); }
             };
-            const handleLogout = async () => { await logout(); setState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, ubicaciones: [], ubicacionesAll: [], adminsAll: [], activeTab: 'dashboard', loading: false, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: 2 }); showToast('Sesion cerrada correctamente', 'success'); };
+            const handleLogout = async () => { await logout(); setState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], activeTab: 'dashboard', loading: false, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: 2 }); showToast('Sesion cerrada correctamente', 'success'); };
 
             const syncData = async (showMsg) => {
                 if (!dataManager || state.syncing) return;
                 setState(s => ({ ...s, syncing: true }));
                 try {
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], syncing: false, lastSync: new Date() }));
+                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], syncing: false, lastSync: new Date() }));
                     if (showMsg) showToast('Sincronizado correctamente', 'success');
                 } catch(e) { setState(s => ({ ...s, syncing: false })); }
             };
@@ -1925,14 +2178,15 @@
                     )
                 ),
                 e('nav', { className: 'nav-tabs' },
-                    ['dashboard', 'inventario', 'asignaciones', 'historial'].map(tab =>
-                        e('button', { key: tab, className: 'tab-button ' + (state.activeTab === tab ? 'active' : ''), onClick: () => handleTabChange(tab) }, { dashboard: '📊 Dashboard', inventario: '📦 Inventario', asignaciones: '📋 Asignaciones', historial: '📜 Historial' }[tab])
+                    ['dashboard', 'inventario', 'activos', 'asignaciones', 'historial'].map(tab =>
+                        e('button', { key: tab, className: 'tab-button ' + (state.activeTab === tab ? 'active' : ''), onClick: () => handleTabChange(tab) }, { dashboard: '📊 Dashboard', inventario: '📦 Inventario', activos: '🏷️ Activos', asignaciones: '📋 Asignaciones', historial: '📜 Historial' }[tab])
                     ),
                     state.isAdmin && e('button', { className: 'tab-button ' + (state.activeTab === 'admin' ? 'active' : ''), onClick: () => handleTabChange('admin'), style: { background: state.activeTab === 'admin' ? 'var(--accent-purple)' : '', borderColor: state.isAdmin ? 'var(--accent-purple)' : '' } }, '🛠️ Admin')
                 ),
                 e('div', { className: 'content-section' },
                     state.activeTab === 'dashboard' && e(Dashboard, { state }),
                     state.activeTab === 'inventario' && e(InventoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
+                    state.activeTab === 'activos' && e(ActivosView, { state, onRefresh: refreshData }),
                     state.activeTab === 'asignaciones' && e(AssignmentsView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
                     state.activeTab === 'historial' && e(HistoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
                     state.activeTab === 'admin' && state.isAdmin && e(AdminPanel, {
