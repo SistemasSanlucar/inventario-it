@@ -221,7 +221,7 @@
         },
         etiquetas: { pais: 'SP' },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.0.1'
+        version: '2.0.2'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -894,13 +894,43 @@
             const [filterType, setFilterType] = useState('all');
             const [filterDateFrom, setFilterDateFrom] = useState('');
             const [filterDateTo, setFilterDateTo] = useState('');
+            const [sortCol, setSortCol] = useState('fecha');
+            const [sortDir, setSortDir] = useState('desc');
+
+            const toggleSort = function(col) {
+                if (sortCol === col) { setSortDir(function(d) { return d === 'asc' ? 'desc' : 'asc'; }); }
+                else { setSortCol(col); setSortDir('asc'); }
+            };
+            const sortIcon = function(col) {
+                if (sortCol !== col) return e('span', { style: { color: 'var(--text-secondary)', marginLeft: '4px', opacity: 0.4 } }, '⇅');
+                return e('span', { style: { color: 'var(--accent-blue)', marginLeft: '4px' } }, sortDir === 'asc' ? '↑' : '↓');
+            };
+            const thSort = function(label, col, width) {
+                return e('th', { style: { width: width || 'auto', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }, onClick: function() { toggleSort(col); } },
+                    label, sortIcon(col)
+                );
+            };
+
             const filtered = state.history.filter(entry => {
                 const matchesSearch = entry.producto.toLowerCase().includes(search.toLowerCase()) || entry.usuario.toLowerCase().includes(search.toLowerCase()) || (entry.ticket && entry.ticket.toLowerCase().includes(search.toLowerCase()));
                 const matchesType = filterType === 'all' || entry.tipo === filterType;
                 let matchesDate = true;
                 if (filterDateFrom || filterDateTo) { const d = new Date(entry.fecha); if (filterDateFrom) matchesDate = d >= new Date(filterDateFrom); if (filterDateTo && matchesDate) matchesDate = d <= new Date(filterDateTo + 'T23:59:59'); }
                 return matchesSearch && matchesType && matchesDate;
+            }).sort(function(a, b) {
+                let av, bv;
+                if (sortCol === 'fecha') { av = new Date(a.fecha); bv = new Date(b.fecha); }
+                else if (sortCol === 'tipo') { av = a.tipo; bv = b.tipo; }
+                else if (sortCol === 'producto') { av = a.producto; bv = b.producto; }
+                else if (sortCol === 'cantidad') { av = a.cantidad; bv = b.cantidad; }
+                else if (sortCol === 'usuario') { av = a.usuario; bv = b.usuario; }
+                else if (sortCol === 'tecnico') { av = a.tecnico; bv = b.tecnico; }
+                else { av = a.fecha; bv = b.fecha; }
+                if (av < bv) return sortDir === 'asc' ? -1 : 1;
+                if (av > bv) return sortDir === 'asc' ? 1 : -1;
+                return 0;
             });
+
             return e('div', null,
                 e('div', { className: 'toolbar' },
                     e('div', { className: 'toolbar-left' },
@@ -917,7 +947,17 @@
                 ),
                 filtered.length > 0 ?
                     e('table', { className: 'history-table' },
-                        e('thead', null, e('tr', null, e('th', { style: { width: '140px' } }, 'Fecha'), e('th', { style: { width: '100px' } }, 'Tipo'), e('th', null, 'Producto'), e('th', { style: { width: '60px' } }, 'Cant.'), e('th', { style: { width: '120px' } }, 'Ticket'), e('th', null, 'Usuario'), e('th', null, 'Tecnico'), e('th', { style: { width: '80px' } }, 'Firma'), e('th', { style: { width: '50px' } }, ''))),
+                        e('thead', null, e('tr', null,
+                            thSort('Fecha', 'fecha', '140px'),
+                            thSort('Tipo', 'tipo', '100px'),
+                            thSort('Producto', 'producto'),
+                            thSort('Cant.', 'cantidad', '60px'),
+                            e('th', { style: { width: '120px' } }, 'Ticket'),
+                            thSort('Usuario', 'usuario'),
+                            thSort('Técnico', 'tecnico'),
+                            e('th', { style: { width: '80px' } }, 'Firma'),
+                            e('th', { style: { width: '50px' } }, '')
+                        )),
                         e('tbody', null, filtered.map(entry =>
                             e('tr', { key: entry.id },
                                 e('td', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px' } }, new Date(entry.fecha).toLocaleString('es-ES')),
@@ -928,7 +968,7 @@
                                 e('td', { style: { fontSize: '13px' } }, entry.usuario),
                                 e('td', { style: { color: 'var(--accent-green)', fontSize: '12px' } }, entry.tecnico),
                                 e('td', null, entry.firma ? e('img', { src: entry.firma, alt: 'Firma', className: 'signature-preview' }) : e('span', { style: { color: 'var(--text-secondary)', fontSize: '12px' } }, '-')),
-                                e('td', null, e('div', { className: 'action-icon danger', onClick: () => onOpenModal('eliminar-historial', entry), title: 'Eliminar' }, '🗑️'))
+                                e('td', null, state.isAdmin ? e('div', { className: 'action-icon danger', onClick: () => onOpenModal('eliminar-historial', entry), title: 'Eliminar' }, '🗑️') : null)
                             )
                         ))
                     ) :
@@ -969,13 +1009,42 @@
             const [filterDept, setFilterDept] = useState('all');
             const [filterEstado, setFilterEstado] = useState('all');
             const [filterTipo, setFilterTipo] = useState('all');
+            const [sortCol, setSortCol] = useState('fechaAsignacion');
+            const [sortDir, setSortDir] = useState('desc');
+
+            const toggleSort = function(col) {
+                if (sortCol === col) { setSortDir(function(d) { return d === 'asc' ? 'desc' : 'asc'; }); }
+                else { setSortCol(col); setSortDir('asc'); }
+            };
+            const sortIcon = function(col) {
+                if (sortCol !== col) return e('span', { style: { color: 'var(--text-secondary)', marginLeft: '4px', opacity: 0.4 } }, '⇅');
+                return e('span', { style: { color: 'var(--accent-blue)', marginLeft: '4px' } }, sortDir === 'asc' ? '↑' : '↓');
+            };
+            const thSort = function(label, col, style) {
+                return e('th', { style: Object.assign({ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }, style || {}), onClick: function() { toggleSort(col); } },
+                    label, sortIcon(col)
+                );
+            };
+
             const filtered = (state.assignments || []).filter(a => {
-                const matchesSearch = a.nombreEmpleado.toLowerCase().includes(search.toLowerCase()) || a.emailEmpleado.toLowerCase().includes(search.toLowerCase()) || a.puesto.toLowerCase().includes(search.toLowerCase());
+                const matchesSearch = a.nombreEmpleado.toLowerCase().includes(search.toLowerCase()) || a.emailEmpleado.toLowerCase().includes(search.toLowerCase()) || (a.puesto || '').toLowerCase().includes(search.toLowerCase());
                 const matchesDept = filterDept === 'all' || a.departamento === filterDept;
                 const matchesEstado = filterEstado === 'all' || a.estado === filterEstado;
                 const matchesTipo = filterTipo === 'all' || (filterTipo === 'prestamo' && a.esPrestamo) || (filterTipo === 'asignacion' && !a.esPrestamo);
                 return matchesSearch && matchesDept && matchesEstado && matchesTipo;
+            }).sort(function(a, b) {
+                let av, bv;
+                if (sortCol === 'fechaAsignacion') { av = new Date(a.fechaAsignacion); bv = new Date(b.fechaAsignacion); }
+                else if (sortCol === 'nombreEmpleado') { av = a.nombreEmpleado; bv = b.nombreEmpleado; }
+                else if (sortCol === 'departamento') { av = a.departamento || ''; bv = b.departamento || ''; }
+                else if (sortCol === 'cantidadProductos') { av = a.cantidadProductos; bv = b.cantidadProductos; }
+                else if (sortCol === 'estado') { av = a.estado; bv = b.estado; }
+                else { av = new Date(a.fechaAsignacion); bv = new Date(b.fechaAsignacion); }
+                if (av < bv) return sortDir === 'asc' ? -1 : 1;
+                if (av > bv) return sortDir === 'asc' ? 1 : -1;
+                return 0;
             });
+
             const departamentos = [...new Set((state.assignments || []).map(a => a.departamento))].filter(Boolean);
             const hoy = new Date(); hoy.setHours(0,0,0,0);
             return e('div', null,
@@ -1005,17 +1074,24 @@
                                 e('div', { style: { padding: '10px 16px', background: 'rgba(249,115,22,.1)', border: '1px solid var(--accent-orange)', borderRadius: '8px', fontSize: '13px' } },
                                     e('strong', { style: { color: 'var(--accent-orange)' } }, prestamosActivos.length), ' préstamo(s) activo(s)'
                                 ),
-                                vencidos.length > 0 && e('div', { style: { padding: '10px 16px', background: 'rgba(239,68,68,.1)', border: '1px solid var(--accent-red)', borderRadius: '8px', fontSize: '13px', animation: 'pulse 2s infinite' } },
+                                vencidos.length > 0 && e('div', { style: { padding: '10px 16px', background: 'rgba(239,68,68,.1)', border: '1px solid var(--accent-red)', borderRadius: '8px', fontSize: '13px' } },
                                     e('strong', { style: { color: 'var(--accent-red)' } }, '⚠ ' + vencidos.length), ' vencido(s)'
                                 )
                             );
                         })(),
                         e('table', { className: 'history-table' },
-                            e('thead', null, e('tr', null, e('th', { style: { width: '90px' } }, 'Tipo'), e('th', { style: { width: '100px' } }, 'Fecha'), e('th', null, 'Empleado'), e('th', null, 'Departamento'), e('th', { style: { width: '70px' } }, 'Prods'), e('th', { style: { width: '90px' } }, 'Estado'), e('th', { style: { width: '120px' } }, 'Acciones'))),
+                            e('thead', null, e('tr', null,
+                                e('th', { style: { width: '90px' } }, 'Tipo'),
+                                thSort('Fecha', 'fechaAsignacion', { width: '100px' }),
+                                thSort('Empleado', 'nombreEmpleado'),
+                                thSort('Departamento', 'departamento'),
+                                thSort('Prods', 'cantidadProductos', { width: '70px', textAlign: 'center' }),
+                                thSort('Estado', 'estado', { width: '90px' }),
+                                e('th', { style: { width: '120px' } }, 'Acciones')
+                            )),
                             e('tbody', null, filtered.map(a => {
                                 const fa = new Date(a.fechaAsignacion); fa.setHours(0,0,0,0);
                                 const vencido = a.esPrestamo && a.estado === 'Activo' && fa < hoy;
-                                // Contar préstamos activos de este empleado
                                 const prestEmpleado = (state.assignments || []).filter(x => x.emailEmpleado === a.emailEmpleado && x.esPrestamo && x.estado === 'Activo').length;
                                 return e('tr', { key: a.id, style: vencido ? { background: 'rgba(239,68,68,.1)', borderLeft: '4px solid var(--accent-red)' } : {} },
                                     e('td', { style: { textAlign: 'center' } }, a.esPrestamo ? e('span', { style: { background: vencido ? 'var(--accent-red)' : 'var(--accent-orange)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' } }, vencido ? '⚠ VENCIDO' : 'Prestamo') : e('span', { style: { background: 'var(--accent-blue)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' } }, 'Asignacion')),
@@ -1032,7 +1108,7 @@
                                         e('div', { className: 'action-icon', onClick: () => onOpenModal('ver-asignacion', a), title: 'Ver' }, '📄'),
                                         e('div', { className: 'action-icon', onClick: () => exportAssignmentToPDF(a), title: 'PDF' }, '📥'),
                                         a.estado === 'Activo' && e('div', { className: 'action-icon', onClick: () => onOpenModal('devolver-material', a), title: 'Devolver' }, '↩️'),
-                                        e('div', { className: 'action-icon danger', onClick: () => onOpenModal('eliminar-asignacion', a), title: 'Eliminar' }, '🗑️')
+                                        state.isAdmin && e('div', { className: 'action-icon danger', onClick: () => onOpenModal('eliminar-asignacion', a), title: 'Eliminar' }, '🗑️')
                                     ))
                                 );
                             }))
@@ -1539,7 +1615,17 @@
                         barcodeField(),
                         tipoLlevaEtiqueta ? e('div', { className: 'info-banner blue' }, '🏷️ Este tipo lleva etiqueta individual. Se generará un ID ', e('strong', null, 'SLF-SP-' + new Date().getFullYear().toString().slice(-2) + '-XXXXX'), ' al guardar.') : null,
                         tipoLlevaEtiqueta ? fld('Número de Serie del fabricante', e('input', { type: 'text', className: 'form-input', value: formData.numSerie || '', placeholder: 'Ej: 5CG1234XYZ (bajo el equipo o en la caja)', onChange: function(ev) { upd('numSerie', ev.target.value); } }), true) : null,
-                        fld('Stock Inicial', e('input', { type: 'number', min: '0', className: 'form-input', value: formData.stock, onChange: function(ev) { upd('stock', ev.target.value); } })),
+                        fld('Cantidad recibida', e('input', { type: 'number', min: '1', className: 'form-input', placeholder: 'Nº de unidades que estás dando de alta', value: formData.stock, onChange: function(ev) { upd('stock', ev.target.value); } })),
+                        (function() {
+                            const productoExistente = state.inventory.find(function(item) { return item.nombre === (formData.tipo && formData.modelo ? formData.tipo + ' - ' + formData.modelo : ''); });
+                            const cant = parseInt(formData.stock) || 0;
+                            if (productoExistente && cant > 0) {
+                                return e('div', { className: 'stock-result' }, '✓ Stock resultante: ', e('strong', null, productoExistente.stock + cant), ' uds (', productoExistente.stock, ' actuales + ', cant, ' nuevas)');
+                            } else if (!productoExistente && cant > 0) {
+                                return e('div', { className: 'stock-result' }, '✓ Se crearán ', e('strong', null, cant), ' unidades de este producto');
+                            }
+                            return null;
+                        })(),
                         e('div', { className: 'form-row' },
                             fld('Ubicacion', ubicacionSelect(), true),
                             fld('Estado', estadoSelect())
@@ -2111,7 +2197,16 @@
                             e('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' } },
                                 e('div', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--accent-blue)', textTransform: 'uppercase', flex: 1 } }, tipo),
                                 e('label', { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: tieneEtiqueta ? 'var(--accent-green)' : 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' } },
-                                    e('input', { type: 'checkbox', checked: tieneEtiqueta, onChange: () => act(async () => { for (const m of modelos) { await dataManager.updateCatalogLlevaEtiqueta(m.id, !tieneEtiqueta); } setCatalogoLoaded(false); }, tieneEtiqueta ? 'Etiqueta desactivada' : 'Etiqueta activada'), style: { width: '16px', height: '16px' } }),
+                                    e('input', { type: 'checkbox', checked: tieneEtiqueta, onChange: async () => {
+                                        try {
+                                            for (const m of modelos) {
+                                                await dataManager.updateCatalogLlevaEtiqueta(m.id, !tieneEtiqueta);
+                                            }
+                                            setCatalogoLoaded(false);
+                                            await onRefresh();
+                                            showToast(tieneEtiqueta ? 'Etiqueta desactivada' : 'Etiqueta activada ✓', 'success');
+                                        } catch(err) { showToast('Error: ' + err.message, 'error'); }
+                                    }, style: { width: '16px', height: '16px', cursor: 'pointer' } }),
                                     tieneEtiqueta ? '🏷️ Lleva etiqueta' : 'Sin etiqueta'
                                 )
                             ),
