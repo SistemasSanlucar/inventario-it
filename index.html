@@ -221,7 +221,7 @@
         },
         etiquetas: { pais: 'SP' },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.0.0'
+        version: '2.0.1'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -1181,8 +1181,11 @@
             useEffect(function() {
                 if (canvasRef.current) {
                     const canvas = canvasRef.current;
-                    canvas.width = canvas.offsetWidth || 600;
-                    canvas.height = 200;
+                    // Solo inicializar dimensiones si no están ya establecidas
+                    if (!canvas.width || canvas.width !== (canvas.offsetWidth || 600)) {
+                        canvas.width = canvas.offsetWidth || 600;
+                        canvas.height = 200;
+                    }
                     const opts = { passive: false };
                     canvas.addEventListener('touchstart', onCanvasDownRef.current, opts);
                     canvas.addEventListener('touchmove', onCanvasMoveRef.current, opts);
@@ -1193,7 +1196,7 @@
                         canvas.removeEventListener('touchend', onCanvasUpRef.current, opts);
                     };
                 }
-            });
+            }, []); // [] = solo ejecutar al montar, nunca más
 
             // Búsqueda AD asignación
             const handleUserSearch = function(query) {
@@ -1291,25 +1294,44 @@
 
                     if (modalType === 'entrada' && !selectedItem) {
                         if (!formData.tipo || !formData.modelo) { showToast('Selecciona tipo y modelo', 'error'); setLoading(false); return; }
-                        if (!formData.barcode.trim()) { showToast('El código de barras es obligatorio', 'error'); setLoading(false); return; }
                         if (!formData.ubicacion) { showToast('Selecciona una ubicación', 'error'); setLoading(false); return; }
                         const tipoLlevaEtiqueta = formData.tipo ? ((state.catalogoTipos || {})[formData.tipo] || {}).llevaEtiqueta : false;
                         if (tipoLlevaEtiqueta && !formData.numSerie.trim()) { showToast('El número de serie es obligatorio para este tipo de material', 'error'); setLoading(false); return; }
-                        const exists = await dataManager.checkBarcodeExists(formData.barcode);
-                        if (exists) { showToast('El código de barras ya existe', 'error'); setLoading(false); return; }
-                        await dataManager.createInventoryItem({ nombre: nombreProducto, categoria: formData.tipo, barcode: formData.barcode, stock: parseInt(formData.stock) || 0, stockMinimo: parseInt(formData.stockMinimo) || 0, ubicacion: formData.ubicacion, estado: formData.estado });
-                        if (parseInt(formData.stock) > 0) {
-                            await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: parseInt(formData.stock) || 1, ticket: '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
-                        }
-                        // Si lleva etiqueta: generar activo e imprimir Dymo
-                        if (tipoLlevaEtiqueta) {
-                            const idEtiqueta = await dataManager.getNextEtiquetaId();
-                            await dataManager.createActivo({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, ubicacion: formData.ubicacion, numSerie: formData.numSerie, notas: '' });
-                            showToast('Producto creado + Etiqueta: ' + idEtiqueta, 'success');
-                            // Imprimir con Dymo Connect
-                            printDymoLabel({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, numSerie: formData.numSerie });
+
+                        // Detectar si ya existe un producto con este tipo+modelo
+                        const productoExistente = state.inventory.find(function(item) { return item.nombre === nombreProducto; });
+                        if (productoExistente) {
+                            // Sumar stock al existente
+                            const addCant = parseInt(formData.stock) || 1;
+                            const newStock = productoExistente.stock + addCant;
+                            await dataManager.updateInventoryItem(productoExistente.id, { Stock: newStock });
+                            await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: addCant, ticket: '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
+                            // Si lleva etiqueta, crear activo igualmente
+                            if (tipoLlevaEtiqueta) {
+                                const idEtiqueta = await dataManager.getNextEtiquetaId();
+                                await dataManager.createActivo({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, ubicacion: formData.ubicacion, numSerie: formData.numSerie, notas: '' });
+                                showToast('Stock actualizado (' + newStock + ' uds) + Etiqueta: ' + idEtiqueta, 'success');
+                                printDymoLabel({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, numSerie: formData.numSerie });
+                            } else {
+                                showToast('Stock actualizado: ' + newStock + ' uds de ' + nombreProducto, 'success');
+                            }
                         } else {
-                            showToast('Producto creado: ' + nombreProducto, 'success');
+                            // Producto nuevo
+                            if (!formData.barcode.trim()) { showToast('El código de barras es obligatorio', 'error'); setLoading(false); return; }
+                            const exists = await dataManager.checkBarcodeExists(formData.barcode);
+                            if (exists) { showToast('El código de barras ya existe', 'error'); setLoading(false); return; }
+                            await dataManager.createInventoryItem({ nombre: nombreProducto, categoria: formData.tipo, barcode: formData.barcode, stock: parseInt(formData.stock) || 0, stockMinimo: parseInt(formData.stockMinimo) || 0, ubicacion: formData.ubicacion, estado: formData.estado });
+                            if (parseInt(formData.stock) > 0) {
+                                await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: parseInt(formData.stock) || 1, ticket: '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
+                            }
+                            if (tipoLlevaEtiqueta) {
+                                const idEtiqueta = await dataManager.getNextEtiquetaId();
+                                await dataManager.createActivo({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, ubicacion: formData.ubicacion, numSerie: formData.numSerie, notas: '' });
+                                showToast('Producto creado + Etiqueta: ' + idEtiqueta, 'success');
+                                printDymoLabel({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, numSerie: formData.numSerie });
+                            } else {
+                                showToast('Producto creado: ' + nombreProducto, 'success');
+                            }
                         }
 
                     } else if (modalType === 'entrada' && selectedItem) {
@@ -1633,12 +1655,19 @@
                             fld('Fecha incorporacion', e('input', { type: 'date', className: 'form-input', value: formData.fechaIncorporacion, onChange: function(ev) { upd('fechaIncorporacion', ev.target.value); } }))
                         ) : null,
                         e('div', { style: { marginBottom: '8px' } }, e('label', { className: 'form-label' }, 'Productos', e('span', { className: 'required-asterisk' }, ' *'))),
+                        // Grid de productos fungibles (toca para añadir)
+                        productsGrid(),
+                        // Separador para material etiquetado
+                        e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', margin: '12px 0' } },
+                            e('div', { style: { flex: 1, height: '1px', background: 'var(--border)' } }),
+                            e('span', { style: { fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' } }, '🏷️ Material con etiqueta — escanea o escribe el ID'),
+                            e('div', { style: { flex: 1, height: '1px', background: 'var(--border)' } })
+                        ),
                         e('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } },
-                            e('input', { type: 'text', className: 'form-input', value: barcodeInput, placeholder: 'Código de barras (Enter)...', style: { flex: 1, fontFamily: 'IBM Plex Mono,monospace' }, onChange: function(ev) { setBarcodeInput(ev.target.value); setBarcodeError(''); }, onKeyDown: function(ev) { if (ev.key === 'Enter') { ev.preventDefault(); addProductByBarcode(barcodeInput.trim()); } } }),
-                            e('button', { type: 'button', className: 'button button-primary', onClick: function() { startBarcodeScanner(function(code) { addProductByBarcode(code); }); } }, '📷 Escanear')
+                            e('input', { type: 'text', className: 'form-input', value: barcodeInput, placeholder: 'ID etiqueta (SLF-SP-26-XXXXX) o código de barras...', style: { flex: 1, fontFamily: 'IBM Plex Mono,monospace' }, onChange: function(ev) { setBarcodeInput(ev.target.value); setBarcodeError(''); }, onKeyDown: function(ev) { if (ev.key === 'Enter') { ev.preventDefault(); addProductByBarcode(barcodeInput.trim()); } } }),
+                            e('button', { type: 'button', className: 'button button-primary', onClick: function() { startBarcodeScanner(function(code) { addProductByBarcode(code); }); } }, '📷 Cámara')
                         ),
                         barcodeError ? e('div', { style: { color: 'var(--accent-red)', fontSize: '13px', marginBottom: '8px' } }, '⚠️ ' + barcodeError) : null,
-                        productsGrid(),
                         selectedProducts.length > 0 ? e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '8px', padding: '12px', marginBottom: '16px', border: '2px solid var(--accent-green)' } },
                             e('div', { style: { fontWeight: '600', fontSize: '12px', color: 'var(--accent-green)', marginBottom: '8px', textTransform: 'uppercase' } }, '✓ ' + selectedProducts.length + ' producto(s) seleccionado(s)'),
                             selectedProducts.map(function(prod, idx) {
@@ -2064,7 +2093,7 @@
                         e('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } },
                             e('select', { className: 'form-select', value: newModeloTipo, onChange: ev => setNewModeloTipo(ev.target.value), style: { flex: 1 } },
                                 e('option', { value: '' }, '-- Selecciona tipo --'),
-                                Object.keys(state.catalogo).map(t => e('option', { key: t, value: t }, t))
+                                Object.keys(state.catalogoTipos || {}).map(t => e('option', { key: t, value: t }, t))
                             ),
                             e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre del modelo', value: newModelo, onChange: ev => setNewModelo(ev.target.value), style: { flex: 2 }, onKeyDown: ev => { if (ev.key === 'Enter' && newModeloTipo && newModelo.trim()) act(async () => { await dataManager.addToCatalog(newModeloTipo, newModelo.trim()); setCatalogoLoaded(false); }, 'Modelo añadido').then(() => setNewModelo('')); } }),
                             e('button', { className: 'button button-success', onClick: () => act(async () => { await dataManager.addToCatalog(newModeloTipo, newModelo.trim()); setCatalogoLoaded(false); }, 'Modelo añadido').then(() => setNewModelo('')), disabled: loading || !newModeloTipo || !newModelo.trim(), style: { padding: '12px 20px' } }, '+ Añadir')
@@ -2375,15 +2404,14 @@
                     )
                 ),
                 e('nav', { className: 'nav-tabs' },
-                    ['dashboard', 'inventario', 'activos', 'asignaciones', 'historial'].map(tab =>
-                        e('button', { key: tab, className: 'tab-button ' + (state.activeTab === tab ? 'active' : ''), onClick: () => handleTabChange(tab) }, { dashboard: '📊 Dashboard', inventario: '📦 Inventario', activos: '🏷️ Activos', asignaciones: '📋 Asignaciones', historial: '📜 Historial' }[tab])
+                    ['dashboard', 'inventario', 'asignaciones', 'historial'].map(tab =>
+                        e('button', { key: tab, className: 'tab-button ' + (state.activeTab === tab ? 'active' : ''), onClick: () => handleTabChange(tab) }, { dashboard: '📊 Dashboard', inventario: '📦 Inventario', asignaciones: '📋 Asignaciones', historial: '📜 Historial' }[tab])
                     ),
                     state.isAdmin && e('button', { className: 'tab-button ' + (state.activeTab === 'admin' ? 'active' : ''), onClick: () => handleTabChange('admin'), style: { background: state.activeTab === 'admin' ? 'var(--accent-purple)' : '', borderColor: state.isAdmin ? 'var(--accent-purple)' : '' } }, '🛠️ Admin')
                 ),
                 e('div', { className: 'content-section' },
                     state.activeTab === 'dashboard' && e(Dashboard, { state }),
                     state.activeTab === 'inventario' && e(InventoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
-                    state.activeTab === 'activos' && e(ActivosView, { state, onRefresh: refreshData }),
                     state.activeTab === 'asignaciones' && e(AssignmentsView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
                     state.activeTab === 'historial' && e(HistoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
                     state.activeTab === 'admin' && state.isAdmin && e(AdminPanel, {
