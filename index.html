@@ -211,7 +211,8 @@
                 asignaciones: 'StockControl_Asignaciones',
                 catalogo: 'StockControl_Catalogo',
                 ubicaciones: 'StockControl_Ubicaciones',
-                activos: 'StockControl_Activos'
+                activos: 'StockControl_Activos',
+                sociedades: 'StockControl_Sociedades'
             }
         },
         msal: {
@@ -219,9 +220,8 @@
             authority: 'https://login.microsoftonline.com/f37778d8-59b2-4e5e-a56b-08eb8ad3c13a',
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
-        etiquetas: { pais: 'SP' },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.2.0'
+        version: '2.3.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -317,7 +317,7 @@
         constructor(graphClient) { this.graph = graphClient; }
         async loadAllData() {
             try {
-                const [inventario, tecnicos, historial, admins, asignaciones, catalogo, ubicacionesRaw, activosRaw] = await Promise.all([
+                const [inventario, tecnicos, historial, admins, asignaciones, catalogo, ubicacionesRaw, activosRaw, sociedadesRaw] = await Promise.all([
                     this.graph.getListItems(CONFIG.sharepoint.lists.inventario),
                     this.graph.getListItems(CONFIG.sharepoint.lists.tecnicos),
                     this.graph.getListItems(CONFIG.sharepoint.lists.historial),
@@ -325,7 +325,8 @@
                     this.graph.getListItems(CONFIG.sharepoint.lists.asignaciones).catch(() => []),
                     this.graph.getListItems(CONFIG.sharepoint.lists.catalogo).catch(() => []),
                     this.graph.getListItems(CONFIG.sharepoint.lists.ubicaciones).catch(() => []),
-                    this.graph.getListItems(CONFIG.sharepoint.lists.activos).catch(() => [])
+                    this.graph.getListItems(CONFIG.sharepoint.lists.activos).catch(() => []),
+                    this.graph.getListItems(CONFIG.sharepoint.lists.sociedades).catch(() => [])
                 ]);
                 // Catálogo: modelos por tipo + metadatos del tipo (LlevaEtiqueta)
                 const catalogoProcessed = {};
@@ -344,9 +345,10 @@
                 return {
                     inventory: inventario.map(item => ({ id: item.sharePointId, nombre: item.Nombre || item.Title, categoria: item.Categoria, barcode: item.CodigoBarras, stock: parseInt(item.Stock) || 0, stockMinimo: parseInt(item.StockMinimo) || 0, ubicacion: item.Ubicacion || '', estado: item.Estado || 'Nuevo' })),
                     technicians: tecnicos.map(item => ({ id: item.sharePointId, nombre: item.NombreTecnico || item.Title, codigo: item.CodigoTecnico, email: item.Email, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })),
-                    history: historial.map(item => ({ id: item.sharePointId, fecha: item.FechaHora || item.Created, tipo: item.TipoMovimiento, producto: item.Producto, cantidad: parseInt(item.Cantidad) || 0, ticket: item.Ticket || '', usuario: item.Usuario || '', tecnico: item.Tecnico || '', firma: item.Firma || null })).sort((a,b) => new Date(b.fecha) - new Date(a.fecha)),
+                    history: historial.map(item => ({ id: item.sharePointId, fecha: item.FechaHora || item.Created, tipo: item.TipoMovimiento, producto: item.Producto, cantidad: parseInt(item.Cantidad) || 0, ticket: item.Ticket || '', usuario: item.Usuario || '', tecnico: item.Tecnico || '', firma: item.Firma || null, idEtiqueta: item.IDEtiqueta || '', motivo: item.MotivoIncidencia || '' })).sort((a,b) => new Date(b.fecha) - new Date(a.fecha)),
                     assignments: asignaciones.map(item => ({ id: item.sharePointId, nombreEmpleado: item.NombreEmpleado, emailEmpleado: item.EmailEmpleado, departamento: item.Departamento, puesto: item.Puesto, fechaIncorporacion: item.FechaIncorporacion, productosAsignados: JSON.parse(item.ProductosAsignados || '[]'), cantidadProductos: parseInt(item.CantidadProductos) || 0, firmaEmpleado: item.FirmaEmpleado, tecnicoResponsable: item.TecnicoResponsable, fechaAsignacion: item.FechaAsignacion, estado: item.Estado, observaciones: item.Observaciones || '', esPrestamo: item.EsPrestamo === 'Si' })).sort((a,b) => new Date(b.fechaAsignacion) - new Date(a.fechaAsignacion)),
-                    activos: activosRaw.map(item => ({ id: item.sharePointId, idEtiqueta: item.IDEtiqueta || '', tipo: item.TipoMaterial || '', modelo: item.ModeloMaterial || '', estado: item.EstadoActivo || 'Almacen', ubicacion: item.UbicacionActivo || '', numSerie: item.NumSerie || '', notas: item.Notas || '' })),
+                    activos: activosRaw.map(item => ({ id: item.sharePointId, idEtiqueta: item.IDEtiqueta || '', tipo: item.TipoMaterial || '', modelo: item.ModeloMaterial || '', estado: item.EstadoActivo || 'Almacen', ubicacion: item.UbicacionActivo || '', numSerie: item.NumSerie || '', notas: item.Notas || '', sociedad: item.Sociedad || '', asignadoA: item.AsignadoA || '', emailAsignadoA: item.EmailAsignadoA || '', fechaAsignacion: item.FechaAsignacion || null, transitoDestino: item.TransitoDestino || '', motivoIncidencia: item.MotivoIncidencia || '' })),
+                    sociedades: sociedadesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, codigo: (item.Codigo || '').toUpperCase(), pais: item.Pais || '', activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })).sort((a,b) => a.nombre.localeCompare(b.nombre)),
                     admins, catalogo: catalogoProcessed, catalogoTipos,
                     ubicaciones: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })).filter(u => u.activo).sort((a,b) => a.nombre.localeCompare(b.nombre)),
                     ubicacionesAll: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })),
@@ -363,7 +365,7 @@
         async updateInventoryItem(itemId, data) { await this.graph.updateListItem(CONFIG.sharepoint.lists.inventario, itemId, data); }
         async deleteInventoryItem(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.inventario, itemId); }
         async addToHistory(data) {
-            await this.graph.createListItem(CONFIG.sharepoint.lists.historial, { Title: data.tipo + ' - ' + data.producto, TipoMovimiento: data.tipo, Producto: data.producto, Cantidad: data.cantidad, Ticket: data.ticket || '', Usuario: data.usuario || '', Tecnico: data.tecnico || '', FechaHora: new Date().toISOString(), Firma: data.firma || '' });
+            await this.graph.createListItem(CONFIG.sharepoint.lists.historial, { Title: data.tipo + ' - ' + data.producto, TipoMovimiento: data.tipo, Producto: data.producto, Cantidad: data.cantidad, Ticket: data.ticket || '', Usuario: data.usuario || '', Tecnico: data.tecnico || '', FechaHora: new Date().toISOString(), Firma: data.firma || '', IDEtiqueta: data.idEtiqueta || '', MotivoIncidencia: data.motivo || '' });
         }
         // UBICACIONES CRUD
         async createUbicacion(nombre) { return await this.graph.createListItem(CONFIG.sharepoint.lists.ubicaciones, { Title: nombre, Activo: 'Si' }); }
@@ -394,13 +396,11 @@
         async toggleTechnicianStatus(itemId, currentStatus) { await this.graph.updateListItem(CONFIG.sharepoint.lists.tecnicos, itemId, { Activo: currentStatus ? 'No' : 'Si' }); }
         async deleteHistoryItem(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.historial, itemId); }
         // ACTIVOS (etiquetas individuales)
-        async getNextEtiquetaId() {
+        async getNextEtiquetaId(codigoSociedad) {
             const anyo = new Date().getFullYear().toString().slice(-2);
-            const pais = CONFIG.etiquetas.pais;
-            // UUID-based: sin race conditions, sin llamada a la API
-            // Formato: SLF-SP-26-ABCD1234 (8 chars hex mayúsculas)
+            const codigo = (codigoSociedad || 'SLF').toUpperCase();
             const unique = crypto.randomUUID().replace(/-/g, '').toUpperCase().slice(0, 8);
-            return 'SLF-' + pais + '-' + anyo + '-' + unique;
+            return codigo + '-' + anyo + '-' + unique;
         }
         async createActivo(data) {
             return await this.graph.createListItem(CONFIG.sharepoint.lists.activos, {
@@ -408,12 +408,41 @@
                 IDEtiqueta: data.idEtiqueta,
                 TipoMaterial: data.tipo,
                 ModeloMaterial: data.modelo,
-                EstadoActivo: data.estado || 'Almacen',
+                EstadoActivo: data.estado || 'Pendiente',
                 UbicacionActivo: data.ubicacion || '',
                 NumSerie: data.numSerie || '',
-                Notas: data.notas || ''
+                Notas: data.notas || '',
+                Sociedad: data.sociedad || ''
             });
         }
+        async cambiarEstadoActivo(itemId, estado, extra) {
+            const fields = { EstadoActivo: estado };
+            const ex = extra || {};
+            if (ex.ubicacion !== undefined) fields.UbicacionActivo = ex.ubicacion;
+            if (ex.asignadoA !== undefined) fields.AsignadoA = ex.asignadoA;
+            if (ex.emailAsignadoA !== undefined) fields.EmailAsignadoA = ex.emailAsignadoA;
+            if (ex.fechaAsignacion !== undefined) fields.FechaAsignacion = ex.fechaAsignacion;
+            if (ex.transitoDestino !== undefined) fields.TransitoDestino = ex.transitoDestino;
+            if (ex.fechaTransito !== undefined) fields.FechaTransito = ex.fechaTransito;
+            if (ex.motivoIncidencia !== undefined) fields.MotivoIncidencia = ex.motivoIncidencia;
+            // Limpiar campos de asignación si vuelve a Almacén
+            if (estado === 'Almacen') { fields.AsignadoA = ''; fields.EmailAsignadoA = ''; fields.FechaAsignacion = null; fields.TransitoDestino = ''; }
+            await this.graph.updateListItem(CONFIG.sharepoint.lists.activos, itemId, fields);
+        }
+        // SOCIEDADES CRUD
+        async createSociedad(data) {
+            const codigo = data.codigo.toUpperCase().slice(0, 3);
+            return await this.graph.createListItem(CONFIG.sharepoint.lists.sociedades, { Title: data.nombre, Codigo: codigo, Pais: data.pais, Activo: 'Si' });
+        }
+        async updateSociedad(itemId, data) {
+            const fields = {};
+            if (data.nombre !== undefined) fields.Title = data.nombre;
+            if (data.codigo !== undefined) fields.Codigo = data.codigo.toUpperCase().slice(0, 3);
+            if (data.pais !== undefined) fields.Pais = data.pais;
+            await this.graph.updateListItem(CONFIG.sharepoint.lists.sociedades, itemId, fields);
+        }
+        async toggleSociedad(itemId, activo) { await this.graph.updateListItem(CONFIG.sharepoint.lists.sociedades, itemId, { Activo: activo ? 'No' : 'Si' }); }
+        async deleteSociedad(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.sociedades, itemId); }
         async updateActivoEstado(itemId, estado, ubicacion) {
             await this.graph.updateListItem(CONFIG.sharepoint.lists.activos, itemId, { EstadoActivo: estado, UbicacionActivo: ubicacion || '' });
         }
@@ -784,51 +813,99 @@
         }
 
         // ---- Dashboard ----
-        function Dashboard({ state }) {
+        function Dashboard({ state, onNavigate }) {
             const hoy = new Date(); hoy.setHours(0,0,0,0);
             const prestamosVencidos = state.assignments.filter(a => { if (!a.esPrestamo || a.estado !== 'Activo') return false; const f = new Date(a.fechaAsignacion); f.setHours(0,0,0,0); return f < hoy; });
-            const stats = { totalProductos: state.inventory.length, totalUnidades: state.inventory.reduce((s,i) => s + i.stock, 0), stockBajo: state.inventory.filter(i => i.stock > 0 && i.stock <= i.stockMinimo).length, sinStock: state.inventory.filter(i => i.stock === 0).length, movimientosHoy: state.history.filter(h => new Date(h.fecha).toDateString() === new Date().toDateString()).length, tecnicosActivos: state.technicians.filter(t => t.activo).length, prestamosActivos: state.assignments.filter(a => a.esPrestamo && a.estado === 'Activo').length };
+            const stats = {
+                totalProductos: state.inventory.length,
+                totalUnidades: state.inventory.reduce((s,i) => s + i.stock, 0),
+                stockBajo: state.inventory.filter(i => i.stock > 0 && i.stock <= i.stockMinimo).length,
+                sinStock: state.inventory.filter(i => i.stock === 0).length,
+                movimientosHoy: state.history.filter(h => new Date(h.fecha).toDateString() === new Date().toDateString()).length,
+                tecnicosActivos: state.technicians.filter(t => t.activo).length,
+                prestamosActivos: state.assignments.filter(a => a.esPrestamo && a.estado === 'Activo').length
+            };
+            const equiposStats = {
+                total: (state.activos || []).length,
+                almacen: (state.activos || []).filter(a => a.estado === 'Almacen').length,
+                asignados: (state.activos || []).filter(a => a.estado === 'Asignado').length,
+                pendientes: (state.activos || []).filter(a => a.estado === 'Pendiente').length,
+                reparacion: (state.activos || []).filter(a => a.estado === 'Reparacion').length,
+                transito: (state.activos || []).filter(a => a.estado === 'Transito').length,
+                extraviado: (state.activos || []).filter(a => a.estado === 'Extraviado').length,
+                robado: (state.activos || []).filter(a => a.estado === 'Robado').length
+            };
+
+            const statCard = function(label, value, color, onClick) {
+                return e('div', {
+                    onClick: onClick || null,
+                    style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px', cursor: onClick ? 'pointer' : 'default', transition: 'all .15s', border: '1px solid transparent' },
+                    onMouseEnter: onClick ? function(ev) { ev.currentTarget.style.borderColor = color; ev.currentTarget.style.transform = 'translateY(-1px)'; } : null,
+                    onMouseLeave: onClick ? function(ev) { ev.currentTarget.style.borderColor = 'transparent'; ev.currentTarget.style.transform = ''; } : null
+                },
+                    e('span', { style: { color: 'var(--text-secondary)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' } }, onClick ? '🔗 ' : '', label),
+                    e('span', { style: { color, fontSize: '18px', fontWeight: '700', fontFamily: 'IBM Plex Mono,monospace' } }, value)
+                );
+            };
+
             return e('div', null,
+                // Alerta préstamos vencidos
                 prestamosVencidos.length > 0 && e('div', { style: { background: 'rgba(239,68,68,.15)', border: '2px solid var(--accent-red)', borderRadius: '12px', padding: '20px', marginBottom: '24px', animation: 'pulse 2s infinite' } },
                     e('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' } },
                         e('div', { style: { fontSize: '40px' } }, '⚠️'),
                         e('div', { style: { flex: 1 } },
                             e('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--accent-red)', marginBottom: '4px' } }, prestamosVencidos.length + ' PRÉSTAMO' + (prestamosVencidos.length > 1 ? 'S' : '') + ' VENCIDO' + (prestamosVencidos.length > 1 ? 'S' : '')),
-                            e('div', { style: { fontSize: '14px', color: 'var(--text-secondary)' } }, 'Material pendiente de devolucion desde ayer o antes')
+                            e('div', { style: { fontSize: '14px', color: 'var(--text-secondary)' } }, 'Material pendiente de devolución desde ayer o antes')
                         ),
-                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-                            prestamosVencidos.slice(0, 3).map((p, idx) => e('div', { key: idx, style: { background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px' } }, e('strong', null, p.nombreEmpleado), ' - ' + p.cantidadProductos + ' producto' + (p.cantidadProductos > 1 ? 's' : ''))),
-                            prestamosVencidos.length > 3 && e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, 'y ' + (prestamosVencidos.length - 3) + ' mas...')
-                        )
+                        e('button', { className: 'button button-danger', onClick: function() { onNavigate('asignaciones', { tipo: 'prestamo', estado: 'vencido' }); } }, 'Ver préstamos vencidos')
                     )
                 ),
                 e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' } },
-                    e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, 'Dashboard'),
+                    e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, '📊 Dashboard'),
                     e('button', { className: 'button button-success', onClick: () => exportToCSV(state.inventory, 'inventario_completo') }, 'Exportar Inventario')
                 ),
                 e('div', { className: 'dashboard-grid' },
+                    // Inventario fungible
                     e('div', { className: 'dashboard-card' },
-                        e('h3', null, 'Resumen de Stock'),
-                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
-                            [{ label: 'Total Productos', value: stats.totalProductos, color: 'var(--accent-blue)' }, { label: 'Total Unidades', value: stats.totalUnidades, color: 'var(--accent-green)' }, { label: 'Stock Bajo', value: stats.stockBajo, color: 'var(--accent-orange)' }, { label: 'Sin Stock', value: stats.sinStock, color: 'var(--accent-red)' }].map((s, idx) =>
-                                e('div', { key: idx, style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                    e('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, s.label),
-                                    e('span', { style: { color: s.color, fontSize: '18px', fontWeight: '700', fontFamily: 'IBM Plex Mono,monospace' } }, s.value)
-                                )
-                            )
+                        e('h3', null, '📦 Inventario Fungible'),
+                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+                            statCard('Total Productos', stats.totalProductos, 'var(--accent-blue)'),
+                            statCard('Total Unidades', stats.totalUnidades, 'var(--accent-green)'),
+                            statCard('Stock Bajo', stats.stockBajo, 'var(--accent-orange)', stats.stockBajo > 0 ? function() { onNavigate('inventario', { tipo: 'stockBajo' }); } : null),
+                            statCard('Sin Stock', stats.sinStock, 'var(--accent-red)', stats.sinStock > 0 ? function() { onNavigate('inventario', { tipo: 'sinStock' }); } : null)
                         )
                     ),
+                    // Actividad
                     e('div', { className: 'dashboard-card' },
-                        e('h3', null, 'Actividad'),
-                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
-                            [{ label: 'Movimientos Hoy', value: stats.movimientosHoy, color: 'var(--accent-purple)' }, { label: 'Total Movimientos', value: state.history.length, color: 'var(--accent-blue)' }, { label: 'Tecnicos Activos', value: stats.tecnicosActivos, color: 'var(--accent-green)' }, { label: 'Prestamos Activos', value: stats.prestamosActivos, color: 'var(--accent-orange)' }].map((s, idx) =>
-                                e('div', { key: idx, style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                    e('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, s.label),
-                                    e('span', { style: { color: s.color, fontSize: '18px', fontWeight: '700', fontFamily: 'IBM Plex Mono,monospace' } }, s.value)
-                                )
-                            )
+                        e('h3', null, '📋 Actividad'),
+                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+                            statCard('Movimientos Hoy', stats.movimientosHoy, 'var(--accent-purple)', stats.movimientosHoy > 0 ? function() { onNavigate('historial', { tipo: 'hoy' }); } : null),
+                            statCard('Total Movimientos', state.history.length, 'var(--accent-blue)', state.history.length > 0 ? function() { onNavigate('historial', {}); } : null),
+                            statCard('Técnicos Activos', stats.tecnicosActivos, 'var(--accent-green)'),
+                            statCard('Préstamos Activos', stats.prestamosActivos, 'var(--accent-orange)', stats.prestamosActivos > 0 ? function() { onNavigate('asignaciones', { tipo: 'prestamo', estado: 'Activo' }); } : null)
                         )
                     ),
+                    // Equipos etiquetados
+                    e('div', { className: 'dashboard-card' },
+                        e('h3', null, '💻 Equipos con Etiqueta'),
+                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+                            statCard('Total Equipos', equiposStats.total, 'var(--accent-blue)', equiposStats.total > 0 ? function() { onNavigate('equipos', {}); } : null),
+                            statCard('En Almacén', equiposStats.almacen, 'var(--accent-green)', equiposStats.almacen > 0 ? function() { onNavigate('equipos', { estado: 'Almacen' }); } : null),
+                            statCard('Asignados', equiposStats.asignados, 'var(--accent-blue)', equiposStats.asignados > 0 ? function() { onNavigate('equipos', { estado: 'Asignado' }); } : null),
+                            equiposStats.pendientes > 0 && statCard('⚠️ Pendientes N/S', equiposStats.pendientes, 'var(--accent-orange)', function() { onNavigate('equipos', { estado: 'Pendiente' }); })
+                        )
+                    ),
+                    // Equipos - situación crítica
+                    (equiposStats.reparacion + equiposStats.transito + equiposStats.extraviado + equiposStats.robado) > 0 && e('div', { className: 'dashboard-card' },
+                        e('h3', null, '🚨 Situaciones Especiales'),
+                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+                            equiposStats.reparacion > 0 && statCard('En Reparación', equiposStats.reparacion, 'var(--accent-purple)', function() { onNavigate('equipos', { estado: 'Reparacion' }); }),
+                            equiposStats.transito > 0 && statCard('En Tránsito', equiposStats.transito, 'var(--accent-yellow)', function() { onNavigate('equipos', { estado: 'Transito' }); }),
+                            equiposStats.extraviado > 0 && statCard('Extraviados', equiposStats.extraviado, 'var(--accent-red)', function() { onNavigate('equipos', { estado: 'Extraviado' }); }),
+                            equiposStats.robado > 0 && statCard('Robados', equiposStats.robado, 'var(--accent-red)', function() { onNavigate('equipos', { estado: 'Robado' }); })
+                        )
+                    ),
+                    // Top 5 productos
                     e('div', { className: 'dashboard-card' },
                         e('h3', null, 'Top 5 Productos'),
                         e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
@@ -840,8 +917,9 @@
                             )
                         )
                     ),
+                    // Productos críticos
                     e('div', { className: 'dashboard-card' },
-                        e('h3', null, 'Productos Criticos'),
+                        e('h3', null, 'Productos Críticos'),
                         state.inventory.filter(i => i.stock > 0 && i.stock <= i.stockMinimo).length > 0 ?
                             e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
                                 state.inventory.filter(i => i.stock > 0 && i.stock <= i.stockMinimo).slice(0,5).map(item =>
@@ -851,22 +929,32 @@
                                     )
                                 )
                             ) :
-                            e('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' } }, '✓ Todo el stock esta en niveles optimos')
+                            e('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' } }, '✓ Todo el stock está en niveles óptimos')
                     )
                 )
             );
         }
 
         // ---- InventoryView ----
-        function InventoryView({ state, onRefresh, onOpenModal }) {
+        function InventoryView({ state, onRefresh, onOpenModal, initialFilter }) {
             const [search, setSearch] = useState('');
             const [filterCategory, setFilterCategory] = useState('all');
             const [filterEstado, setFilterEstado] = useState('all');
             const [sortBy, setSortBy] = useState('nombre');
+
+            useEffect(function() {
+                if (!initialFilter) return;
+                if (initialFilter.tipo === 'stockBajo') setFilterEstado('stockBajo');
+                if (initialFilter.tipo === 'sinStock') setFilterEstado('sinStock');
+            }, []);
+            const [sortBy, setSortBy] = useState('nombre');
             const filtered = state.inventory.filter(item => {
                 const matchesSearch = item.nombre.toLowerCase().includes(search.toLowerCase()) || item.categoria.toLowerCase().includes(search.toLowerCase()) || item.barcode.includes(search);
                 const matchesCategory = filterCategory === 'all' || item.categoria === filterCategory;
-                const matchesEstado = filterEstado === 'all' || item.estado === filterEstado;
+                let matchesEstado = true;
+                if (filterEstado === 'stockBajo') matchesEstado = item.stock > 0 && item.stock <= item.stockMinimo;
+                else if (filterEstado === 'sinStock') matchesEstado = item.stock === 0;
+                else if (filterEstado !== 'all') matchesEstado = item.estado === filterEstado;
                 return matchesSearch && matchesCategory && matchesEstado;
             }).sort((a,b) => { if (sortBy === 'nombre') return a.nombre.localeCompare(b.nombre); if (sortBy === 'stock') return b.stock - a.stock; if (sortBy === 'categoria') return a.categoria.localeCompare(b.categoria); return 0; });
             const categories = [...new Set(state.inventory.map(i => i.categoria))].filter(Boolean);
@@ -876,7 +964,7 @@
                         e('input', { type: 'text', className: 'search-bar', placeholder: 'Buscar productos...', value: search, onChange: ev => setSearch(ev.target.value) }),
                         e('button', { className: 'button button-primary', onClick: () => startBarcodeScanner(code => { setSearch(code); showToast('Buscando: ' + code, 'success'); }), style: { padding: '12px 20px' } }, '📷 Escanear'),
                         e('select', { className: 'filter-select', value: filterCategory, onChange: ev => setFilterCategory(ev.target.value) }, e('option', { value: 'all' }, 'Todas las categorias'), categories.map(cat => e('option', { key: cat, value: cat }, cat))),
-                        e('select', { className: 'filter-select', value: filterEstado, onChange: ev => setFilterEstado(ev.target.value) }, e('option', { value: 'all' }, 'Todos los estados'), e('option', { value: 'Nuevo' }, 'Nuevo'), e('option', { value: 'Usado' }, 'Usado')),
+                        e('select', { className: 'filter-select', value: filterEstado, onChange: ev => setFilterEstado(ev.target.value) }, e('option', { value: 'all' }, 'Todos los estados'), e('option', { value: 'Nuevo' }, 'Nuevo'), e('option', { value: 'Usado' }, 'Usado'), e('option', { value: 'stockBajo' }, '⚠️ Stock Bajo'), e('option', { value: 'sinStock' }, '🔴 Sin Stock')),
                         e('select', { className: 'filter-select', value: sortBy, onChange: ev => setSortBy(ev.target.value) }, e('option', { value: 'nombre' }, 'Ordenar: Nombre'), e('option', { value: 'stock' }, 'Ordenar: Stock'), e('option', { value: 'categoria' }, 'Ordenar: Categoria')),
                         e('span', { className: 'results-count' }, e('strong', null, filtered.length), ' de ', state.inventory.length, ' productos')
                     ),
@@ -918,13 +1006,22 @@
         }
 
         // ---- HistoryView ----
-        function HistoryView({ state, onOpenModal }) {
+        function HistoryView({ state, onOpenModal, initialFilter }) {
             const [search, setSearch] = useState('');
             const [filterType, setFilterType] = useState('all');
             const [filterDateFrom, setFilterDateFrom] = useState('');
             const [filterDateTo, setFilterDateTo] = useState('');
             const [sortCol, setSortCol] = useState('fecha');
             const [sortDir, setSortDir] = useState('desc');
+
+            useEffect(function() {
+                if (!initialFilter) return;
+                if (initialFilter.tipo === 'hoy') {
+                    const hoy = new Date().toISOString().split('T')[0];
+                    setFilterDateFrom(hoy);
+                    setFilterDateTo(hoy);
+                }
+            }, []);
 
             const toggleSort = function(col) {
                 if (sortCol === col) { setSortDir(function(d) { return d === 'asc' ? 'desc' : 'asc'; }); }
@@ -1072,13 +1169,20 @@
         }
 
 
-        function AssignmentsView({ state, onOpenModal }) {
+        function AssignmentsView({ state, onOpenModal, initialFilter }) {
             const [search, setSearch] = useState('');
             const [filterDept, setFilterDept] = useState('all');
             const [filterEstado, setFilterEstado] = useState('all');
             const [filterTipo, setFilterTipo] = useState('all');
             const [sortCol, setSortCol] = useState('fechaAsignacion');
             const [sortDir, setSortDir] = useState('desc');
+
+            useEffect(function() {
+                if (!initialFilter) return;
+                if (initialFilter.tipo === 'prestamo') setFilterTipo('prestamo');
+                if (initialFilter.estado === 'Activo') setFilterEstado('Activo');
+                if (initialFilter.estado === 'vencido') { setFilterTipo('prestamo'); setFilterEstado('vencido'); }
+            }, []);
 
             const toggleSort = function(col) {
                 if (sortCol === col) { setSortDir(function(d) { return d === 'asc' ? 'desc' : 'asc'; }); }
@@ -1094,10 +1198,17 @@
                 );
             };
 
+            const hoy = new Date(); hoy.setHours(0,0,0,0);
             const filtered = (state.assignments || []).filter(a => {
                 const matchesSearch = a.nombreEmpleado.toLowerCase().includes(search.toLowerCase()) || a.emailEmpleado.toLowerCase().includes(search.toLowerCase()) || (a.puesto || '').toLowerCase().includes(search.toLowerCase());
                 const matchesDept = filterDept === 'all' || a.departamento === filterDept;
-                const matchesEstado = filterEstado === 'all' || a.estado === filterEstado;
+                let matchesEstado = true;
+                if (filterEstado === 'vencido') {
+                    const fa = new Date(a.fechaAsignacion); fa.setHours(0,0,0,0);
+                    matchesEstado = a.esPrestamo && a.estado === 'Activo' && fa < hoy;
+                } else {
+                    matchesEstado = filterEstado === 'all' || a.estado === filterEstado;
+                }
                 const matchesTipo = filterTipo === 'all' || (filterTipo === 'prestamo' && a.esPrestamo) || (filterTipo === 'asignacion' && !a.esPrestamo);
                 return matchesSearch && matchesDept && matchesEstado && matchesTipo;
             }).sort(function(a, b) {
@@ -1905,21 +2016,32 @@
         // ==========================================
         // EQUIPOS VIEW - v2.2.0
         // ==========================================
-        function EquiposView({ state, onRefresh }) {
+        function EquiposView({ state, onRefresh, initialFilter }) {
             const [view, setView] = useState('lista'); // 'lista' | 'pendientes' | 'recepcion'
             const [search, setSearch] = useState('');
             const [filterTipo, setFilterTipo] = useState('all');
             const [filterEstado, setFilterEstado] = useState('all');
+            const [fichaEquipo, setFichaEquipo] = useState(null); // equipo seleccionado para ver ficha
             // Recepción en lote
-            const [sublotes, setSublotes] = useState([{ id: 1, tipo: '', modelo: '', ubicacion: '', cantidad: 1 }]);
+            const [sublotes, setSublotes] = useState([{ id: 1, tipo: '', modelo: '', ubicacion: '', cantidad: 1, sociedad: '' }]);
             const [creatingProgress, setCreatingProgress] = useState(null);
             // Inline N/S editing
             const [inlineNS, setInlineNS] = useState({});
             const [savingNS, setSavingNS] = useState({});
+            // Cambiar estado
+            const [cambioEstado, setCambioEstado] = useState(null); // { equipo, nuevoEstado }
+            const [cambioMotivo, setCambioMotivo] = useState('');
+            const [cambioDestino, setCambioDestino] = useState('');
+            const [savingEstado, setSavingEstado] = useState(false);
             // Confirm delete
             const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-            // Ref para auto-focus en campo N/S
             const nsInputRefs = useRef({});
+
+            useEffect(function() {
+                if (!initialFilter) return;
+                if (initialFilter.estado) setFilterEstado(initialFilter.estado);
+                if (initialFilter.estado === 'Pendiente') setView('pendientes');
+            }, []);
 
             const pendientes = (state.activos || []).filter(function(a) { return a.estado === 'Pendiente'; });
             const tiposConEtiqueta = Object.keys(state.catalogoTipos || {}).filter(function(t) { return (state.catalogoTipos[t] || {}).llevaEtiqueta; });
@@ -1941,7 +2063,7 @@
             const estadoLabel = { 'Pendiente': '⚠️ Pendiente N/S', 'Almacen': 'En Almacén', 'Asignado': 'Asignado', 'Baja': 'Baja' };
 
             // ---- Sublote helpers ----
-            const addSublote = function() { setSublotes(function(prev) { return prev.concat([{ id: Date.now(), tipo: '', modelo: '', ubicacion: '', cantidad: 1 }]); }); };
+            const addSublote = function() { setSublotes(function(prev) { return prev.concat([{ id: Date.now(), tipo: '', modelo: '', ubicacion: '', cantidad: 1, sociedad: '' }]); }); };
             const removeSublote = function(id) { setSublotes(function(prev) { return prev.filter(function(s) { return s.id !== id; }); }); };
             const updateSublote = function(id, field, value) {
                 setSublotes(function(prev) {
@@ -1954,7 +2076,27 @@
                 });
             };
             const totalUnidades = sublotes.reduce(function(sum, s) { return sum + (parseInt(s.cantidad) || 0); }, 0);
-            const sublotesValidos = sublotes.length > 0 && sublotes.every(function(s) { return s.tipo && s.modelo && s.ubicacion && parseInt(s.cantidad) >= 1; });
+            const sublotesValidos = sublotes.length > 0 && sublotes.every(function(s) { return s.tipo && s.modelo && s.ubicacion && s.sociedad && parseInt(s.cantidad) >= 1; });
+
+            // ---- Cambiar estado ----
+            const handleCambiarEstado = async function() {
+                if (!cambioEstado) return;
+                const { equipo, nuevoEstado } = cambioEstado;
+                const motivosRequeridos = ['Baja', 'Extraviado', 'Robado', 'Reparacion', 'Transito'];
+                if (motivosRequeridos.includes(nuevoEstado) && !cambioMotivo.trim()) { showToast('El motivo es obligatorio para este estado', 'error'); return; }
+                if (nuevoEstado === 'Transito' && !cambioDestino.trim()) { showToast('El destino es obligatorio para Tránsito', 'error'); return; }
+                setSavingEstado(true);
+                try {
+                    const extra = { motivoIncidencia: cambioMotivo };
+                    if (nuevoEstado === 'Transito') { extra.transitoDestino = cambioDestino; extra.fechaTransito = new Date().toISOString(); }
+                    await dataManager.cambiarEstadoActivo(equipo.id, nuevoEstado, extra);
+                    await dataManager.addToHistory({ tipo: 'CambioEstado', producto: equipo.tipo + ' - ' + equipo.modelo, cantidad: 1, usuario: '', tecnico: state.user.name, idEtiqueta: equipo.idEtiqueta, motivo: nuevoEstado + (cambioMotivo ? ': ' + cambioMotivo : '') });
+                    showToast('Estado actualizado: ' + nuevoEstado, 'success');
+                    setCambioEstado(null); setCambioMotivo(''); setCambioDestino('');
+                    await onRefresh();
+                } catch(err) { showToast('Error: ' + err.message, 'error'); }
+                finally { setSavingEstado(false); }
+            };
 
             // ---- Crear lote ----
             const handleCrearLote = async function() {
@@ -1966,14 +2108,14 @@
                         const sublote = sublotes[si];
                         const cant = parseInt(sublote.cantidad) || 1;
                         for (var i = 0; i < cant; i++) {
-                            const idEtiqueta = await dataManager.getNextEtiquetaId();
-                            await dataManager.createActivo({ idEtiqueta, tipo: sublote.tipo, modelo: sublote.modelo, ubicacion: sublote.ubicacion, numSerie: '', notas: '', estado: 'Pendiente' });
+                            const idEtiqueta = await dataManager.getNextEtiquetaId(sublote.sociedad);
+                            await dataManager.createActivo({ idEtiqueta, tipo: sublote.tipo, modelo: sublote.modelo, ubicacion: sublote.ubicacion, numSerie: '', notas: '', estado: 'Pendiente', sociedad: sublote.sociedad });
                             current++;
                             setCreatingProgress({ current, total });
                         }
                     }
                     showToast(total + ' equipo(s) registrados. Ahora añade los N/S para completarlos.', 'success');
-                    setSublotes([{ id: Date.now(), tipo: '', modelo: '', ubicacion: '', cantidad: 1 }]);
+                    setSublotes([{ id: Date.now(), tipo: '', modelo: '', ubicacion: '', cantidad: 1, sociedad: '' }]);
                     setView('pendientes');
                     await onRefresh();
                 } catch(err) { showToast('Error: ' + err.message, 'error'); }
@@ -1982,7 +2124,7 @@
 
             // ---- Guardar N/S inline ----
             const saveNS = async function(activo) {
-                const ns = (inlineNS[activo.id] !== undefined ? inlineNS[activo.id] : '').trim();
+                const ns = (inlineNS[activo.id] !== undefined ? inlineNS[activo.id] : '').trim().toUpperCase();
                 if (!ns || ns.length < 4) { showToast('El N/S debe tener al menos 4 caracteres', 'error'); return; }
                 if (ns.length > 40) { showToast('El N/S no puede superar 40 caracteres', 'error'); return; }
                 setSavingNS(function(prev) { return Object.assign({}, prev, { [activo.id]: true }); });
@@ -2013,6 +2155,13 @@
                                 sublotes.length > 1 ? e('button', { onClick: function() { removeSublote(sublote.id); }, style: { background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: '22px', padding: '0 4px', lineHeight: 1 } }, '×') : null
                             ),
                             e('div', { className: 'form-row' },
+                                e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Sociedad *'),
+                                    e('select', { className: 'form-select', value: sublote.sociedad, onChange: function(ev) { updateSublote(sublote.id, 'sociedad', ev.target.value); } },
+                                        e('option', { value: '' }, '-- Sociedad --'),
+                                        (state.sociedades || []).filter(function(s) { return s.activo; }).map(function(s) { return e('option', { key: s.id, value: s.codigo }, s.codigo + ' · ' + s.nombre); })
+                                    )
+                                ),
                                 e('div', { className: 'form-group' },
                                     e('label', { className: 'form-label' }, 'Tipo *'),
                                     e('select', { className: 'form-select', value: sublote.tipo, onChange: function(ev) { updateSublote(sublote.id, 'tipo', ev.target.value); } },
@@ -2154,44 +2303,40 @@
                 view === 'pendientes' ? renderPendientes() :
                 filtered.length > 0 ? e('table', { className: 'history-table' },
                     e('thead', null, e('tr', null,
-                        e('th', { style: { width: '170px' } }, 'ID Interno'),
+                        e('th', { style: { width: '165px' } }, 'ID Interno'),
                         e('th', null, 'Tipo'),
                         e('th', null, 'Modelo'),
+                        e('th', { style: { width: '70px' } }, 'Soc.'),
                         e('th', null, 'N/S Fabricante'),
-                        e('th', { style: { width: '120px' } }, 'Estado'),
+                        e('th', { style: { width: '130px' } }, 'Estado'),
                         e('th', null, 'Ubicación'),
-                        e('th', { style: { width: '130px' } }, 'Acciones')
+                        e('th', { style: { width: '140px' } }, 'Acciones')
                     )),
                     e('tbody', null, filtered.map(function(activo) {
                         const tieneNS = !!activo.numSerie;
                         const isPendiente = activo.estado === 'Pendiente';
+                        const esTerminal = activo.estado === 'Robado' || activo.estado === 'Baja';
                         return e('tr', { key: activo.id, style: isPendiente ? { background: 'rgba(249,115,22,.04)' } : {} },
-                            e('td', null, e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '11px', fontWeight: '700', color: isPendiente ? 'var(--accent-orange)' : 'var(--accent-blue)' } }, activo.idEtiqueta)),
+                            e('td', null, e('span', {
+                                style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '11px', fontWeight: '700', color: isPendiente ? 'var(--accent-orange)' : 'var(--accent-blue)', cursor: 'pointer', textDecoration: 'underline' },
+                                onClick: function() { setFichaEquipo(activo); }, title: 'Ver ficha completa'
+                            }, activo.idEtiqueta)),
                             e('td', { style: { fontWeight: '500' } }, activo.tipo),
                             e('td', null, activo.modelo),
-                            e('td', null, tieneNS
-                                ? e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', color: 'var(--text-secondary)' } }, activo.numSerie)
-                                : e('span', { style: { color: 'var(--accent-orange)', fontSize: '12px', fontWeight: '600' } }, '⚠️ Sin N/S')
-                            ),
+                            e('td', null, activo.sociedad ? e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '11px', color: 'var(--accent-purple)', fontWeight: '700' } }, activo.sociedad) : '-'),
+                            e('td', null, tieneNS ? e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', color: 'var(--text-secondary)' } }, activo.numSerie) : e('span', { style: { color: 'var(--accent-orange)', fontSize: '12px', fontWeight: '600' } }, '⚠️ Sin N/S')),
                             e('td', null, e('span', { style: { background: estadoBg[activo.estado] || 'var(--bg-tertiary)', color: estadoColor[activo.estado] || 'var(--text-primary)', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700' } }, estadoLabel[activo.estado] || activo.estado)),
                             e('td', { style: { fontSize: '13px' } }, activo.ubicacion || '-'),
-                            e('td', null, e('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
-                                // Botón imprimir — bloqueado si no tiene N/S
-                                e('div', {
-                                    className: 'action-icon' + (tieneNS ? ' tooltip' : ''),
-                                    'data-tooltip': tieneNS ? 'Imprimir etiqueta QR' : 'Requiere N/S',
-                                    onClick: tieneNS ? function() { exportEtiquetaPDF([activo]); } : null,
-                                    style: tieneNS ? {} : { opacity: 0.3, cursor: 'not-allowed' }
-                                }, '🖨️'),
-                                // Si pendiente, acceso directo a completar N/S
+                            e('td', null, e('div', { style: { display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' } },
+                                e('div', { className: 'action-icon tooltip', 'data-tooltip': 'Ver ficha', onClick: function() { setFichaEquipo(activo); } }, '📄'),
+                                e('div', { className: 'action-icon tooltip', 'data-tooltip': tieneNS ? 'Imprimir QR' : 'Requiere N/S', onClick: tieneNS ? function() { exportEtiquetaPDF([activo]); } : null, style: tieneNS ? {} : { opacity: 0.3, cursor: 'not-allowed' } }, '🖨️'),
+                                !esTerminal && !isPendiente && e('div', { className: 'action-icon tooltip', 'data-tooltip': 'Cambiar estado', onClick: function() { setCambioEstado({ equipo: activo, nuevoEstado: '' }); setCambioMotivo(''); setCambioDestino(''); } }, '🔄'),
                                 isPendiente && e('div', { className: 'action-icon tooltip', 'data-tooltip': 'Añadir N/S', onClick: function() { setView('pendientes'); }, style: { color: 'var(--accent-orange)' } }, '✏️'),
-                                // Eliminar
                                 confirmDeleteId === activo.id
                                     ? e('div', { style: { display: 'flex', gap: '4px' } },
                                         e('button', { className: 'button button-danger', onClick: async function() { await dataManager.deleteActivo(activo.id); setConfirmDeleteId(null); await onRefresh(); showToast('Equipo eliminado', 'success'); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✓'),
-                                        e('button', { className: 'button button-secondary', onClick: function() { setConfirmDeleteId(null); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✕')
-                                      )
-                                    : e('div', { className: 'action-icon danger', title: 'Eliminar', onClick: function() { setConfirmDeleteId(activo.id); } }, '🗑️')
+                                        e('button', { className: 'button button-secondary', onClick: function() { setConfirmDeleteId(null); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✕'))
+                                    : e('div', { className: 'action-icon danger tooltip', 'data-tooltip': 'Eliminar', onClick: function() { setConfirmDeleteId(activo.id); } }, '🗑️')
                             ))
                         );
                     }))
@@ -2199,13 +2344,111 @@
                     e('div', { className: 'empty-state-icon' }, '💻'),
                     e('div', { className: 'empty-state-title' }, search || filterTipo !== 'all' || filterEstado !== 'all' ? 'Sin resultados' : 'No hay equipos registrados'),
                     e('div', { className: 'empty-state-text' }, search || filterTipo !== 'all' || filterEstado !== 'all' ? 'Prueba otros filtros' : 'Usa "Recepción de lote" para registrar equipos con etiqueta')
+                ),
+
+                // Modal: Ficha de equipo
+                fichaEquipo && e('div', { className: 'modal-overlay', onClick: function(ev) { if (ev.target === ev.currentTarget) setFichaEquipo(null); } },
+                    e('div', { className: 'modal', style: { maxWidth: '750px' }, onClick: function(ev) { ev.stopPropagation(); } },
+                        e('div', { className: 'modal-header' },
+                            e('h2', { className: 'modal-title' }, '📄 Ficha de Equipo'),
+                            e('button', { className: 'modal-close', onClick: function() { setFichaEquipo(null); } }, '×')
+                        ),
+                        e('div', { className: 'modal-body' },
+                            e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '20px', marginBottom: '20px' } },
+                                e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' } },
+                                    e('div', null,
+                                        e('div', { style: { fontSize: '20px', fontWeight: '700', marginBottom: '4px' } }, fichaEquipo.tipo + ' · ' + fichaEquipo.modelo),
+                                        e('div', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '14px', color: 'var(--accent-blue)', fontWeight: '700' } }, fichaEquipo.idEtiqueta)
+                                    ),
+                                    e('span', { style: { background: estadoBg[fichaEquipo.estado] || 'var(--bg-primary)', color: estadoColor[fichaEquipo.estado] || 'var(--text-primary)', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '700' } }, estadoLabel[fichaEquipo.estado] || fichaEquipo.estado)
+                                ),
+                                e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' } },
+                                    [
+                                        { label: 'N/S Fabricante', value: fichaEquipo.numSerie || '⚠️ Sin N/S' },
+                                        { label: 'Sociedad', value: fichaEquipo.sociedad || '-' },
+                                        { label: 'Ubicación', value: fichaEquipo.ubicacion || '-' },
+                                        fichaEquipo.asignadoA ? { label: 'Asignado a', value: fichaEquipo.asignadoA } : null,
+                                        fichaEquipo.transitoDestino ? { label: 'Destino tránsito', value: fichaEquipo.transitoDestino } : null
+                                    ].filter(Boolean).map(function(info, idx) {
+                                        return e('div', { key: idx },
+                                            e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '2px' } }, info.label),
+                                            e('div', { style: { fontWeight: '600', fontSize: '14px' } }, info.value)
+                                        );
+                                    })
+                                )
+                            ),
+                            e('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '12px', letterSpacing: '.5px' } }, '📋 Historial del equipo'),
+                            (function() {
+                                const hEq = state.history.filter(function(h) { return h.idEtiqueta === fichaEquipo.idEtiqueta; });
+                                if (hEq.length === 0) return e('div', { style: { color: 'var(--text-secondary)', fontSize: '14px', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, 'Sin movimientos registrados aún');
+                                return e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+                                    hEq.map(function(h) {
+                                        return e('div', { key: h.id, style: { display: 'flex', gap: '10px', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: '8px', alignItems: 'center', flexWrap: 'wrap' } },
+                                            e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'IBM Plex Mono,monospace', minWidth: '110px' } }, new Date(h.fecha).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })),
+                                            e('span', { className: 'movement-badge ' + h.tipo, style: { minWidth: '90px', textAlign: 'center' } }, h.tipo),
+                                            e('span', { style: { flex: 1, fontSize: '13px' } }, h.motivo || h.usuario || '-'),
+                                            e('span', { style: { fontSize: '12px', color: 'var(--accent-green)' } }, h.tecnico)
+                                        );
+                                    })
+                                );
+                            })()
+                        ),
+                        e('div', { className: 'modal-footer' },
+                            fichaEquipo.numSerie && e('button', { className: 'button button-success', onClick: function() { exportEtiquetaPDF([fichaEquipo]); } }, '🖨️ Imprimir etiqueta'),
+                            !['Robado','Baja','Pendiente'].includes(fichaEquipo.estado) && e('button', { className: 'button button-secondary', onClick: function() { setCambioEstado({ equipo: fichaEquipo, nuevoEstado: '' }); setCambioMotivo(''); setCambioDestino(''); setFichaEquipo(null); } }, '🔄 Cambiar estado'),
+                            e('button', { className: 'button button-secondary', onClick: function() { setFichaEquipo(null); } }, 'Cerrar')
+                        )
+                    )
+                ),
+
+                // Modal: Cambiar estado
+                cambioEstado && e('div', { className: 'modal-overlay', onClick: function(ev) { if (ev.target === ev.currentTarget) setCambioEstado(null); } },
+                    e('div', { className: 'modal', style: { maxWidth: '480px' }, onClick: function(ev) { ev.stopPropagation(); } },
+                        e('div', { className: 'modal-header' },
+                            e('h2', { className: 'modal-title' }, '🔄 Cambiar Estado'),
+                            e('button', { className: 'modal-close', onClick: function() { setCambioEstado(null); } }, '×')
+                        ),
+                        e('div', { className: 'modal-body' },
+                            e('div', { style: { background: 'var(--bg-tertiary)', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' } },
+                                e('div', { style: { fontWeight: '700' } }, cambioEstado.equipo.tipo + ' · ' + cambioEstado.equipo.modelo),
+                                e('div', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', color: 'var(--accent-blue)' } }, cambioEstado.equipo.idEtiqueta),
+                                e('div', { style: { marginTop: '4px', fontSize: '13px', color: 'var(--text-secondary)' } }, 'Estado actual: ', e('strong', { style: { color: estadoColor[cambioEstado.equipo.estado] } }, estadoLabel[cambioEstado.equipo.estado] || cambioEstado.equipo.estado))
+                            ),
+                            e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, 'Nuevo estado *'),
+                                e('select', { className: 'form-select', value: cambioEstado.nuevoEstado, onChange: function(ev) { setCambioEstado(function(p) { return Object.assign({}, p, { nuevoEstado: ev.target.value }); }); setCambioMotivo(''); setCambioDestino(''); } },
+                                    e('option', { value: '' }, '-- Selecciona --'),
+                                    (function() {
+                                        const trans = { 'Almacen': ['Reparacion','Transito','Baja'], 'Asignado': ['Reparacion','Extraviado','Robado'], 'Reparacion': ['Almacen'], 'Transito': ['Almacen'], 'Extraviado': ['Almacen'] };
+                                        return (trans[cambioEstado.equipo.estado] || []).map(function(est) { return e('option', { key: est, value: est }, estadoLabel[est] || est); });
+                                    })()
+                                )
+                            ),
+                            cambioEstado.nuevoEstado === 'Transito' && e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, 'Destino *'),
+                                e('input', { type: 'text', className: 'form-input', placeholder: 'Ej: SLN · Países Bajos  o  SAT HP Madrid', value: cambioDestino, onChange: function(ev) { setCambioDestino(ev.target.value); } })
+                            ),
+                            ['Baja','Extraviado','Robado','Reparacion'].includes(cambioEstado.nuevoEstado) && e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, cambioEstado.nuevoEstado === 'Reparacion' ? 'Descripción del problema *' : 'Motivo *'),
+                                e('input', { type: 'text', className: 'form-input', placeholder: cambioEstado.nuevoEstado === 'Reparacion' ? 'Ej: Pantalla parpadeante, enviado a SAT HP' : cambioEstado.nuevoEstado === 'Robado' ? 'Ej: Robo en oficina, denuncia nº...' : cambioEstado.nuevoEstado === 'Extraviado' ? 'Ej: No aparece tras traslado' : 'Ej: Pantalla rota irreparable', value: cambioMotivo, onChange: function(ev) { setCambioMotivo(ev.target.value); } })
+                            ),
+                            cambioEstado.nuevoEstado === 'Almacen' && e('div', { className: 'info-banner green' }, '✓ El equipo volverá a estar disponible en el almacén.')
+                        ),
+                        e('div', { className: 'modal-footer' },
+                            e('button', { className: 'button button-secondary', onClick: function() { setCambioEstado(null); } }, 'Cancelar'),
+                            e('button', { className: 'button button-primary', onClick: handleCambiarEstado, disabled: savingEstado || !cambioEstado.nuevoEstado },
+                                savingEstado ? e('span', { className: 'loading-spinner' }) : null,
+                                ' ', savingEstado ? 'Guardando...' : 'Confirmar cambio'
+                            )
+                        )
+                    )
                 )
             );
         }
 
 
 
-        // ADMIN PANEL - v1.9.0
+        // ADMIN PANEL - v2.3.0
         // ==========================================
         function AdminPanel({ state, onRefresh, onSetStockMinimo }) {
             const [activeSection, setActiveSection] = useState('ubicaciones');
@@ -2217,6 +2460,10 @@
             const [newModelo, setNewModelo] = useState('');
             const [newModeloTipo, setNewModeloTipo] = useState('');
             const [stockMinimoInput, setStockMinimoInput] = useState(String(state.stockMinimoDefault || 2));
+            // Sociedades
+            const [newSoc, setNewSoc] = useState({ nombre: '', codigo: '', pais: '' });
+            const [editingSocId, setEditingSocId] = useState(null);
+            const [editingSocData, setEditingSocData] = useState({});
             // Búsqueda AD - técnicos
             const [tecnicoQuery, setTecnicoQuery] = useState('');
             const [tecnicoResults, setTecnicoResults] = useState([]);
@@ -2516,22 +2763,85 @@
                                     )
                                 ),
                                 e('div', { style: { maxHeight: '500px', overflowY: 'auto' } },
-                                    state.history.slice(0, 100).map(h => e('div', { key: h.id, style: { display: 'flex', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' } },
-                                        e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', minWidth: '120px', fontFamily: 'IBM Plex Mono,monospace' } }, new Date(h.fecha).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
-                                        e('span', { className: 'movement-badge ' + h.tipo, style: { minWidth: '80px', textAlign: 'center' } }, h.tipo),
-                                        e('span', { style: { flex: 1, fontSize: '13px', fontWeight: '500' } }, h.producto),
-                                        e('span', { style: { fontSize: '12px', color: 'var(--accent-green)' } }, h.tecnico || '-'),
-                                        h.usuario ? e('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, '→ ' + h.usuario) : null
-                                    ))
+                                    (function() {
+                                        const logTec = window._logTecnico || 'all';
+                                        const logTip = window._logTipo || 'all';
+                                        return state.history
+                                            .filter(h => (logTec === 'all' || h.tecnico === logTec) && (logTip === 'all' || h.tipo === logTip))
+                                            .slice(0, 200)
+                                            .map(h => e('div', { key: h.id, style: { display: 'flex', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' } },
+                                                e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', minWidth: '120px', fontFamily: 'IBM Plex Mono,monospace' } }, new Date(h.fecha).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
+                                                e('span', { className: 'movement-badge ' + h.tipo, style: { minWidth: '80px', textAlign: 'center' } }, h.tipo),
+                                                e('span', { style: { flex: 1, fontSize: '13px', fontWeight: '500' } }, h.producto),
+                                                h.idEtiqueta ? e('span', { style: { fontSize: '11px', color: 'var(--accent-blue)', fontFamily: 'IBM Plex Mono,monospace' } }, h.idEtiqueta) : null,
+                                                e('span', { style: { fontSize: '12px', color: 'var(--accent-green)' } }, h.tecnico || '-'),
+                                                h.usuario ? e('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, '→ ' + h.usuario) : null
+                                            ));
+                                    })()
                                 )
                             )
                         )
                     )
                 )
             );
-        }
 
+            const renderSociedades = () => card('🏢 Sociedades',
+                e('div', null,
+                    e('div', { style: { marginBottom: '20px' } },
+                        e('div', { className: 'form-label', style: { marginBottom: '8px' } }, 'Nueva Sociedad'),
+                        e('div', { style: { display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px', marginBottom: '8px' } },
+                            e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre completo (ej: SanLucar Fruit Import Netherlands B.V.)', value: newSoc.nombre, onChange: ev => setNewSoc(s => ({ ...s, nombre: ev.target.value })) }),
+                            e('input', { type: 'text', className: 'form-input', placeholder: 'Código (3)', maxLength: 3, value: newSoc.codigo, onChange: ev => setNewSoc(s => ({ ...s, codigo: ev.target.value.toUpperCase() })), style: { width: '80px', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '700', textTransform: 'uppercase' } }),
+                            e('input', { type: 'text', className: 'form-input', placeholder: 'País', value: newSoc.pais, onChange: ev => setNewSoc(s => ({ ...s, pais: ev.target.value })), style: { width: '120px' } })
+                        ),
+                        (function() {
+                            const codigoExiste = newSoc.codigo.length === 3 && (state.sociedades || []).some(s => s.codigo === newSoc.codigo.toUpperCase());
+                            return codigoExiste ? e('div', { style: { color: 'var(--accent-red)', fontSize: '13px', marginBottom: '8px' } }, '⚠️ El código "' + newSoc.codigo + '" ya existe. Elige otro.') : null;
+                        })(),
+                        e('button', {
+                            className: 'button button-success',
+                            onClick: () => {
+                                const codigoExiste = (state.sociedades || []).some(s => s.codigo === newSoc.codigo.toUpperCase());
+                                if (codigoExiste) { showToast('Código duplicado', 'error'); return; }
+                                act(() => dataManager.createSociedad(newSoc), 'Sociedad añadida').then(() => setNewSoc({ nombre: '', codigo: '', pais: '' }));
+                            },
+                            disabled: loading || !newSoc.nombre.trim() || newSoc.codigo.length !== 3 || !newSoc.pais.trim(),
+                            style: { width: '100%' }
+                        }, loading ? e('span', { className: 'loading-spinner' }) : '+ Añadir Sociedad')
+                    ),
+                    state.sociedades.length === 0 ?
+                        e('div', { style: { color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' } }, 'No hay sociedades') :
+                        state.sociedades.map(s => {
+                            const isEditing = editingSocId === s.id;
+                            return e('div', { key: s.id, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: s.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '8px', marginBottom: '6px', opacity: s.activo ? 1 : 0.6 } },
+                                e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', fontWeight: '700', color: 'var(--accent-purple)', minWidth: '40px' } }, s.codigo),
+                                isEditing ?
+                                    e('div', { style: { flex: 1, display: 'flex', gap: '8px' } },
+                                        e('input', { type: 'text', className: 'form-input', value: editingSocData.nombre || '', onChange: ev => setEditingSocData(d => ({ ...d, nombre: ev.target.value })), style: { flex: 1, padding: '6px 10px', fontSize: '14px' } }),
+                                        e('input', { type: 'text', className: 'form-input', maxLength: 3, value: editingSocData.codigo || '', onChange: ev => setEditingSocData(d => ({ ...d, codigo: ev.target.value.toUpperCase() })), style: { width: '70px', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '700', padding: '6px 10px', fontSize: '14px' } }),
+                                        e('input', { type: 'text', className: 'form-input', value: editingSocData.pais || '', onChange: ev => setEditingSocData(d => ({ ...d, pais: ev.target.value })), style: { width: '100px', padding: '6px 10px', fontSize: '14px' } })
+                                    ) :
+                                    e('div', { style: { flex: 1 } },
+                                        e('div', { style: { fontWeight: '600', fontSize: '14px' } }, s.nombre),
+                                        e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, s.pais)
+                                    ),
+                                isEditing ?
+                                    e('button', { className: 'button button-success', onClick: () => {
+                                        const codigoExiste = editingSocData.codigo !== s.codigo && (state.sociedades || []).some(x => x.codigo === editingSocData.codigo);
+                                        if (codigoExiste) { showToast('Código duplicado', 'error'); return; }
+                                        act(() => dataManager.updateSociedad(s.id, editingSocData), 'Sociedad actualizada').then(() => setEditingSocId(null));
+                                    }, style: { padding: '6px 12px', fontSize: '12px' } }, '✓') :
+                                    e('button', { className: 'button button-secondary', onClick: () => { setEditingSocId(s.id); setEditingSocData({ nombre: s.nombre, codigo: s.codigo, pais: s.pais }); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✏️'),
+                                isEditing ?
+                                    e('button', { className: 'button button-secondary', onClick: () => setEditingSocId(null), style: { padding: '6px 10px', fontSize: '12px' } }, '✕') :
+                                    e('button', { className: 'button ' + (s.activo ? 'button-warning' : 'button-success'), onClick: () => act(() => dataManager.toggleSociedad(s.id, s.activo), s.activo ? 'Desactivada' : 'Activada'), disabled: loading, style: { padding: '6px 10px', fontSize: '12px' } }, s.activo ? 'Desactivar' : 'Activar'),
+                                !isEditing && e('button', { className: 'button button-danger', onClick: () => act(() => dataManager.deleteSociedad(s.id), 'Eliminada'), disabled: loading, style: { padding: '6px 10px', fontSize: '12px' } }, '🗑️')
+                            );
+                        })
+                )
+            );
 
+            return e('div', null,
         function ConfirmModal({ message, onConfirm, onCancel, loading }) {
             return e('div', { className: 'modal-overlay', onClick: ev => { if (ev.target === ev.currentTarget) onCancel(); } },
                 e('div', { className: 'modal', style: { maxWidth: '500px' }, onClick: ev => ev.stopPropagation() },
@@ -2551,7 +2861,7 @@
 
         // ---- App ----
         function App() {
-            const [state, setState] = useState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2') });
+            const [state, setState] = useState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], sociedades: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2'), tabFilter: null });
 
             useEffect(() => { initializeApp(); }, []);
 
@@ -2568,7 +2878,7 @@
                     const currentUser = await graphClient.getCurrentUser();
                     const data = await dataManager.loadAllData();
                     const isAdmin = data.admins.some(a => a.Email && a.Email.toLowerCase() === currentUser.mail.toLowerCase() && (a.Activo === true || a.Activo === 'Yes'));
-                    setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], loading: false, syncing: false, lastSync: new Date() }));
+                    setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], loading: false, syncing: false, lastSync: new Date() }));
                     showToast('Bienvenido, ' + currentUser.displayName, 'success');
                 } catch(error) { console.error('Error inicializando app:', error); showToast('Error cargando la aplicacion', 'error'); setState(s => ({ ...s, loading: false })); }
             };
@@ -2580,7 +2890,7 @@
                 if (!dataManager) return;
                 try {
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], lastSync: new Date() }));
+                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], lastSync: new Date() }));
                 } catch(e) { console.error('Error refreshing:', e); }
             };
             const handleLogout = async () => { await logout(); setState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], activeTab: 'dashboard', loading: false, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: 2 }); showToast('Sesion cerrada correctamente', 'success'); };
@@ -2590,12 +2900,13 @@
                 setState(s => ({ ...s, syncing: true }));
                 try {
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], syncing: false, lastSync: new Date() }));
+                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], syncing: false, lastSync: new Date() }));
                     if (showMsg) showToast('Sincronizado correctamente', 'success');
                 } catch(e) { setState(s => ({ ...s, syncing: false })); }
             };
 
-            const handleTabChange = async tab => { setState(s => ({ ...s, activeTab: tab })); await syncData(false); };
+            const handleTabChange = async tab => { setState(s => ({ ...s, activeTab: tab, tabFilter: null })); await syncData(false); };
+            const handleNavigate = (tab, filter) => { setState(s => ({ ...s, activeTab: tab, tabFilter: filter })); };
             const handleOpenModal = (type, item) => {
                 const confirmTypes = ['eliminar-producto', 'eliminar-historial', 'toggle-tecnico', 'eliminar-asignacion'];
                 if (confirmTypes.includes(type)) {
@@ -2618,7 +2929,7 @@
                     setState(s => ({ ...s, showConfirm: false, confirmAction: null }));
                     // Refresh completo: incluye activos y ubicaciones para que la UI sea consistente
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, history: data.history, technicians: data.technicians, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], lastSync: new Date() }));
+                    setState(s => ({ ...s, inventory: data.inventory, history: data.history, technicians: data.technicians, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], sociedades: data.sociedades || [], lastSync: new Date() }));
                 } catch(error) { console.error('Error:', error); showToast('Error: ' + error.message, 'error'); }
             };
 
@@ -2665,11 +2976,11 @@
                     state.isAdmin && e('button', { className: 'tab-button ' + (state.activeTab === 'admin' ? 'active' : ''), onClick: () => handleTabChange('admin'), style: { background: state.activeTab === 'admin' ? 'var(--accent-purple)' : '', borderColor: state.isAdmin ? 'var(--accent-purple)' : '' } }, '🛠️ Admin')
                 ),
                 e('div', { className: 'content-section' },
-                    state.activeTab === 'dashboard' && e(Dashboard, { state }),
-                    state.activeTab === 'inventario' && e(InventoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
-                    state.activeTab === 'equipos' && e(EquiposView, { state, onRefresh: refreshData }),
-                    state.activeTab === 'asignaciones' && e(AssignmentsView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
-                    state.activeTab === 'historial' && e(HistoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
+                    state.activeTab === 'dashboard' && e(Dashboard, { state, onNavigate: handleNavigate }),
+                    state.activeTab === 'inventario' && e(InventoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal, initialFilter: state.tabFilter }),
+                    state.activeTab === 'equipos' && e(EquiposView, { state, onRefresh: refreshData, initialFilter: state.tabFilter }),
+                    state.activeTab === 'asignaciones' && e(AssignmentsView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal, initialFilter: state.tabFilter }),
+                    state.activeTab === 'historial' && e(HistoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal, initialFilter: state.tabFilter }),
                     state.activeTab === 'admin' && state.isAdmin && e(AdminPanel, {
                         state,
                         onRefresh: refreshData,
