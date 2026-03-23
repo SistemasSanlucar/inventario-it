@@ -947,7 +947,6 @@
                 if (initialFilter.tipo === 'stockBajo') setFilterEstado('stockBajo');
                 if (initialFilter.tipo === 'sinStock') setFilterEstado('sinStock');
             }, []);
-            const [sortBy, setSortBy] = useState('nombre');
             const filtered = state.inventory.filter(item => {
                 const matchesSearch = item.nombre.toLowerCase().includes(search.toLowerCase()) || item.categoria.toLowerCase().includes(search.toLowerCase()) || item.barcode.includes(search);
                 const matchesCategory = filterCategory === 'all' || item.categoria === filterCategory;
