@@ -2840,6 +2840,64 @@
             );
 
             return e('div', null,
+                e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } },
+                    e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, '🛠️ Panel de Administración')
+                ),
+                e('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } },
+                    e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '180px' } },
+                        sectionBtn('ubicaciones', 'Ubicaciones', '📍'),
+                        sectionBtn('sociedades', 'Sociedades', '🏢'),
+                        sectionBtn('catalogo', 'Catálogo', '📦'),
+                        sectionBtn('tecnicos', 'Técnicos', '👤'),
+                        sectionBtn('admins', 'Administradores', '🛡️'),
+                        sectionBtn('ajustes', 'Ajustes', '⚙️'),
+                        sectionBtn('log', 'Log de Acciones', '📋')
+                    ),
+                    e('div', { style: { flex: 1, minWidth: '300px' } },
+                        activeSection === 'ubicaciones' && renderUbicaciones(),
+                        activeSection === 'sociedades' && renderSociedades(),
+                        activeSection === 'catalogo' && renderCatalogo(),
+                        activeSection === 'tecnicos' && renderTecnicos(),
+                        activeSection === 'admins' && renderAdmins(),
+                        activeSection === 'ajustes' && renderAjustes(),
+                        activeSection === 'log' && e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' } },
+                            e('div', { style: { padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: '700', fontSize: '16px' } }, '📋 Log de Acciones'),
+                            e('div', { style: { padding: '20px' } },
+                                e('div', { style: { display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' } },
+                                    e('select', { className: 'filter-select', style: { flex: 1 }, defaultValue: 'all', onChange: ev => { window._logTecnico = ev.target.value; } },
+                                        e('option', { value: 'all' }, 'Todos los técnicos'),
+                                        state.technicians.map(t => e('option', { key: t.id, value: t.nombre }, t.nombre))
+                                    ),
+                                    e('select', { className: 'filter-select', defaultValue: 'all', onChange: ev => { window._logTipo = ev.target.value; } },
+                                        e('option', { value: 'all' }, 'Todos los tipos'),
+                                        ['Entrada', 'Salida', 'Asignacion', 'Prestamo', 'Devolucion', 'CambioEstado'].map(t => e('option', { key: t, value: t }, t))
+                                    )
+                                ),
+                                e('div', { style: { maxHeight: '500px', overflowY: 'auto' } },
+                                    (function() {
+                                        const logTec = window._logTecnico || 'all';
+                                        const logTip = window._logTipo || 'all';
+                                        return state.history
+                                            .filter(h => (logTec === 'all' || h.tecnico === logTec) && (logTip === 'all' || h.tipo === logTip))
+                                            .slice(0, 200)
+                                            .map(h => e('div', { key: h.id, style: { display: 'flex', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' } },
+                                                e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', minWidth: '120px', fontFamily: 'IBM Plex Mono,monospace' } }, new Date(h.fecha).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
+                                                e('span', { className: 'movement-badge ' + h.tipo, style: { minWidth: '80px', textAlign: 'center' } }, h.tipo),
+                                                e('span', { style: { flex: 1, fontSize: '13px', fontWeight: '500' } }, h.producto),
+                                                h.idEtiqueta ? e('span', { style: { fontSize: '11px', color: 'var(--accent-blue)', fontFamily: 'IBM Plex Mono,monospace' } }, h.idEtiqueta) : null,
+                                                e('span', { style: { fontSize: '12px', color: 'var(--accent-green)' } }, h.tecnico || '-'),
+                                                h.usuario ? e('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, '→ ' + h.usuario) : null
+                                            ));
+                                    })()
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        }
+
+
         function ConfirmModal({ message, onConfirm, onCancel, loading }) {
             return e('div', { className: 'modal-overlay', onClick: ev => { if (ev.target === ev.currentTarget) onCancel(); } },
                 e('div', { className: 'modal', style: { maxWidth: '500px' }, onClick: ev => ev.stopPropagation() },
