@@ -10,6 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -220,7 +221,7 @@
         },
         etiquetas: { pais: 'SP' },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.1.0'
+        version: '2.2.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -416,6 +417,10 @@
         async updateActivoEstado(itemId, estado, ubicacion) {
             await this.graph.updateListItem(CONFIG.sharepoint.lists.activos, itemId, { EstadoActivo: estado, UbicacionActivo: ubicacion || '' });
         }
+        async updateActivoNS(itemId, numSerie) {
+            // Al añadir N/S, el equipo pasa automáticamente de Pendiente → Almacen
+            await this.graph.updateListItem(CONFIG.sharepoint.lists.activos, itemId, { NumSerie: numSerie, EstadoActivo: 'Almacen' });
+        }
         async deleteActivo(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.activos, itemId); }
         async createAssignment(data) {
             const titulo = data.esPrestamo ? 'Prestamo - ' + data.nombreEmpleado : 'Asignacion - ' + data.nombreEmpleado + ' - ' + new Date().toLocaleDateString('es-ES');
@@ -509,32 +514,30 @@
         printWindow.document.close();
         setTimeout(() => printWindow.print(), 250);
     }
-    function exportEtiquetaPDF(activos) {
+    async function exportEtiquetaPDF(activos) {
         if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF no disponible', 'error'); return; }
         try {
             const doc = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: [89, 25] });
-            activos.forEach(function(activo, idx) {
+            for (let idx = 0; idx < activos.length; idx++) {
+                const activo = activos[idx];
                 if (idx > 0) doc.addPage([89, 25], 'landscape');
                 doc.setFillColor(255, 255, 255);
                 doc.rect(0, 0, 89, 25, 'F');
-                // Código de barras
+                // QR code (lado izquierdo, 23x23mm)
                 try {
-                    const canvas = document.createElement('canvas');
-                    JsBarcode(canvas, activo.idEtiqueta, { format: 'CODE128', width: 1.2, height: 30, displayValue: false, margin: 0 });
-                    doc.addImage(canvas.toDataURL('image/png'), 'PNG', 1, 1, 30, 10);
+                    const qrDataUrl = await QRCode.toDataURL(activo.idEtiqueta, { margin: 1, width: 128, color: { dark: '#000000', light: '#FFFFFF' } });
+                    doc.addImage(qrDataUrl, 'PNG', 1, 1, 23, 23);
                 } catch(e) {}
-                // ID grande
+                // Texto lado derecho
                 doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
-                doc.text(activo.idEtiqueta, 1, 16);
-                // Tipo - Modelo
+                doc.text(activo.idEtiqueta, 26, 8);
                 doc.setFontSize(6.5); doc.setFont(undefined, 'normal');
-                doc.text(activo.tipo + (activo.modelo ? ' · ' + activo.modelo : ''), 1, 20.5);
-                // N/S si tiene
-                if (activo.numSerie) { doc.setFontSize(5.5); doc.setTextColor(80, 80, 80); doc.text('N/S: ' + activo.numSerie, 1, 24); }
-                // Logo SLF esquina derecha
+                doc.text(activo.tipo + (activo.modelo ? ' \xB7 ' + activo.modelo : ''), 26, 13.5);
+                if (activo.numSerie) { doc.setFontSize(5.5); doc.setTextColor(80, 80, 80); doc.text('N/S: ' + activo.numSerie, 26, 18.5); }
+                // Logo SLF
                 doc.setFontSize(5.5); doc.setTextColor(150, 150, 150);
                 doc.text('SLF', 82, 6); doc.text('IT', 83, 10);
-            });
+            }
             doc.save('Etiquetas_' + new Date().toISOString().split('T')[0] + '.pdf');
             showToast(activos.length + ' etiqueta(s) generada(s)', 'success');
         } catch(e) { console.error(e); showToast('Error generando etiquetas', 'error'); }
@@ -1436,28 +1439,15 @@
                     if (modalType === 'entrada' && !selectedItem) {
                         if (!formData.tipo || !formData.modelo) { showToast('Selecciona tipo y modelo', 'error'); setLoading(false); return; }
                         if (!formData.ubicacion) { showToast('Selecciona una ubicación', 'error'); setLoading(false); return; }
-                        const tipoLlevaEtiqueta = formData.tipo ? ((state.catalogoTipos || {})[formData.tipo] || {}).llevaEtiqueta : false;
-                        if (tipoLlevaEtiqueta && !formData.numSerie.trim()) { showToast('El número de serie es obligatorio para este tipo de material', 'error'); setLoading(false); return; }
-
                         // Detectar si ya existe un producto con este tipo+modelo
                         const productoExistente = state.inventory.find(function(item) { return item.nombre === nombreProducto; });
                         if (productoExistente) {
-                            // Sumar stock al existente
                             const addCant = parseInt(formData.stock) || 1;
                             const newStock = productoExistente.stock + addCant;
                             await dataManager.updateInventoryItem(productoExistente.id, { Stock: newStock });
                             await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: addCant, ticket: '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
-                            // Si lleva etiqueta, crear activo igualmente
-                            if (tipoLlevaEtiqueta) {
-                                const idEtiqueta = await dataManager.getNextEtiquetaId();
-                                await dataManager.createActivo({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, ubicacion: formData.ubicacion, numSerie: formData.numSerie, notas: '' });
-                                showToast('Stock actualizado (' + newStock + ' uds) + Etiqueta: ' + idEtiqueta, 'success');
-                                printDymoLabel({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, numSerie: formData.numSerie });
-                            } else {
-                                showToast('Stock actualizado: ' + newStock + ' uds de ' + nombreProducto, 'success');
-                            }
+                            showToast('Stock actualizado: ' + newStock + ' uds de ' + nombreProducto, 'success');
                         } else {
-                            // Producto nuevo
                             if (!formData.barcode.trim()) { showToast('El código de barras es obligatorio', 'error'); setLoading(false); return; }
                             const exists = await dataManager.checkBarcodeExists(formData.barcode);
                             if (exists) { showToast('El código de barras ya existe', 'error'); setLoading(false); return; }
@@ -1465,14 +1455,7 @@
                             if (parseInt(formData.stock) > 0) {
                                 await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: parseInt(formData.stock) || 1, ticket: '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
                             }
-                            if (tipoLlevaEtiqueta) {
-                                const idEtiqueta = await dataManager.getNextEtiquetaId();
-                                await dataManager.createActivo({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, ubicacion: formData.ubicacion, numSerie: formData.numSerie, notas: '' });
-                                showToast('Producto creado + Etiqueta: ' + idEtiqueta, 'success');
-                                printDymoLabel({ idEtiqueta, tipo: formData.tipo, modelo: formData.modelo, numSerie: formData.numSerie });
-                            } else {
-                                showToast('Producto creado: ' + nombreProducto, 'success');
-                            }
+                            showToast('Producto creado: ' + nombreProducto, 'success');
                         }
 
                     } else if (modalType === 'entrada' && selectedItem) {
@@ -1641,16 +1624,14 @@
 
             // Render body
             const renderBody = function() {
-                // NUEVO PRODUCTO
+                // NUEVO PRODUCTO (consumible)
                 if (modalType === 'entrada' && !selectedItem) {
-                    const tipoLlevaEtiqueta = formData.tipo ? ((state.catalogoTipos || {})[formData.tipo] || {}).llevaEtiqueta : false;
                     return e('div', null,
                         tecnicoBanner(),
+                        e('div', { className: 'info-banner blue', style: { marginBottom: '16px' } }, 'ℹ️ Usa esta entrada para ', e('strong', null, 'material consumible'), ': cables, ratones, auriculares, adaptadores... Para equipos con etiqueta (portátiles, iPads, etc.) usa la pestaña ', e('strong', null, '💻 Equipos'), '.'),
                         tipoModeloFields(),
                         barcodeField(),
-                        tipoLlevaEtiqueta ? e('div', { className: 'info-banner blue' }, '🏷️ Este tipo lleva etiqueta individual. Se generará un ID ', e('strong', null, 'SLF-SP-' + new Date().getFullYear().toString().slice(-2) + '-XXXXX'), ' al guardar.') : null,
-                        tipoLlevaEtiqueta ? fld('Número de Serie del fabricante', e('input', { type: 'text', className: 'form-input', value: formData.numSerie || '', placeholder: 'Ej: 5CG1234XYZ (bajo el equipo o en la caja)', onChange: function(ev) { upd('numSerie', ev.target.value); } }), true) : null,
-                        fld('Cantidad recibida', e('input', { type: 'number', min: '1', className: 'form-input', placeholder: 'Nº de unidades que estás dando de alta', value: formData.stock, onChange: function(ev) { upd('stock', ev.target.value); } })),
+                        fld('Cantidad recibida', e('input', { type: 'number', min: '1', className: 'form-input', placeholder: 'Nº de unidades', value: formData.stock, onChange: function(ev) { upd('stock', ev.target.value); } })),
                         (function() {
                             const productoExistente = state.inventory.find(function(item) { return item.nombre === (formData.tipo && formData.modelo ? formData.tipo + ' - ' + formData.modelo : ''); });
                             const cant = parseInt(formData.stock) || 0;
@@ -1921,166 +1902,293 @@
         }
 
         // ==========================================
-        // ACTIVOS VIEW - v2.0.0
         // ==========================================
-        function ActivosView({ state, onRefresh }) {
+        // EQUIPOS VIEW - v2.2.0
+        // ==========================================
+        function EquiposView({ state, onRefresh }) {
+            const [view, setView] = useState('lista'); // 'lista' | 'pendientes' | 'recepcion'
             const [search, setSearch] = useState('');
             const [filterTipo, setFilterTipo] = useState('all');
             const [filterEstado, setFilterEstado] = useState('all');
-            const [showNewForm, setShowNewForm] = useState(false);
-            const [newForm, setNewForm] = useState({ tipo: '', modelo: '', cantidad: 1, ubicacion: '', numSerie: '', notas: '' });
-            const [creando, setCreando] = useState(false);
-            const [generados, setGenerados] = useState([]);
-            const [showGenerados, setShowGenerados] = useState(false);
-            const [confirmDeleteId, setConfirmDeleteId] = useState(null); // Fix: elimina confirm() nativo
+            // Recepción en lote
+            const [sublotes, setSublotes] = useState([{ id: 1, tipo: '', modelo: '', ubicacion: '', cantidad: 1 }]);
+            const [creatingProgress, setCreatingProgress] = useState(null);
+            // Inline N/S editing
+            const [inlineNS, setInlineNS] = useState({});
+            const [savingNS, setSavingNS] = useState({});
+            // Confirm delete
+            const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+            // Ref para auto-focus en campo N/S
+            const nsInputRefs = useRef({});
 
-            const tiposConEtiqueta = Object.keys(state.catalogoTipos || {}).filter(t => (state.catalogoTipos[t] || {}).llevaEtiqueta);
-            const modelosDelTipo = newForm.tipo ? (state.catalogo[newForm.tipo] || []) : [];
+            const pendientes = (state.activos || []).filter(function(a) { return a.estado === 'Pendiente'; });
+            const tiposConEtiqueta = Object.keys(state.catalogoTipos || {}).filter(function(t) { return (state.catalogoTipos[t] || {}).llevaEtiqueta; });
+            const tiposUnicos = [...new Set((state.activos || []).map(function(a) { return a.tipo; }))].filter(Boolean);
 
             const filtered = (state.activos || []).filter(function(a) {
-                const matchSearch = a.idEtiqueta.toLowerCase().includes(search.toLowerCase()) || a.modelo.toLowerCase().includes(search.toLowerCase()) || a.tipo.toLowerCase().includes(search.toLowerCase());
+                const matchSearch = !search ||
+                    a.idEtiqueta.toLowerCase().includes(search.toLowerCase()) ||
+                    a.modelo.toLowerCase().includes(search.toLowerCase()) ||
+                    a.tipo.toLowerCase().includes(search.toLowerCase()) ||
+                    (a.numSerie || '').toLowerCase().includes(search.toLowerCase());
                 const matchTipo = filterTipo === 'all' || a.tipo === filterTipo;
                 const matchEstado = filterEstado === 'all' || a.estado === filterEstado;
                 return matchSearch && matchTipo && matchEstado;
             });
 
-            const tiposUnicos = [...new Set((state.activos || []).map(a => a.tipo))].filter(Boolean);
-            const estadoColor = { 'Almacen': 'var(--accent-green)', 'Asignado': 'var(--accent-blue)', 'Baja': 'var(--accent-red)' };
-            const estadoBg = { 'Almacen': 'rgba(63,185,80,.15)', 'Asignado': 'rgba(88,166,255,.15)', 'Baja': 'rgba(239,68,68,.15)' };
+            const estadoColor = { 'Pendiente': 'var(--accent-orange)', 'Almacen': 'var(--accent-green)', 'Asignado': 'var(--accent-blue)', 'Baja': 'var(--accent-red)' };
+            const estadoBg = { 'Pendiente': 'rgba(249,115,22,.15)', 'Almacen': 'rgba(63,185,80,.15)', 'Asignado': 'rgba(88,166,255,.15)', 'Baja': 'rgba(239,68,68,.15)' };
+            const estadoLabel = { 'Pendiente': '⚠️ Pendiente N/S', 'Almacen': 'En Almacén', 'Asignado': 'Asignado', 'Baja': 'Baja' };
 
-            const handleCrearActivos = async function() {
-                if (!newForm.tipo || !newForm.modelo || !newForm.ubicacion) { showToast('Tipo, modelo y ubicación son obligatorios', 'error'); return; }
-                const cant = parseInt(newForm.cantidad) || 1;
-                if (cant < 1 || cant > 50) { showToast('Cantidad entre 1 y 50', 'error'); return; }
-                setCreando(true);
+            // ---- Sublote helpers ----
+            const addSublote = function() { setSublotes(function(prev) { return prev.concat([{ id: Date.now(), tipo: '', modelo: '', ubicacion: '', cantidad: 1 }]); }); };
+            const removeSublote = function(id) { setSublotes(function(prev) { return prev.filter(function(s) { return s.id !== id; }); }); };
+            const updateSublote = function(id, field, value) {
+                setSublotes(function(prev) {
+                    return prev.map(function(s) {
+                        if (s.id !== id) return s;
+                        var updated = Object.assign({}, s, { [field]: value });
+                        if (field === 'tipo') updated.modelo = '';
+                        return updated;
+                    });
+                });
+            };
+            const totalUnidades = sublotes.reduce(function(sum, s) { return sum + (parseInt(s.cantidad) || 0); }, 0);
+            const sublotesValidos = sublotes.length > 0 && sublotes.every(function(s) { return s.tipo && s.modelo && s.ubicacion && parseInt(s.cantidad) >= 1; });
+
+            // ---- Crear lote ----
+            const handleCrearLote = async function() {
+                if (!sublotesValidos) { showToast('Completa todos los campos de cada sublote', 'error'); return; }
+                let total = totalUnidades, current = 0;
+                setCreatingProgress({ current: 0, total });
                 try {
-                    const creados = [];
-                    for (let i = 0; i < cant; i++) {
-                        const idEtiqueta = await dataManager.getNextEtiquetaId();
-                        await dataManager.createActivo({ idEtiqueta, tipo: newForm.tipo, modelo: newForm.modelo, ubicacion: newForm.ubicacion, numSerie: cant === 1 ? newForm.numSerie : '', notas: newForm.notas });
-                        creados.push({ idEtiqueta, tipo: newForm.tipo, modelo: newForm.modelo, numSerie: cant === 1 ? newForm.numSerie : '' });
+                    for (var si = 0; si < sublotes.length; si++) {
+                        const sublote = sublotes[si];
+                        const cant = parseInt(sublote.cantidad) || 1;
+                        for (var i = 0; i < cant; i++) {
+                            const idEtiqueta = await dataManager.getNextEtiquetaId();
+                            await dataManager.createActivo({ idEtiqueta, tipo: sublote.tipo, modelo: sublote.modelo, ubicacion: sublote.ubicacion, numSerie: '', notas: '', estado: 'Pendiente' });
+                            current++;
+                            setCreatingProgress({ current, total });
+                        }
                     }
-                    setGenerados(creados);
-                    setShowGenerados(true);
-                    setShowNewForm(false);
-                    setNewForm({ tipo: '', modelo: '', cantidad: 1, ubicacion: '', numSerie: '', notas: '' });
-                    showToast(cant + ' activo(s) creado(s)', 'success');
+                    showToast(total + ' equipo(s) registrados. Ahora añade los N/S para completarlos.', 'success');
+                    setSublotes([{ id: Date.now(), tipo: '', modelo: '', ubicacion: '', cantidad: 1 }]);
+                    setView('pendientes');
                     await onRefresh();
                 } catch(err) { showToast('Error: ' + err.message, 'error'); }
-                finally { setCreando(false); }
+                finally { setCreatingProgress(null); }
             };
 
-            const upd = function(f, v) { setNewForm(function(p) { return Object.assign({}, p, { [f]: v }); }); };
+            // ---- Guardar N/S inline ----
+            const saveNS = async function(activo) {
+                const ns = (inlineNS[activo.id] !== undefined ? inlineNS[activo.id] : '').trim();
+                if (!ns || ns.length < 4) { showToast('El N/S debe tener al menos 4 caracteres', 'error'); return; }
+                if (ns.length > 40) { showToast('El N/S no puede superar 40 caracteres', 'error'); return; }
+                setSavingNS(function(prev) { return Object.assign({}, prev, { [activo.id]: true }); });
+                try {
+                    await dataManager.updateActivoNS(activo.id, ns);
+                    setInlineNS(function(prev) { var n = Object.assign({}, prev); delete n[activo.id]; return n; });
+                    await onRefresh();
+                    showToast('✓ N/S guardado · Equipo listo para etiquetar', 'success');
+                } catch(err) { showToast('Error guardando N/S', 'error'); }
+                finally { setSavingNS(function(prev) { var n = Object.assign({}, prev); delete n[activo.id]; return n; }); }
+            };
 
+            // ---- Render: Recepción en lote ----
+            const renderRecepcion = function() {
+                return e('div', { style: { background: 'var(--bg-tertiary)', padding: '24px', borderRadius: '12px', border: '2px solid var(--accent-blue)' } },
+                    e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' } },
+                        e('div', null,
+                            e('div', { style: { fontWeight: '700', fontSize: '20px', marginBottom: '4px' } }, '📦 Recepción de lote'),
+                            e('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, 'Registra uno o varios modelos de equipo. Los N/S se añaden en el siguiente paso.')
+                        ),
+                        e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, '✕ Cancelar')
+                    ),
+                    sublotes.map(function(sublote, idx) {
+                        const modelosDisponibles = sublote.tipo ? (state.catalogo[sublote.tipo] || []) : [];
+                        return e('div', { key: sublote.id, style: { background: 'var(--bg-primary)', borderRadius: '10px', padding: '16px', marginBottom: '12px', border: '1px solid var(--border)' } },
+                            e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' } },
+                                e('span', { style: { fontWeight: '700', fontSize: '14px', color: 'var(--accent-blue)' } }, 'Sublote ' + (idx + 1)),
+                                sublotes.length > 1 ? e('button', { onClick: function() { removeSublote(sublote.id); }, style: { background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: '22px', padding: '0 4px', lineHeight: 1 } }, '×') : null
+                            ),
+                            e('div', { className: 'form-row' },
+                                e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Tipo *'),
+                                    e('select', { className: 'form-select', value: sublote.tipo, onChange: function(ev) { updateSublote(sublote.id, 'tipo', ev.target.value); } },
+                                        e('option', { value: '' }, '-- Tipo --'),
+                                        tiposConEtiqueta.map(function(t) { return e('option', { key: t, value: t }, t); })
+                                    )
+                                ),
+                                e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Modelo *'),
+                                    e('select', { className: 'form-select', value: sublote.modelo, onChange: function(ev) { updateSublote(sublote.id, 'modelo', ev.target.value); }, disabled: !sublote.tipo },
+                                        e('option', { value: '' }, '-- Modelo --'),
+                                        modelosDisponibles.map(function(m) { return e('option', { key: m, value: m }, m); })
+                                    )
+                                ),
+                                e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Ubicación inicial *'),
+                                    e('select', { className: 'form-select', value: sublote.ubicacion, onChange: function(ev) { updateSublote(sublote.id, 'ubicacion', ev.target.value); } },
+                                        e('option', { value: '' }, '-- Ubicación --'),
+                                        (state.ubicaciones || []).map(function(u) { return e('option', { key: u.id, value: u.nombre }, u.nombre); })
+                                    )
+                                ),
+                                e('div', { className: 'form-group', style: { maxWidth: '130px' } },
+                                    e('label', { className: 'form-label' }, 'Cantidad *'),
+                                    e('input', { type: 'number', min: '1', max: '200', className: 'form-input', value: sublote.cantidad, onChange: function(ev) { updateSublote(sublote.id, 'cantidad', ev.target.value); } })
+                                )
+                            )
+                        );
+                    }),
+                    e('button', { className: 'button button-secondary', onClick: addSublote, style: { marginBottom: '20px' } }, '+ Añadir otro modelo'),
+                    // Barra de progreso
+                    creatingProgress ? e('div', { style: { marginBottom: '16px' } },
+                        e('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' } },
+                            e('span', null, 'Creando equipos en SharePoint...'),
+                            e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontWeight: '700', color: 'var(--accent-blue)' } }, creatingProgress.current + ' / ' + creatingProgress.total)
+                        ),
+                        e('div', { style: { background: 'var(--bg-primary)', borderRadius: '8px', height: '10px', overflow: 'hidden' } },
+                            e('div', { style: { background: 'var(--accent-blue)', height: '100%', width: Math.round(creatingProgress.current / creatingProgress.total * 100) + '%', transition: 'width .3s ease', borderRadius: '8px' } })
+                        )
+                    ) : null,
+                    e('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '8px' } },
+                        totalUnidades > 0 ? e('div', { style: { padding: '10px 16px', background: 'rgba(88,166,255,.1)', border: '1px solid var(--accent-blue)', borderRadius: '8px', fontSize: '14px' } },
+                            'Se crearán ', e('strong', { style: { color: 'var(--accent-blue)' } }, totalUnidades), ' equipo(s) en estado ', e('strong', null, '⚠️ Pendiente N/S')
+                        ) : null,
+                        e('button', { className: 'button button-primary', onClick: handleCrearLote, disabled: !sublotesValidos || !!creatingProgress, style: { marginLeft: 'auto', minWidth: '180px' } },
+                            creatingProgress ? e('span', { className: 'loading-spinner' }) : null,
+                            ' ', creatingProgress ? 'Creando...' : '✓ Crear ' + (totalUnidades > 0 ? totalUnidades + ' equipos' : '')
+                        )
+                    )
+                );
+            };
+
+            // ---- Render: Pendientes (inline N/S) ----
+            const renderPendientes = function() {
+                if (pendientes.length === 0) return e('div', { className: 'empty-state' },
+                    e('div', { className: 'empty-state-icon' }, '✅'),
+                    e('div', { className: 'empty-state-title' }, 'Sin equipos pendientes'),
+                    e('div', { className: 'empty-state-text' }, 'Todos los equipos tienen N/S asignado')
+                );
+                return e('div', null,
+                    e('div', { className: 'info-banner orange', style: { marginBottom: '16px' } },
+                        '⚠️ ', e('strong', null, pendientes.length + ' equipo(s)'), ' pendientes de N/S. Rellena el campo y pulsa Enter o "✓". Sin N/S no se puede imprimir etiqueta ni asignar el equipo.'
+                    ),
+                    e('table', { className: 'history-table' },
+                        e('thead', null, e('tr', null,
+                            e('th', { style: { width: '180px' } }, 'ID Interno'),
+                            e('th', null, 'Tipo'),
+                            e('th', null, 'Modelo'),
+                            e('th', null, 'Ubicación'),
+                            e('th', null, 'Número de Serie del fabricante *'),
+                            e('th', { style: { width: '110px' } }, '')
+                        )),
+                        e('tbody', null, pendientes.map(function(activo) {
+                            const nsVal = inlineNS[activo.id] !== undefined ? inlineNS[activo.id] : '';
+                            const isSaving = !!savingNS[activo.id];
+                            return e('tr', { key: activo.id },
+                                e('td', null, e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '11px', fontWeight: '700', color: 'var(--accent-orange)' } }, activo.idEtiqueta)),
+                                e('td', { style: { fontWeight: '500' } }, activo.tipo),
+                                e('td', null, activo.modelo),
+                                e('td', { style: { fontSize: '13px' } }, activo.ubicacion || '-'),
+                                e('td', null,
+                                    e('input', {
+                                        type: 'text',
+                                        className: 'form-input',
+                                        placeholder: 'Escribe o escanea con cámara...',
+                                        value: nsVal,
+                                        autoComplete: 'off',
+                                        style: { padding: '8px 12px', fontSize: '14px', fontFamily: 'IBM Plex Mono,monospace' },
+                                        ref: function(el) { if (el) nsInputRefs.current[activo.id] = el; },
+                                        onChange: function(ev) { setInlineNS(function(prev) { return Object.assign({}, prev, { [activo.id]: ev.target.value }); }); },
+                                        onKeyDown: function(ev) {
+                                            if (ev.key === 'Enter') { ev.preventDefault(); saveNS(activo); }
+                                            if (ev.key === 'Tab') { /* dejar comportamiento por defecto para navegar */ }
+                                        }
+                                    })
+                                ),
+                                e('td', null, e('button', {
+                                    className: 'button button-success',
+                                    onClick: function() { saveNS(activo); },
+                                    disabled: isSaving || !nsVal.trim(),
+                                    style: { padding: '8px 14px', fontSize: '13px', width: '100%' }
+                                }, isSaving ? e('span', { className: 'loading-spinner' }) : '✓ Guardar'))
+                            );
+                        }))
+                    )
+                );
+            };
+
+            // ---- Render principal ----
             return e('div', null,
                 // Toolbar
                 e('div', { className: 'toolbar' },
                     e('div', { className: 'toolbar-left' },
-                        e('input', { type: 'text', className: 'search-bar', placeholder: 'Buscar por ID, tipo, modelo...', value: search, onChange: function(ev) { setSearch(ev.target.value); } }),
-                        e('select', { className: 'filter-select', value: filterTipo, onChange: function(ev) { setFilterTipo(ev.target.value); } },
+                        view === 'lista' && e('input', { type: 'text', className: 'search-bar', placeholder: 'Buscar por ID, tipo, modelo, N/S...', value: search, onChange: function(ev) { setSearch(ev.target.value); } }),
+                        view === 'lista' && e('select', { className: 'filter-select', value: filterTipo, onChange: function(ev) { setFilterTipo(ev.target.value); } },
                             e('option', { value: 'all' }, 'Todos los tipos'),
                             tiposUnicos.map(function(t) { return e('option', { key: t, value: t }, t); })
                         ),
-                        e('select', { className: 'filter-select', value: filterEstado, onChange: function(ev) { setFilterEstado(ev.target.value); } },
+                        view === 'lista' && e('select', { className: 'filter-select', value: filterEstado, onChange: function(ev) { setFilterEstado(ev.target.value); } },
                             e('option', { value: 'all' }, 'Todos los estados'),
+                            e('option', { value: 'Pendiente' }, '⚠️ Pendiente N/S'),
                             e('option', { value: 'Almacen' }, 'En Almacén'),
                             e('option', { value: 'Asignado' }, 'Asignado'),
                             e('option', { value: 'Baja' }, 'Baja')
                         ),
-                        e('span', { className: 'results-count' }, e('strong', null, filtered.length), ' activos')
+                        view === 'lista' && e('span', { className: 'results-count' }, e('strong', null, filtered.length), ' equipos')
                     ),
                     e('div', { className: 'toolbar-right' },
-                        generados.length > 0 && e('button', { className: 'button button-success', onClick: function() { exportEtiquetaPDF(generados); } }, '🖨️ Imprimir etiquetas (' + generados.length + ')'),
-                        e('button', { className: 'button button-primary', onClick: function() { setShowNewForm(!showNewForm); setShowGenerados(false); } }, showNewForm ? '✕ Cancelar' : '+ Dar de alta activos')
+                        pendientes.length > 0 && view === 'lista' && e('button', {
+                            className: 'button button-warning',
+                            onClick: function() { setView('pendientes'); }
+                        }, '⚠️ Pendientes N/S (' + pendientes.length + ')'),
+                        view === 'pendientes' && e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, '← Volver a lista'),
+                        view === 'recepcion' && e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, '← Volver a lista'),
+                        view === 'lista' && e('button', { className: 'button button-primary', onClick: function() { setView('recepcion'); } }, '+ Recepción de lote')
                     )
                 ),
-
-                // Formulario nuevo activo
-                showNewForm && e('div', { style: { background: 'var(--bg-tertiary)', padding: '24px', borderRadius: '12px', marginBottom: '24px', border: '2px solid var(--accent-blue)' } },
-                    e('div', { style: { fontWeight: '700', fontSize: '16px', marginBottom: '16px' } }, '📦 Dar de alta nuevos activos con etiqueta'),
-                    tiposConEtiqueta.length === 0 && e('div', { className: 'info-banner orange' }, '⚠️ No hay tipos con etiqueta configurados. Ve al Admin Panel → Catálogo y activa "Lleva etiqueta" en los tipos correspondientes.'),
-                    e('div', { className: 'form-row' },
-                        e('div', { className: 'form-group' },
-                            e('label', { className: 'form-label' }, 'Tipo de material *'),
-                            e('select', { className: 'form-select', value: newForm.tipo, onChange: function(ev) { upd('tipo', ev.target.value); upd('modelo', ''); } },
-                                e('option', { value: '' }, '-- Selecciona tipo --'),
-                                tiposConEtiqueta.map(function(t) { return e('option', { key: t, value: t }, t); })
-                            )
-                        ),
-                        e('div', { className: 'form-group' },
-                            e('label', { className: 'form-label' }, 'Modelo *'),
-                            e('select', { className: 'form-select', value: newForm.modelo, onChange: function(ev) { upd('modelo', ev.target.value); }, disabled: !newForm.tipo },
-                                e('option', { value: '' }, '-- Selecciona modelo --'),
-                                modelosDelTipo.map(function(m) { return e('option', { key: m, value: m }, m); })
-                            )
-                        )
-                    ),
-                    e('div', { className: 'form-row' },
-                        e('div', { className: 'form-group' },
-                            e('label', { className: 'form-label' }, 'Ubicación inicial *'),
-                            e('select', { className: 'form-select', value: newForm.ubicacion, onChange: function(ev) { upd('ubicacion', ev.target.value); } },
-                                e('option', { value: '' }, '-- Selecciona ubicación --'),
-                                (state.ubicaciones || []).map(function(u) { return e('option', { key: u.id, value: u.nombre }, u.nombre); })
-                            )
-                        ),
-                        e('div', { className: 'form-group' },
-                            e('label', { className: 'form-label' }, 'Cantidad de unidades'),
-                            e('input', { type: 'number', min: '1', max: '50', className: 'form-input', value: newForm.cantidad, onChange: function(ev) { upd('cantidad', ev.target.value); } })
-                        )
-                    ),
-                    parseInt(newForm.cantidad) === 1 && e('div', { className: 'form-row' },
-                        e('div', { className: 'form-group' },
-                            e('label', { className: 'form-label' }, 'N/S Fabricante (opcional)'),
-                            e('input', { type: 'text', className: 'form-input', value: newForm.numSerie, placeholder: 'Número de serie del fabricante', onChange: function(ev) { upd('numSerie', ev.target.value); } })
-                        ),
-                        e('div', { className: 'form-group' },
-                            e('label', { className: 'form-label' }, 'Notas'),
-                            e('input', { type: 'text', className: 'form-input', value: newForm.notas, placeholder: 'Observaciones opcionales', onChange: function(ev) { upd('notas', ev.target.value); } })
-                        )
-                    ),
-                    e('div', { className: 'info-banner blue' }, 'ℹ️ Se generarán ', e('strong', null, newForm.cantidad || 1), ' ID(s) únicos con formato ', e('strong', null, 'SLF-SP-' + new Date().getFullYear().toString().slice(-2) + '-XXXXX')),
-                    e('button', { className: 'button button-primary', onClick: handleCrearActivos, disabled: creando || !newForm.tipo || !newForm.modelo || !newForm.ubicacion, style: { marginTop: '8px' } },
-                        creando ? e('span', { className: 'loading-spinner' }) : null,
-                        creando ? ' Creando...' : '✓ Crear y generar IDs'
-                    )
-                ),
-
-                // IDs generados - botón imprimir etiquetas
-                showGenerados && generados.length > 0 && e('div', { style: { background: 'rgba(63,185,80,.1)', border: '2px solid var(--accent-green)', borderRadius: '12px', padding: '20px', marginBottom: '24px' } },
-                    e('div', { style: { fontWeight: '700', color: 'var(--accent-green)', marginBottom: '12px' } }, '✓ ' + generados.length + ' activo(s) creado(s) correctamente'),
-                    e('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' } },
-                        generados.map(function(a) {
-                            return e('span', { key: a.idEtiqueta, style: { background: 'var(--bg-secondary)', border: '1px solid var(--accent-green)', borderRadius: '6px', padding: '6px 12px', fontFamily: 'IBM Plex Mono,monospace', fontSize: '13px', fontWeight: '600' } }, a.idEtiqueta);
-                        })
-                    ),
-                    e('button', { className: 'button button-success', onClick: function() { exportEtiquetaPDF(generados); } }, '🖨️ Imprimir etiquetas PDF'),
-                    e('button', { className: 'button button-secondary', onClick: function() { setShowGenerados(false); setGenerados([]); }, style: { marginLeft: '8px' } }, 'Cerrar')
-                ),
-
-                // Tabla de activos
+                // Contenido según vista
+                view === 'recepcion' ? renderRecepcion() :
+                view === 'pendientes' ? renderPendientes() :
                 filtered.length > 0 ? e('table', { className: 'history-table' },
                     e('thead', null, e('tr', null,
-                        e('th', { style: { width: '160px' } }, 'ID Etiqueta'),
+                        e('th', { style: { width: '170px' } }, 'ID Interno'),
                         e('th', null, 'Tipo'),
                         e('th', null, 'Modelo'),
-                        e('th', { style: { width: '100px' } }, 'Estado'),
+                        e('th', null, 'N/S Fabricante'),
+                        e('th', { style: { width: '120px' } }, 'Estado'),
                         e('th', null, 'Ubicación'),
-                        e('th', { style: { width: '120px' } }, 'N/S'),
-                        e('th', { style: { width: '120px' } }, 'Acciones')
+                        e('th', { style: { width: '130px' } }, 'Acciones')
                     )),
                     e('tbody', null, filtered.map(function(activo) {
-                        return e('tr', { key: activo.id },
-                            e('td', null, e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', fontWeight: '700', color: 'var(--accent-blue)' } }, activo.idEtiqueta)),
+                        const tieneNS = !!activo.numSerie;
+                        const isPendiente = activo.estado === 'Pendiente';
+                        return e('tr', { key: activo.id, style: isPendiente ? { background: 'rgba(249,115,22,.04)' } : {} },
+                            e('td', null, e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '11px', fontWeight: '700', color: isPendiente ? 'var(--accent-orange)' : 'var(--accent-blue)' } }, activo.idEtiqueta)),
                             e('td', { style: { fontWeight: '500' } }, activo.tipo),
                             e('td', null, activo.modelo),
-                            e('td', null, e('span', { style: { background: estadoBg[activo.estado] || 'var(--bg-tertiary)', color: estadoColor[activo.estado] || 'var(--text-primary)', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' } }, activo.estado)),
+                            e('td', null, tieneNS
+                                ? e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', color: 'var(--text-secondary)' } }, activo.numSerie)
+                                : e('span', { style: { color: 'var(--accent-orange)', fontSize: '12px', fontWeight: '600' } }, '⚠️ Sin N/S')
+                            ),
+                            e('td', null, e('span', { style: { background: estadoBg[activo.estado] || 'var(--bg-tertiary)', color: estadoColor[activo.estado] || 'var(--text-primary)', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700' } }, estadoLabel[activo.estado] || activo.estado)),
                             e('td', { style: { fontSize: '13px' } }, activo.ubicacion || '-'),
-                            e('td', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, activo.numSerie || '-'),
-                            e('td', null, e('div', { style: { display: 'flex', gap: '6px' } },
-                                e('div', { className: 'action-icon', title: 'Imprimir etiqueta', onClick: function() { exportEtiquetaPDF([activo]); } }, '🖨️'),
+                            e('td', null, e('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
+                                // Botón imprimir — bloqueado si no tiene N/S
+                                e('div', {
+                                    className: 'action-icon' + (tieneNS ? ' tooltip' : ''),
+                                    'data-tooltip': tieneNS ? 'Imprimir etiqueta QR' : 'Requiere N/S',
+                                    onClick: tieneNS ? function() { exportEtiquetaPDF([activo]); } : null,
+                                    style: tieneNS ? {} : { opacity: 0.3, cursor: 'not-allowed' }
+                                }, '🖨️'),
+                                // Si pendiente, acceso directo a completar N/S
+                                isPendiente && e('div', { className: 'action-icon tooltip', 'data-tooltip': 'Añadir N/S', onClick: function() { setView('pendientes'); }, style: { color: 'var(--accent-orange)' } }, '✏️'),
+                                // Eliminar
                                 confirmDeleteId === activo.id
-                                    ? e('div', { style: { display: 'flex', gap: '4px', alignItems: 'center' } },
-                                        e('button', { className: 'button button-danger', onClick: async function() { await dataManager.deleteActivo(activo.id); setConfirmDeleteId(null); await onRefresh(); showToast('Activo eliminado', 'success'); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✓ Sí'),
+                                    ? e('div', { style: { display: 'flex', gap: '4px' } },
+                                        e('button', { className: 'button button-danger', onClick: async function() { await dataManager.deleteActivo(activo.id); setConfirmDeleteId(null); await onRefresh(); showToast('Equipo eliminado', 'success'); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✓'),
                                         e('button', { className: 'button button-secondary', onClick: function() { setConfirmDeleteId(null); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✕')
                                       )
                                     : e('div', { className: 'action-icon danger', title: 'Eliminar', onClick: function() { setConfirmDeleteId(activo.id); } }, '🗑️')
@@ -2088,12 +2196,14 @@
                         );
                     }))
                 ) : e('div', { className: 'empty-state' },
-                    e('div', { className: 'empty-state-icon' }, '🏷️'),
-                    e('div', { className: 'empty-state-title' }, 'No hay activos registrados'),
-                    e('div', { className: 'empty-state-text' }, 'Da de alta equipos con etiqueta usando el botón "+ Dar de alta activos"')
+                    e('div', { className: 'empty-state-icon' }, '💻'),
+                    e('div', { className: 'empty-state-title' }, search || filterTipo !== 'all' || filterEstado !== 'all' ? 'Sin resultados' : 'No hay equipos registrados'),
+                    e('div', { className: 'empty-state-text' }, search || filterTipo !== 'all' || filterEstado !== 'all' ? 'Prueba otros filtros' : 'Usa "Recepción de lote" para registrar equipos con etiqueta')
                 )
             );
         }
+
+
 
         // ADMIN PANEL - v1.9.0
         // ==========================================
@@ -2544,14 +2654,20 @@
                     )
                 ),
                 e('nav', { className: 'nav-tabs' },
-                    ['dashboard', 'inventario', 'asignaciones', 'historial'].map(tab =>
-                        e('button', { key: tab, className: 'tab-button ' + (state.activeTab === tab ? 'active' : ''), onClick: () => handleTabChange(tab) }, { dashboard: '📊 Dashboard', inventario: '📦 Inventario', asignaciones: '📋 Asignaciones', historial: '📜 Historial' }[tab])
-                    ),
+                    ['dashboard', 'inventario', 'equipos', 'asignaciones', 'historial'].map(function(tab) {
+                        const labels = { dashboard: '📊 Dashboard', inventario: '📦 Inventario', equipos: '💻 Equipos', asignaciones: '📋 Asignaciones', historial: '📜 Historial' };
+                        const pendientesCount = tab === 'equipos' ? (state.activos || []).filter(function(a) { return a.estado === 'Pendiente'; }).length : 0;
+                        return e('button', { key: tab, className: 'tab-button ' + (state.activeTab === tab ? 'active' : ''), onClick: function() { handleTabChange(tab); } },
+                            labels[tab],
+                            pendientesCount > 0 ? e('span', { style: { background: 'var(--accent-orange)', color: 'white', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700', marginLeft: '4px' } }, pendientesCount) : null
+                        );
+                    }),
                     state.isAdmin && e('button', { className: 'tab-button ' + (state.activeTab === 'admin' ? 'active' : ''), onClick: () => handleTabChange('admin'), style: { background: state.activeTab === 'admin' ? 'var(--accent-purple)' : '', borderColor: state.isAdmin ? 'var(--accent-purple)' : '' } }, '🛠️ Admin')
                 ),
                 e('div', { className: 'content-section' },
                     state.activeTab === 'dashboard' && e(Dashboard, { state }),
                     state.activeTab === 'inventario' && e(InventoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
+                    state.activeTab === 'equipos' && e(EquiposView, { state, onRefresh: refreshData }),
                     state.activeTab === 'asignaciones' && e(AssignmentsView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
                     state.activeTab === 'historial' && e(HistoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal }),
                     state.activeTab === 'admin' && state.isAdmin && e(AdminPanel, {
