@@ -9,7 +9,6 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -221,7 +220,7 @@
         },
         etiquetas: { pais: 'SP' },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.0.2'
+        version: '2.1.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -233,6 +232,7 @@
         constructor(ttlMinutes = 5) { this.ttl = ttlMinutes * 60 * 1000; this.prefix = 'inv_cache_'; }
         set(key, data) { try { localStorage.setItem(this.prefix + key, JSON.stringify({ data, timestamp: Date.now() })); } catch(e) {} }
         get(key) { try { const item = localStorage.getItem(this.prefix + key); if (!item) return null; const parsed = JSON.parse(item); if (Date.now() - parsed.timestamp > this.ttl) { localStorage.removeItem(this.prefix + key); return null; } return parsed.data; } catch(e) { return null; } }
+        clearKey(key) { try { localStorage.removeItem(this.prefix + key); } catch(e) {} }
         clear() { Object.keys(localStorage).filter(k => k.startsWith(this.prefix)).forEach(k => localStorage.removeItem(k)); }
     }
     const cache = new CacheManager(5);
@@ -252,24 +252,45 @@
                 return await response.json();
             } catch(error) { console.error('Graph API Error:', error); throw error; }
         }
-        async getListItems(listName) {
-            const endpoint = '/sites/' + CONFIG.sharepoint.sitePath + ':/lists/' + listName + '/items?expand=fields&$top=5000';
-            const result = await this.request(endpoint);
-            return result.value.map(item => ({ ...item.fields, sharePointId: item.id }));
+        async getListItems(listName, forceRefresh = false) {
+            if (!forceRefresh) {
+                const cached = cache.get(listName);
+                if (cached) return cached;
+            }
+            let endpoint = '/sites/' + CONFIG.sharepoint.sitePath + ':/lists/' + listName + '/items?expand=fields&$top=500';
+            let allItems = [];
+            // Paginación con @odata.nextLink
+            while (endpoint) {
+                const result = await this.request(endpoint);
+                const page = (result.value || []).map(item => ({ ...item.fields, sharePointId: item.id }));
+                allItems = allItems.concat(page);
+                const nextLink = result['@odata.nextLink'];
+                if (nextLink) {
+                    // nextLink es una URL completa, extraer solo el path+query relativo
+                    endpoint = nextLink.replace(this.baseUrl, '');
+                } else {
+                    endpoint = null;
+                }
+            }
+            cache.set(listName, allItems);
+            return allItems;
         }
         async createListItem(listName, data) {
             const endpoint = '/sites/' + CONFIG.sharepoint.sitePath + ':/lists/' + listName + '/items';
             const result = await this.request(endpoint, { method: 'POST', body: JSON.stringify({ fields: data }) });
+            cache.clearKey(listName); // Invalida la caché de esta lista
             return { ...result.fields, sharePointId: result.id };
         }
         async updateListItem(listName, itemId, data) {
             const endpoint = '/sites/' + CONFIG.sharepoint.sitePath + ':/lists/' + listName + '/items/' + itemId + '/fields';
             await this.request(endpoint, { method: 'PATCH', body: JSON.stringify(data) });
+            cache.clearKey(listName); // Invalida la caché de esta lista
             return true;
         }
         async deleteListItem(listName, itemId) {
             const endpoint = '/sites/' + CONFIG.sharepoint.sitePath + ':/lists/' + listName + '/items/' + itemId;
             await this.request(endpoint, { method: 'DELETE' });
+            cache.clearKey(listName); // Invalida la caché de esta lista
             return true;
         }
         async getCurrentUser() { return await this.request('/me'); }
@@ -345,6 +366,7 @@
         }
         // UBICACIONES CRUD
         async createUbicacion(nombre) { return await this.graph.createListItem(CONFIG.sharepoint.lists.ubicaciones, { Title: nombre, Activo: 'Si' }); }
+        async updateUbicacion(itemId, nombre) { await this.graph.updateListItem(CONFIG.sharepoint.lists.ubicaciones, itemId, { Title: nombre }); }
         async toggleUbicacion(itemId, activo) { await this.graph.updateListItem(CONFIG.sharepoint.lists.ubicaciones, itemId, { Activo: activo ? 'No' : 'Si' }); }
         async deleteUbicacion(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.ubicaciones, itemId); }
         // CATALOGO CRUD completo
@@ -372,19 +394,12 @@
         async deleteHistoryItem(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.historial, itemId); }
         // ACTIVOS (etiquetas individuales)
         async getNextEtiquetaId() {
-            const items = await this.graph.getListItems(CONFIG.sharepoint.lists.activos).catch(() => []);
             const anyo = new Date().getFullYear().toString().slice(-2);
             const pais = CONFIG.etiquetas.pais;
-            const prefix = 'SLF-' + pais + '-' + anyo + '-';
-            let maxNum = 0;
-            items.forEach(item => {
-                const id = item.IDEtiqueta || '';
-                if (id.startsWith(prefix)) {
-                    const num = parseInt(id.replace(prefix, '')) || 0;
-                    if (num > maxNum) maxNum = num;
-                }
-            });
-            return prefix + String(maxNum + 1).padStart(5, '0');
+            // UUID-based: sin race conditions, sin llamada a la API
+            // Formato: SLF-SP-26-ABCD1234 (8 chars hex mayúsculas)
+            const unique = crypto.randomUUID().replace(/-/g, '').toUpperCase().slice(0, 8);
+            return 'SLF-' + pais + '-' + anyo + '-' + unique;
         }
         async createActivo(data) {
             return await this.graph.createListItem(CONFIG.sharepoint.lists.activos, {
@@ -410,12 +425,13 @@
         async updateAssignmentStatus(itemId, nuevoEstado) { await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, itemId, { Estado: nuevoEstado }); }
         async deleteAssignment(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.asignaciones, itemId); }
         async searchUsers(searchTerm) { return await this.graph.searchUsers(searchTerm); }
-        async returnMaterial(assignmentId, returnedProducts, allProducts, observaciones, tecnico) {
+        async returnMaterial(assignmentId, returnedProducts, allProducts, observaciones, tecnico, inventoryData) {
             const fullyReturned = returnedProducts.length === allProducts.length;
             const newState = fullyReturned ? 'Devuelto' : 'Parcial';
             await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, assignmentId, { Estado: newState, Observaciones: observaciones });
             for (const prod of returnedProducts) {
-                const inventoryItem = await this.findProductByBarcode(prod.barcode);
+                // Resuelve en cliente con los datos ya cargados — sin llamadas extra a la API
+                const inventoryItem = (inventoryData || []).find(i => i.barcode === prod.barcode);
                 if (inventoryItem) await this.graph.updateListItem(CONFIG.sharepoint.lists.inventario, inventoryItem.id, { Stock: (inventoryItem.stock || 0) + 1 });
                 await this.graph.createListItem(CONFIG.sharepoint.lists.historial, { Title: 'Devolucion - ' + prod.nombre, TipoMovimiento: 'Devolucion', Producto: prod.nombre, Cantidad: 1, Usuario: '', Tecnico: tecnico, FechaHora: new Date().toISOString() });
             }
@@ -470,6 +486,16 @@
         link.download = filename + '_' + new Date().toISOString().split('T')[0] + '.csv';
         link.click();
         showToast('Archivo exportado correctamente', 'success');
+    }
+    // jsPDF usa Helvetica que no soporta caracteres latinos extendidos.
+    // Esta función normaliza el texto para evitar caracteres corruptos en los PDFs.
+    function safePdfText(str) {
+        if (!str) return '';
+        return String(str)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // elimina diacríticos: á→a, é→e, etc.
+            .replace(/[Ññ]/g, function(c) { return c === 'ñ' ? 'n' : 'N'; })
+            .replace(/[^\x00-\x7E]/g, '?'); // reemplaza cualquier otro no-ASCII
     }
     function generateBarcode(code) {
         const canvas = document.createElement('canvas');
@@ -526,16 +552,16 @@
             doc.text(assignment.esPrestamo ? 'ACTA DE PRESTAMO DE MATERIAL IT' : 'ACTA DE ASIGNACION DE MATERIAL IT', pageWidth / 2, y, { align: 'center' }); y += 15;
             doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.text('DATOS DEL EMPLEADO', margin, y); y += 8;
             doc.setFont(undefined, 'normal'); doc.setFontSize(10);
-            doc.text('Nombre: ' + assignment.nombreEmpleado, margin, y); y += 6;
-            doc.text('Email: ' + assignment.emailEmpleado, margin, y); y += 6;
-            doc.text('Departamento: ' + assignment.departamento, margin, y); y += 6;
-            doc.text('Puesto: ' + assignment.puesto, margin, y); y += 6;
+            doc.text('Nombre: ' + safePdfText(assignment.nombreEmpleado), margin, y); y += 6;
+            doc.text('Email: ' + safePdfText(assignment.emailEmpleado), margin, y); y += 6;
+            doc.text('Departamento: ' + safePdfText(assignment.departamento), margin, y); y += 6;
+            doc.text('Puesto: ' + safePdfText(assignment.puesto), margin, y); y += 6;
             if (assignment.fechaIncorporacion) { doc.text('Fecha Alta: ' + new Date(assignment.fechaIncorporacion).toLocaleDateString('es-ES'), margin, y); y += 6; }
             y += 6;
             doc.setFont(undefined, 'bold'); doc.setFontSize(11); doc.text('MATERIAL ' + (assignment.esPrestamo ? 'EN PRESTAMO' : 'ASIGNADO'), margin, y); y += 8;
             doc.setFont(undefined, 'normal'); doc.setFontSize(10);
             (assignment.productosAsignados || []).forEach((prod, idx) => {
-                doc.text((idx + 1) + '. ' + prod.nombre + ' (Cod: ' + prod.barcode + ')', margin, y); y += 6;
+                doc.text((idx + 1) + '. ' + safePdfText(prod.nombre) + ' (Cod: ' + prod.barcode + ')', margin, y); y += 6;
                 if (y > 270) { doc.addPage(); y = 20; }
             });
             y += 10;
@@ -543,15 +569,15 @@
             doc.setFont(undefined, 'normal'); doc.setFontSize(9);
             const conditions = ['El empleado declara haber recibido el material en perfecto estado.', 'Se compromete a hacer un uso adecuado del mismo.', 'Mantendra el material en buen estado de conservacion.', 'Lo devolvera cuando finalice su relacion laboral o cuando se solicite.'];
             conditions.forEach(cond => { doc.text('- ' + cond, margin, y); y += 5; });
-            if (assignment.observaciones) { y += 5; doc.setFont(undefined, 'bold'); doc.text('OBSERVACIONES:', margin, y); y += 6; doc.setFont(undefined, 'normal'); doc.text(assignment.observaciones, margin, y); y += 10; }
+            if (assignment.observaciones) { y += 5; doc.setFont(undefined, 'bold'); doc.text('OBSERVACIONES:', margin, y); y += 6; doc.setFont(undefined, 'normal'); doc.text(safePdfText(assignment.observaciones), margin, y); y += 10; }
             y += 15;
             doc.setFontSize(10);
-            doc.text('Empleado: ' + assignment.nombreEmpleado, margin, y);
-            doc.text('Tecnico IT: ' + assignment.tecnicoResponsable, pageWidth / 2 + 10, y);
+            doc.text('Empleado: ' + safePdfText(assignment.nombreEmpleado), margin, y);
+            doc.text('Tecnico IT: ' + safePdfText(assignment.tecnicoResponsable), pageWidth / 2 + 10, y);
             y += 15;
             doc.setFontSize(8);
             doc.text('Fecha: ' + new Date(assignment.fechaAsignacion).toLocaleString('es-ES') + ' | Sanlucar Fruit', pageWidth / 2, y, { align: 'center' });
-            doc.save('Asignacion_' + assignment.nombreEmpleado.replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf');
+            doc.save('Asignacion_' + safePdfText(assignment.nombreEmpleado).replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf');
             showToast('PDF generado correctamente', 'success');
         } catch(e) { console.error('Error generando PDF:', e); showToast('Error generando PDF', 'error'); }
     }
@@ -1003,7 +1029,46 @@
             );
         }
 
-        // ---- AssignmentsView ----
+        // ---- ProductsGrid (componente separado para cumplir Rules of Hooks) ----
+        function ProductsGrid({ inventory, selectedProducts, onAdd }) {
+            const [prodSearch, setProdSearch] = useState('');
+            const available = inventory.filter(function(item) {
+                return item.stock > 0 && !selectedProducts.find(function(p) { return p.barcode === item.barcode; });
+            });
+            // Con búsqueda activa muestra todos los resultados; sin búsqueda limita a 60
+            // para no saturar el DOM del iPad con listas muy largas
+            const filtered = prodSearch.trim()
+                ? available.filter(function(item) { return item.nombre.toLowerCase().includes(prodSearch.toLowerCase()) || item.categoria.toLowerCase().includes(prodSearch.toLowerCase()); })
+                : available.slice(0, 60);
+            const hiddenCount = !prodSearch.trim() && available.length > 60 ? available.length - 60 : 0;
+            return e('div', { style: { marginBottom: '16px' } },
+                e('input', { type: 'text', className: 'form-input', placeholder: '🔍 Buscar producto por nombre (cables, ratones, auriculares...)', value: prodSearch, onChange: function(ev) { setProdSearch(ev.target.value); }, style: { marginBottom: '8px', fontSize: '14px' } }),
+                e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '600' } }, 'Stock disponible — toca para añadir'),
+                e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px', maxHeight: '220px', overflowY: 'auto', padding: '4px' } },
+                    filtered.length === 0
+                        ? e('div', { style: { color: 'var(--text-secondary)', fontSize: '13px', padding: '12px', gridColumn: '1/-1' } }, prodSearch ? 'No se encontró "' + prodSearch + '"' : 'No hay más productos con stock disponible')
+                        : filtered.map(function(item) {
+                            return e('div', {
+                                key: item.barcode,
+                                onClick: function() { onAdd(item.barcode); },
+                                style: { background: 'var(--bg-primary)', border: '2px solid var(--border)', borderRadius: '8px', padding: '10px', cursor: 'pointer', transition: 'all .15s', userSelect: 'none' },
+                                onMouseEnter: function(ev) { ev.currentTarget.style.borderColor = 'var(--accent-green)'; ev.currentTarget.style.transform = 'translateY(-2px)'; },
+                                onMouseLeave: function(ev) { ev.currentTarget.style.borderColor = 'var(--border)'; ev.currentTarget.style.transform = ''; }
+                            },
+                                e('div', { style: { fontWeight: '600', fontSize: '13px', marginBottom: '4px', lineHeight: '1.3' } }, item.nombre),
+                                e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' } }, item.categoria),
+                                e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                                    e('span', { style: { fontSize: '11px', color: 'var(--accent-green)', fontWeight: '600' } }, '✓ ' + item.stock + ' uds'),
+                                    e('span', { style: { fontSize: '18px', color: 'var(--accent-green)' } }, '+')
+                                )
+                            );
+                        })
+                ),
+                hiddenCount > 0 ? e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', textAlign: 'center' } }, 'Busca para ver los ' + hiddenCount + ' productos restantes') : null
+            );
+        }
+
+
         function AssignmentsView({ state, onOpenModal }) {
             const [search, setSearch] = useState('');
             const [filterDept, setFilterDept] = useState('all');
@@ -1329,9 +1394,9 @@
             };
 
             const genBarcode = function() {
-                const ts = Date.now().toString().slice(-8);
-                const rnd = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-                upd('barcode', 'SL' + ts + rnd);
+                // crypto.randomUUID garantiza unicidad sin colisiones entre dispositivos simultáneos
+                const unique = crypto.randomUUID().replace(/-/g, '').toUpperCase().slice(0, 10);
+                upd('barcode', 'SL' + unique);
             };
 
             // Guardar catálogo
@@ -1460,7 +1525,7 @@
                     } else if (modalType === 'devolver-material') {
                         const toReturn = (selectedItem.productosAsignados || []).filter(function(p) { return returnSelections[p.barcode]; });
                         if (toReturn.length === 0) { showToast('Selecciona al menos un producto', 'warning'); setLoading(false); return; }
-                        await dataManager.returnMaterial(selectedItem.id, toReturn, selectedItem.productosAsignados || [], formData.observaciones || '', tecnicoActual);
+                        await dataManager.returnMaterial(selectedItem.id, toReturn, selectedItem.productosAsignados || [], formData.observaciones || '', tecnicoActual, state.inventory);
                         showToast('Devolución registrada: ' + toReturn.length + ' producto(s)', 'success');
                     }
 
@@ -1571,37 +1636,7 @@
                 );
             };
             const productsGrid = function() {
-                const available = state.inventory.filter(function(item) {
-                    return item.stock > 0 && !selectedProducts.find(function(p) { return p.barcode === item.barcode; });
-                });
-                const [prodSearch, setProdSearch] = useState('');
-                const filtered = prodSearch.trim()
-                    ? available.filter(function(item) { return item.nombre.toLowerCase().includes(prodSearch.toLowerCase()) || item.categoria.toLowerCase().includes(prodSearch.toLowerCase()); })
-                    : available;
-                return e('div', { style: { marginBottom: '16px' } },
-                    e('input', { type: 'text', className: 'form-input', placeholder: '🔍 Buscar producto por nombre (cables, ratones, auriculares...)', value: prodSearch, onChange: function(ev) { setProdSearch(ev.target.value); }, style: { marginBottom: '8px', fontSize: '14px' } }),
-                    e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '600' } }, 'Stock disponible — toca para añadir'),
-                    e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px', maxHeight: '220px', overflowY: 'auto', padding: '4px' } },
-                        filtered.length === 0
-                            ? e('div', { style: { color: 'var(--text-secondary)', fontSize: '13px', padding: '12px', gridColumn: '1/-1' } }, prodSearch ? 'No se encontró "' + prodSearch + '"' : 'No hay más productos con stock disponible')
-                            : filtered.map(function(item) {
-                                return e('div', {
-                                    key: item.barcode,
-                                    onClick: function() { addProductByBarcode(item.barcode); },
-                                    style: { background: 'var(--bg-primary)', border: '2px solid var(--border)', borderRadius: '8px', padding: '10px', cursor: 'pointer', transition: 'all .15s', userSelect: 'none' },
-                                    onMouseEnter: function(ev) { ev.currentTarget.style.borderColor = 'var(--accent-green)'; ev.currentTarget.style.transform = 'translateY(-2px)'; },
-                                    onMouseLeave: function(ev) { ev.currentTarget.style.borderColor = 'var(--border)'; ev.currentTarget.style.transform = ''; }
-                                },
-                                    e('div', { style: { fontWeight: '600', fontSize: '13px', marginBottom: '4px', lineHeight: '1.3' } }, item.nombre),
-                                    e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' } }, item.categoria),
-                                    e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-                                        e('span', { style: { fontSize: '11px', color: 'var(--accent-green)', fontWeight: '600' } }, '✓ ' + item.stock + ' uds'),
-                                        e('span', { style: { fontSize: '18px', color: 'var(--accent-green)' } }, '+')
-                                    )
-                                );
-                            })
-                    )
-                );
+                return e(ProductsGrid, { inventory: state.inventory, selectedProducts, onAdd: addProductByBarcode });
             };
 
             // Render body
@@ -1897,6 +1932,7 @@
             const [creando, setCreando] = useState(false);
             const [generados, setGenerados] = useState([]);
             const [showGenerados, setShowGenerados] = useState(false);
+            const [confirmDeleteId, setConfirmDeleteId] = useState(null); // Fix: elimina confirm() nativo
 
             const tiposConEtiqueta = Object.keys(state.catalogoTipos || {}).filter(t => (state.catalogoTipos[t] || {}).llevaEtiqueta);
             const modelosDelTipo = newForm.tipo ? (state.catalogo[newForm.tipo] || []) : [];
@@ -2042,7 +2078,12 @@
                             e('td', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, activo.numSerie || '-'),
                             e('td', null, e('div', { style: { display: 'flex', gap: '6px' } },
                                 e('div', { className: 'action-icon', title: 'Imprimir etiqueta', onClick: function() { exportEtiquetaPDF([activo]); } }, '🖨️'),
-                                e('div', { className: 'action-icon danger', title: 'Eliminar', onClick: async function() { if (confirm('¿Eliminar activo ' + activo.idEtiqueta + '?')) { await dataManager.deleteActivo(activo.id); await onRefresh(); showToast('Activo eliminado', 'success'); } } }, '🗑️')
+                                confirmDeleteId === activo.id
+                                    ? e('div', { style: { display: 'flex', gap: '4px', alignItems: 'center' } },
+                                        e('button', { className: 'button button-danger', onClick: async function() { await dataManager.deleteActivo(activo.id); setConfirmDeleteId(null); await onRefresh(); showToast('Activo eliminado', 'success'); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✓ Sí'),
+                                        e('button', { className: 'button button-secondary', onClick: function() { setConfirmDeleteId(null); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✕')
+                                      )
+                                    : e('div', { className: 'action-icon danger', title: 'Eliminar', onClick: function() { setConfirmDeleteId(activo.id); } }, '🗑️')
                             ))
                         );
                     }))
@@ -2151,10 +2192,10 @@
                             const isEditing = editingUbicId === u.id;
                             return e('div', { key: u.id, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: u.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '8px', marginBottom: '6px', opacity: u.activo ? 1 : 0.6 } },
                                 isEditing
-                                    ? e('input', { type: 'text', className: 'form-input', value: editingUbicNombre, onChange: ev => setEditingUbicNombre(ev.target.value), style: { flex: 1, padding: '6px 10px', fontSize: '14px' }, onKeyDown: ev => { if (ev.key === 'Enter') act(() => dataManager.graph.updateListItem(CONFIG.sharepoint.lists.ubicaciones, u.id, { Title: editingUbicNombre.trim() }), 'Ubicación actualizada').then(() => setEditingUbicId(null)); if (ev.key === 'Escape') setEditingUbicId(null); } })
+                                    ? e('input', { type: 'text', className: 'form-input', value: editingUbicNombre, onChange: ev => setEditingUbicNombre(ev.target.value), style: { flex: 1, padding: '6px 10px', fontSize: '14px' }, onKeyDown: ev => { if (ev.key === 'Enter') act(() => dataManager.updateUbicacion(u.id, editingUbicNombre.trim()), 'Ubicación actualizada').then(() => setEditingUbicId(null)); if (ev.key === 'Escape') setEditingUbicId(null); } })
                                     : e('span', { style: { flex: 1, fontSize: '14px', fontWeight: '500' } }, u.nombre),
                                 isEditing
-                                    ? e('button', { className: 'button button-success', onClick: () => act(() => dataManager.graph.updateListItem(CONFIG.sharepoint.lists.ubicaciones, u.id, { Title: editingUbicNombre.trim() }), 'Actualizada').then(() => setEditingUbicId(null)), disabled: loading, style: { padding: '6px 12px', fontSize: '12px' } }, '✓ Guardar')
+                                    ? e('button', { className: 'button button-success', onClick: () => act(() => dataManager.updateUbicacion(u.id, editingUbicNombre.trim()), 'Actualizada').then(() => setEditingUbicId(null)), disabled: loading, style: { padding: '6px 12px', fontSize: '12px' } }, '✓ Guardar')
                                     : e('button', { className: 'button button-secondary', onClick: () => { setEditingUbicId(u.id); setEditingUbicNombre(u.nombre); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✏️'),
                                 isEditing
                                     ? e('button', { className: 'button button-secondary', onClick: () => setEditingUbicId(null), style: { padding: '6px 10px', fontSize: '12px' } }, '✕')
@@ -2445,29 +2486,33 @@
             };
 
             const handleTabChange = async tab => { setState(s => ({ ...s, activeTab: tab })); await syncData(false); };
-            const handleOpenModal = (type, item) => { syncData(false); setState(s => ({ ...s, modalType: type, selectedItem: item })); };
+            const handleOpenModal = (type, item) => {
+                const confirmTypes = ['eliminar-producto', 'eliminar-historial', 'toggle-tecnico', 'eliminar-asignacion'];
+                if (confirmTypes.includes(type)) {
+                    syncData(false);
+                    setState(s => ({ ...s, showConfirm: true, confirmAction: { type, item }, modalType: null, selectedItem: item }));
+                } else {
+                    syncData(false);
+                    setState(s => ({ ...s, modalType: type, selectedItem: item }));
+                }
+            };
             const handleCloseModal = () => setState(s => ({ ...s, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null }));
 
             const handleConfirmAction = async () => {
-                const { confirmAction, selectedItem } = state;
+                const { confirmAction } = state;
                 try {
                     if (confirmAction.type === 'eliminar-producto') { await dataManager.deleteInventoryItem(confirmAction.item.id); showToast('Producto eliminado', 'success'); }
                     else if (confirmAction.type === 'eliminar-historial') { await dataManager.deleteHistoryItem(confirmAction.item.id); showToast('Registro eliminado', 'success'); }
                     else if (confirmAction.type === 'toggle-tecnico') { await dataManager.toggleTechnicianStatus(confirmAction.item.id, confirmAction.item.activo); showToast('Estado actualizado', 'success'); }
                     else if (confirmAction.type === 'eliminar-asignacion') { await dataManager.deleteAssignment(confirmAction.item.id); showToast('Asignacion eliminada', 'success'); }
                     setState(s => ({ ...s, showConfirm: false, confirmAction: null }));
+                    // Refresh completo: incluye activos y ubicaciones para que la UI sea consistente
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, history: data.history, technicians: data.technicians, assignments: data.assignments, catalogo: data.catalogo || {} }));
+                    setState(s => ({ ...s, inventory: data.inventory, history: data.history, technicians: data.technicians, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], lastSync: new Date() }));
                 } catch(error) { console.error('Error:', error); showToast('Error: ' + error.message, 'error'); }
             };
 
-            useEffect(() => {
-                if (!state.modalType) return;
-                const confirmTypes = { 'eliminar-producto': 'eliminar-producto', 'eliminar-historial': 'eliminar-historial', 'toggle-tecnico': 'toggle-tecnico', 'eliminar-asignacion': 'eliminar-asignacion' };
-                if (confirmTypes[state.modalType]) {
-                    setState(s => ({ ...s, showConfirm: true, confirmAction: { type: confirmTypes[s.modalType], item: s.selectedItem }, modalType: null }));
-                }
-            }, [state.modalType]);
+            
 
             const getLastSyncText = () => { if (!state.lastSync) return ''; const diff = Math.floor((new Date() - state.lastSync) / 1000); if (diff < 60) return 'Hace un momento'; if (diff < 3600) return 'Hace ' + Math.floor(diff/60) + ' min'; return 'Hace ' + Math.floor(diff/3600) + 'h'; };
 
@@ -2527,7 +2572,7 @@
             );
         }
 
-        ReactDOM.render(e(App), document.getElementById('root'));
+        ReactDOM.createRoot(document.getElementById('root')).render(e(App));
     });
     </script>
 </body>
