@@ -1224,7 +1224,6 @@
             });
 
             const departamentos = [...new Set((state.assignments || []).map(a => a.departamento))].filter(Boolean);
-            const hoy = new Date(); hoy.setHours(0,0,0,0);
             return e('div', null,
                 e('div', { className: 'toolbar' },
                     e('div', { className: 'toolbar-left' },
