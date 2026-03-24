@@ -222,7 +222,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.7.0'
+        version: '2.6.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -596,8 +596,8 @@
             return newState;
         }
         async findProductByBarcode(barcode) {
-            const items = await this.graph.getListItems(CONFIG.sharepoint.lists.inventario);
-            const item = items.find(i => i.CodigoBarras === barcode);
+            const items = await this.graph.getListItems(CONFIG.sharepoint.lists.inventario, "$filter=fields/CodigoBarras eq '" + barcode + "'");
+            const item = items[0];
             if (item) return { id: item.sharePointId, nombre: item.Nombre || item.Title, stock: parseInt(item.Stock) || 0, barcode: item.CodigoBarras };
             return null;
         }
@@ -3529,6 +3529,27 @@
 
             useEffect(() => { initializeApp(); }, []);
 
+            // ── setDataState: única función que actualiza datos del estado ─────────
+            // Evita duplicar el objeto en initializeApp, refreshData, syncData y handleConfirmAction
+            const setDataState = (data, extra) => {
+                setState(s => Object.assign({}, s, {
+                    inventory:        data.inventory        || [],
+                    technicians:      data.technicians      || [],
+                    history:          data.history          || [],
+                    assignments:      data.assignments      || [],
+                    catalogo:         data.catalogo         || {},
+                    catalogoTipos:    data.catalogoTipos    || {},
+                    catalogoAccesorios: data.catalogoAccesorios || {},
+                    activos:          data.activos          || [],
+                    ubicaciones:      data.ubicaciones      || [],
+                    ubicacionesAll:   data.ubicacionesAll   || [],
+                    adminsAll:        data.adminsAll        || [],
+                    sociedades:       data.sociedades       || [],
+                    proveedores:      data.proveedores      || [],
+                    lastSync:         new Date(),
+                }, extra || {}));
+            };
+
             const initializeApp = async () => {
                 try {
                     const msalReady = await initializeMSAL();
@@ -3543,24 +3564,19 @@
                     const data = await dataManager.loadAllData();
                     const isAdmin = data.admins.some(a => a.Email && a.Email.toLowerCase() === currentUser.mail.toLowerCase() && (a.Activo === true || a.Activo === 'Yes'));
                     const isTechnician = data.technicians.some(t => t.email && t.email.toLowerCase() === currentUser.mail.toLowerCase() && t.activo);
-                    // Control de acceso: solo admins y técnicos autorizados
                     if (!isAdmin && !isTechnician) {
                         setState(s => ({ ...s, loading: false, accessDenied: true, user: { name: currentUser.displayName, email: currentUser.mail } }));
                         return;
                     }
-                    setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, catalogoAccesorios: data.catalogoAccesorios || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], proveedores: data.proveedores || [], loading: false, syncing: false, lastSync: new Date() }));
+                    setDataState(data, { user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, loading: false, syncing: false });
                     showToast(T().welcome + ', ' + currentUser.displayName, 'success');
-                    // Si la URL contiene ?equipo=ID, navegar directamente a la ficha
+                    // Deep link: ?equipo=ID abre la ficha directamente
                     const urlParams = new URLSearchParams(window.location.search);
                     const equipoId = urlParams.get('equipo');
                     if (equipoId) {
                         const activo = (data.activos || []).find(function(a) { return a.idEtiqueta === equipoId.toUpperCase(); });
-                        if (activo) {
-                            setState(s => ({ ...s, activeTab: 'equipos', deepLinkEquipo: activo }));
-                        } else {
-                            showToast('Equipo no encontrado: ' + equipoId, 'warning');
-                        }
-                        // Limpiar el parámetro de la URL sin recargar
+                        if (activo) setState(s => ({ ...s, activeTab: 'equipos', deepLinkEquipo: activo }));
+                        else showToast('Equipo no encontrado: ' + equipoId, 'warning');
                         window.history.replaceState({}, '', window.location.pathname);
                     }
                 } catch(error) { console.error('Error inicializando app:', error); showToast('Error cargando la aplicacion', 'error'); setState(s => ({ ...s, loading: false })); }
@@ -3568,51 +3584,62 @@
 
             const handleLogin = async () => { try { await login(); await initializeApp(); } catch(e) { showToast('Error al iniciar sesion', 'error'); } };
 
-            // refreshData: recarga datos SIN toast de bienvenida. Se usa en onRefresh de modales.
+            // refreshData: recarga datos sin toast. Usado en onRefresh de modales y AdminPanel.
             const refreshData = async () => {
                 if (!dataManager) return;
-                try {
-                    const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, catalogoAccesorios: data.catalogoAccesorios || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], proveedores: data.proveedores || [], lastSync: new Date() }));
-                } catch(e) { console.error('Error refreshing:', e); }
+                try { const data = await dataManager.loadAllData(); setDataState(data); }
+                catch(e) { console.error('Error refreshing:', e); }
             };
-            const handleLogout = async () => { await logout(); setState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], activeTab: 'dashboard', loading: false, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: 2 }); showToast('Sesion cerrada correctamente', 'success'); };
+
+            // handleLogout: reset COMPLETO del estado — sin residuos entre cuentas
+            const handleLogout = async () => {
+                await logout();
+                setState({
+                    user: null, isAdmin: false, accessDenied: false,
+                    inventory: [], technicians: [], history: [], assignments: [],
+                    catalogo: {}, catalogoTipos: {}, catalogoAccesorios: {},
+                    activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [],
+                    sociedades: [], proveedores: [],
+                    activeTab: 'dashboard', loading: false, syncing: false, lastSync: null,
+                    modalType: null, selectedItem: null, showConfirm: false, confirmAction: null,
+                    stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2'),
+                    tabFilter: null, lang: currentLang, globalSearch: '', showGlobalResults: false, deepLinkEquipo: null
+                });
+                showToast('Sesion cerrada correctamente', 'success');
+            };
 
             const syncData = async (showMsg) => {
                 if (!dataManager || state.syncing) return;
                 setState(s => ({ ...s, syncing: true }));
                 try {
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, catalogoAccesorios: data.catalogoAccesorios || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], proveedores: data.proveedores || [], syncing: false, lastSync: new Date() }));
+                    setDataState(data, { syncing: false });
                     if (showMsg) showToast('Sincronizado correctamente', 'success');
                 } catch(e) { setState(s => ({ ...s, syncing: false })); }
             };
 
-            const handleTabChange = async tab => { setState(s => ({ ...s, activeTab: tab, tabFilter: null })); await syncData(false); };
-            const handleNavigate = (tab, filter) => { setState(s => ({ ...s, activeTab: tab, tabFilter: filter })); };
+            // handleTabChange: solo cambia pestaña — NO hace sync (innecesario y lento)
+            const handleTabChange = tab => setState(s => ({ ...s, activeTab: tab, tabFilter: null }));
+            const handleNavigate = (tab, filter) => setState(s => ({ ...s, activeTab: tab, tabFilter: filter }));
+
+            // handleOpenModal: solo abre el modal — NO hace sync (innecesario)
             const handleOpenModal = (type, item) => {
                 const confirmTypes = ['eliminar-producto', 'eliminar-historial', 'toggle-tecnico', 'eliminar-asignacion'];
-                if (confirmTypes.includes(type)) {
-                    syncData(false);
-                    setState(s => ({ ...s, showConfirm: true, confirmAction: { type, item }, modalType: null, selectedItem: item }));
-                } else {
-                    syncData(false);
-                    setState(s => ({ ...s, modalType: type, selectedItem: item }));
-                }
+                if (confirmTypes.includes(type)) setState(s => ({ ...s, showConfirm: true, confirmAction: { type, item }, modalType: null, selectedItem: item }));
+                else setState(s => ({ ...s, modalType: type, selectedItem: item }));
             };
             const handleCloseModal = () => setState(s => ({ ...s, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null }));
 
             const handleConfirmAction = async () => {
                 const { confirmAction } = state;
                 try {
-                    if (confirmAction.type === 'eliminar-producto') { await dataManager.deleteInventoryItem(confirmAction.item.id); showToast('Producto eliminado', 'success'); }
-                    else if (confirmAction.type === 'eliminar-historial') { await dataManager.deleteHistoryItem(confirmAction.item.id); showToast('Registro eliminado', 'success'); }
-                    else if (confirmAction.type === 'toggle-tecnico') { await dataManager.toggleTechnicianStatus(confirmAction.item.id, confirmAction.item.activo); showToast('Estado actualizado', 'success'); }
+                    if (confirmAction.type === 'eliminar-producto')  { await dataManager.deleteInventoryItem(confirmAction.item.id); showToast('Producto eliminado', 'success'); }
+                    else if (confirmAction.type === 'eliminar-historial')  { await dataManager.deleteHistoryItem(confirmAction.item.id); showToast('Registro eliminado', 'success'); }
+                    else if (confirmAction.type === 'toggle-tecnico')      { await dataManager.toggleTechnicianStatus(confirmAction.item.id, confirmAction.item.activo); showToast('Estado actualizado', 'success'); }
                     else if (confirmAction.type === 'eliminar-asignacion') { await dataManager.deleteAssignment(confirmAction.item.id); showToast('Asignacion eliminada', 'success'); }
                     setState(s => ({ ...s, showConfirm: false, confirmAction: null }));
-                    // Refresh completo: incluye activos y ubicaciones para que la UI sea consistente
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, history: data.history, technicians: data.technicians, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, catalogoAccesorios: data.catalogoAccesorios || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], sociedades: data.sociedades || [], proveedores: data.proveedores || [], lastSync: new Date() }));
+                    setDataState(data);
                 } catch(error) { console.error('Error:', error); showToast('Error: ' + error.message, 'error'); }
             };
 
