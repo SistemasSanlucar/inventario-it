@@ -681,12 +681,22 @@
             const resp = await fetch(DYMO_URL + '/dcd/api/get-default-label/LabelWriterPrinter');
             if (resp.ok) {
                 const data = await resp.json();
-                console.log('get-default-label response:', JSON.stringify(data).slice(0, 500));
-                const xml = String(data.labelXml || data.responseValue || '');
-                const pmMatch = xml.match(/<PaperName>([^<]+)<\/PaperName>/);
-                if (pmMatch) paperName = pmMatch[1];
-                const rrMatch = xml.match(/Width="(\d+)"\s+Height="(\d+)"/);
+                const rv = data.responseValue || {};
+                // PaperName: intentar extraerlo del XML del label, o derivarlo del name
+                const labelXml = String(rv.label || '');
+                console.log('rv.name:', rv.name, '| rv.paperName:', rv.paperName, '| label[0:100]:', labelXml.slice(0,100));
+                const pmMatch = labelXml.match(/<PaperName>([^<]+)<\/PaperName>/);
+                if (pmMatch && pmMatch[1]) {
+                    paperName = pmMatch[1];
+                } else if (rv.name) {
+                    // rv.name = "Address30251" → PaperName = "30251 Address"
+                    const nameMatch = rv.name.match(/([A-Za-z]+)(\d+)/);
+                    if (nameMatch) paperName = nameMatch[2] + ' ' + nameMatch[1];
+                    else paperName = rv.name;
+                }
+                const rrMatch = labelXml.match(/Width="(\d+)"\s+Height="(\d+)"/);
                 if (rrMatch) { drawW = parseInt(rrMatch[1]); drawH = parseInt(rrMatch[2]); }
+                console.log('DYMO PaperName:', paperName, 'drawW:', drawW, 'drawH:', drawH);
             }
         } catch(e) { console.warn('get-default-label falló, usando fallback:', e.message); }
 
@@ -802,10 +812,18 @@
                 doc.rect(0, 0, W, H, 'F');
                 const qrUrl = baseUrl + '?equipo=' + activo.idEtiqueta;
                 try {
-                    const QRLib = (typeof QRCode !== 'undefined' ? QRCode : null) || (typeof window.QRCode !== 'undefined' ? window.QRCode : null);
-                    if (!QRLib) throw new Error('QRCode lib not loaded');
-                    const qrDataUrl = await QRLib.toDataURL(qrUrl, { margin: 1, width: 256, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#FFFFFF' } });
-                    doc.addImage(qrDataUrl, 'PNG', 1, 1, 38, 38);
+                    // QRCode lib (may be blocked by browser tracking prevention)
+                    const QRLib = (typeof QRCode !== 'undefined' && QRCode.toDataURL) ? QRCode : 
+                                  (typeof window.QRCode !== 'undefined' && window.QRCode.toDataURL) ? window.QRCode : null;
+                    if (QRLib) {
+                        const qrDataUrl = await QRLib.toDataURL(qrUrl, { margin: 1, width: 256, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#FFFFFF' } });
+                        doc.addImage(qrDataUrl, 'PNG', 1, 1, 38, 38);
+                    } else {
+                        // Fallback: dibuja cuadrado placeholder con texto
+                        doc.setFillColor(230,230,230); doc.rect(1, 1, 38, 38, 'F');
+                        doc.setFontSize(5); doc.setTextColor(80,80,80);
+                        doc.text('QR: ' + activo.idEtiqueta, 2, 20, { maxWidth: 36 });
+                    }
                 } catch(e) { console.error('QR error:', e); }
                 doc.setDrawColor(220, 220, 220);
                 doc.line(41, 3, 41, H - 3);
