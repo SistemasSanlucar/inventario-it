@@ -222,10 +222,97 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.4.0'
+        version: '2.5.0'
     };
 
     let msalInstance, graphClient, dataManager;
+
+    // ==========================================
+    // i18n — TRADUCCIONES ES / EN
+    // ==========================================
+    const TRANSLATIONS = {
+        es: {
+            appTitle: 'Sistema de Inventario IT',
+            login: 'Iniciar Sesión con Microsoft', loginIng: 'Iniciando...',
+            loginDesc: 'Inicia sesión con tu cuenta corporativa de Microsoft 365 para acceder al sistema de gestión de inventario.',
+            loginNote: 'Usa tu cuenta @sanlucar.com',
+            dashboard: '📊 Dashboard', inventory: '📦 Inventario', equipment: '💻 Equipos',
+            assignments: '📋 Asignaciones', history: '📜 Historial', admin: '🛠️ Admin',
+            sync: '🔄 Sync', syncing: '⏳ Sync...', logout: 'Salir',
+            products: 'Productos', units: 'Unidades', lowStock: 'Stock Bajo',
+            newProduct: '+ Nuevo Producto', export: 'Exportar', search: 'Buscar...',
+            save: 'Guardar', cancel: 'Cancelar', delete: '🗑️ Eliminar', edit: '✏️ Editar',
+            activate: 'Activar', deactivate: 'Desactivar', add: '+ Añadir',
+            confirm: 'Confirmar', close: 'Cerrar',
+            accessDenied: 'Acceso Denegado',
+            accessDeniedMsg: 'Tu cuenta no tiene acceso a esta aplicación. Contacta con el departamento IT.',
+            accessDeniedSub: 'Solo el personal autorizado por IT puede acceder.',
+            tryOtherAccount: 'Intentar con otra cuenta',
+            reception: '+ Recepción de lote', pendingNS: '⚠️ Pendientes N/S',
+            newAssignment: '+ Nueva Asignación', loan: '⏱️ Préstamo',
+            employeeLeave: '👋 Baja de Empleado',
+            globalSearch: 'Buscar en todo... (o escanea QR)',
+            packLoad: 'Cargar pack',
+            packStandard: 'Usuario Estándar', packPremium: 'Usuario Premium',
+            saving: 'Guardando...', loading: 'Cargando...',
+            welcome: 'Bienvenido',
+            noAccess: 'Sin acceso',
+        },
+        en: {
+            appTitle: 'IT Inventory System',
+            login: 'Sign in with Microsoft', loginIng: 'Signing in...',
+            loginDesc: 'Sign in with your Microsoft 365 corporate account to access the inventory management system.',
+            loginNote: 'Use your @sanlucar.com account',
+            dashboard: '📊 Dashboard', inventory: '📦 Inventory', equipment: '💻 Equipment',
+            assignments: '📋 Assignments', history: '📜 History', admin: '🛠️ Admin',
+            sync: '🔄 Sync', syncing: '⏳ Sync...', logout: 'Sign out',
+            products: 'Products', units: 'Units', lowStock: 'Low Stock',
+            newProduct: '+ New Product', export: 'Export', search: 'Search...',
+            save: 'Save', cancel: 'Cancel', delete: '🗑️ Delete', edit: '✏️ Edit',
+            activate: 'Activate', deactivate: 'Deactivate', add: '+ Add',
+            confirm: 'Confirm', close: 'Close',
+            accessDenied: 'Access Denied',
+            accessDeniedMsg: 'Your account does not have access to this application. Please contact the IT department.',
+            accessDeniedSub: 'Only IT-authorized personnel can access this application.',
+            tryOtherAccount: 'Try another account',
+            reception: '+ Receive batch', pendingNS: '⚠️ Pending S/N',
+            newAssignment: '+ New Assignment', loan: '⏱️ Loan',
+            employeeLeave: '👋 Employee Offboarding',
+            globalSearch: 'Search everything... (or scan QR)',
+            packLoad: 'Load pack',
+            packStandard: 'Standard User', packPremium: 'Premium User',
+            saving: 'Saving...', loading: 'Loading...',
+            welcome: 'Welcome',
+            noAccess: 'No access',
+        }
+    };
+    let currentLang = localStorage.getItem('inv_lang') || 'es';
+    const T = () => TRANSLATIONS[currentLang] || TRANSLATIONS.es;
+
+    // ==========================================
+    // PACKS — almacenados en localStorage
+    // ==========================================
+    const PacksManager = {
+        key: 'inv_packs_v1',
+        getAll() {
+            try { return JSON.parse(localStorage.getItem(this.key) || '[]'); } catch(e) { return []; }
+        },
+        save(packs) {
+            try { localStorage.setItem(this.key, JSON.stringify(packs)); } catch(e) {}
+        },
+        create(pack) {
+            const packs = this.getAll();
+            packs.push({ id: Date.now().toString(), ...pack });
+            this.save(packs);
+        },
+        update(id, pack) {
+            const packs = this.getAll().map(p => p.id === id ? { ...p, ...pack } : p);
+            this.save(packs);
+        },
+        delete(id) {
+            this.save(this.getAll().filter(p => p.id !== id));
+        }
+    };
 
     // ==========================================
     // CACHE MANAGER
@@ -1256,8 +1343,9 @@
                         e('span', { className: 'results-count' }, e('strong', null, filtered.length), ' asignaciones')
                     ),
                     e('div', { className: 'toolbar-right' },
-                        e('button', { className: 'button button-success', onClick: () => onOpenModal('nueva-asignacion', null) }, '+ Nueva Asignacion'),
-                        e('button', { className: 'button button-warning', onClick: () => onOpenModal('nuevo-prestamo', null) }, '⏱️ Prestamo'),
+                        e('button', { className: 'button button-success', onClick: () => onOpenModal('nueva-asignacion', null) }, T ? T().newAssignment : '+ Nueva Asignación'),
+                        e('button', { className: 'button button-warning', onClick: () => onOpenModal('nuevo-prestamo', null) }, T ? T().loan : '⏱️ Préstamo'),
+                        e('button', { className: 'button button-danger', onClick: () => onOpenModal('baja-empleado', null), style: { background: 'rgba(239,68,68,.15)', border: '1px solid var(--accent-red)', color: 'var(--accent-red)' } }, '👋 Baja de Empleado'),
                         e('button', { className: 'button button-secondary', onClick: () => exportToCSV(filtered, 'asignaciones') }, 'Exportar')
                     )
                 ),
@@ -1377,6 +1465,11 @@
             const [barcodeError, setBarcodeError] = useState('');
             const [returnSelections, setReturnSelections] = useState({});
             const [savingCatalog, setSavingCatalog] = useState(false);
+            // Baja empleado
+            const [bajaQuery, setBajaQuery] = useState('');
+            const [bajaResults, setBajaResults] = useState([]);
+            const [bajaSelected, setBajaSelected] = useState(null);
+            const [bajaSelections, setBajaSelections] = useState({});
             const canvasRef = useRef(null);
             const searchTimeoutRef = useRef(null);
             const salidaSearchRef = useRef(null);
@@ -1631,6 +1724,8 @@
                         if (!formData.nombreEmpleado.trim()) { showToast('Selecciona un empleado', 'error'); setLoading(false); return; }
                         const totalItems = selectedProducts.length + selectedEquipos.length;
                         if (totalItems === 0) { showToast('Añade al menos un producto o equipo', 'error'); setLoading(false); return; }
+                        const pendientes = selectedEquipos.filter(function(eq) { return eq.pendienteEscaneo; });
+                        if (pendientes.length > 0) { showToast('Faltan ' + pendientes.length + ' equipo(s) por escanear', 'error'); setLoading(false); return; }
                         // Material fungible — descuenta stock
                         for (var i = 0; i < selectedProducts.length; i++) {
                             const prod = selectedProducts[i];
@@ -1654,6 +1749,22 @@
                         if (toReturn.length === 0) { showToast('Selecciona al menos un producto', 'warning'); setLoading(false); return; }
                         await dataManager.returnMaterial(selectedItem.id, toReturn, selectedItem.productosAsignados || [], formData.observaciones || '', tecnicoActual, state.inventory, state.activos);
                         showToast('Devolución registrada: ' + toReturn.length + ' producto(s)', 'success');
+
+                    } else if (modalType === 'baja-empleado') {
+                        if (!bajaSelected) { showToast('Selecciona un empleado', 'error'); setLoading(false); return; }
+                        const asignacionesActivas = (state.assignments || []).filter(function(a) { return a.emailEmpleado.toLowerCase() === bajaSelected.emailEmpleado.toLowerCase() && a.estado === 'Activo'; });
+                        const todosItemsSubmit = asignacionesActivas.flatMap(function(a) { return (a.productosAsignados || []).map(function(p) { return Object.assign({}, p, { asignacionId: a.id, asignacion: a }); }); });
+                        const toReturn = todosItemsSubmit.filter(function(p) { return bajaSelections[p.barcode || p.idEtiqueta]; });
+                        if (todosItemsSubmit.length > 0 && toReturn.length === 0) { showToast('Selecciona al menos un item', 'warning'); setLoading(false); return; }
+                        for (const asig of asignacionesActivas) {
+                            const itemsDeAsig = toReturn.filter(function(p) { return p.asignacionId === asig.id; });
+                            if (itemsDeAsig.length > 0) {
+                                await dataManager.returnMaterial(asig.id, itemsDeAsig, asig.productosAsignados || [], formData.observaciones || ('Baja: ' + bajaSelected.nombreEmpleado), tecnicoActual, state.inventory, state.activos);
+                            } else if (itemsDeAsig.length === 0 && todosItemsSubmit.filter(function(p){return p.asignacionId===asig.id;}).length === 0) {
+                                await dataManager.updateAssignmentStatus(asig.id, 'Devuelto');
+                            }
+                        }
+                        showToast('Baja procesada: ' + toReturn.length + ' item(s) devuelto(s)', 'success');
                     }
 
                     onClose();
@@ -1895,9 +2006,24 @@
                         setSelectedEquipos(function(prev) { return prev.concat([{ id: activo.id, idEtiqueta: activo.idEtiqueta, nombre: activo.tipo + ' - ' + activo.modelo, tipo: activo.tipo, modelo: activo.modelo, esEquipo: true }]); });
                         setEquipoInput(''); setEquipoError('');
                     };
+                    const availablePacks = PacksManager.getAll();
                     return e('div', null,
                         tecnicoBanner(),
                         formData.esPrestamo ? e('div', { className: 'info-banner orange' }, '⏱️ PRÉSTAMO: Este material debe ser devuelto hoy.') : null,
+                        // Selector de pack
+                        !formData.esPrestamo && availablePacks.length > 0 && e('div', { style: { background: 'rgba(88,166,255,.08)', border: '1px solid rgba(88,166,255,.3)', borderRadius: '10px', padding: '14px 16px', marginBottom: '16px' } },
+                            e('div', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--accent-blue)', marginBottom: '10px', textTransform: 'uppercase' } }, '🎒 Cargar Pack de Incorporación'),
+                            e('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+                                availablePacks.map(function(pack) {
+                                    return e('button', { key: pack.id, type: 'button', className: 'button button-secondary', style: { fontSize: '13px' }, onClick: function() {
+                                        setSelectedEquipos([]); setEquipoError('');
+                                        const pendientes = (pack.equipos || []).map(function(eq) { return { id: null, idEtiqueta: '', nombre: eq.tipo + ' - ' + eq.modelo, tipo: eq.tipo, modelo: eq.modelo, esEquipo: true, pendienteEscaneo: true }; });
+                                        setSelectedEquipos(pendientes);
+                                        showToast('Pack cargado: ' + pack.nombre + ' — escanea los IDs', 'success');
+                                    } }, '🎒 ' + pack.nombre + ' (' + (pack.equipos||[]).length + ')');
+                                })
+                            )
+                        ),
                         e('div', { className: 'form-group', style: { position: 'relative' } },
                             e('label', { className: 'form-label' }, 'Empleado', e('span', { className: 'required-asterisk' }, ' *')),
                             e('input', { type: 'text', className: 'form-input', value: formData.nombreEmpleado || userSearchQuery, placeholder: 'Buscar empleado en Active Directory...', onChange: function(ev) { if (formData.nombreEmpleado) setFormData(function(p) { return Object.assign({}, p, { nombreEmpleado: '', emailEmpleado: '', departamento: '', puesto: '' }); }); handleUserSearch(ev.target.value); } }),
@@ -1926,12 +2052,26 @@
                             equipoError ? e('div', { style: { color: 'var(--accent-red)', fontSize: '13px', marginBottom: '6px' } }, '⚠️ ' + equipoError) : null,
                             selectedEquipos.length > 0 && e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '8px', padding: '10px', marginBottom: '8px', border: '2px solid var(--accent-blue)' } },
                                 selectedEquipos.map(function(eq, idx) {
-                                    return e('div', { key: eq.idEtiqueta, className: 'product-row-assigned' },
-                                        e('div', null,
-                                            e('span', { style: { fontWeight: '600', marginRight: '8px' } }, (idx + 1) + '. ' + eq.nombre),
-                                            e('span', { style: { color: 'var(--accent-blue)', fontSize: '11px', fontFamily: 'IBM Plex Mono,monospace' } }, eq.idEtiqueta)
+                                    return e('div', { key: eq.idEtiqueta || ('pending-' + idx), className: 'product-row-assigned', style: eq.pendienteEscaneo ? { border: '1px dashed var(--accent-orange)', borderRadius: '6px', padding: '6px' } : {} },
+                                        e('div', { style: { flex: 1 } },
+                                            e('div', { style: { fontWeight: '600', marginBottom: '2px' } }, eq.nombre),
+                                            eq.pendienteEscaneo ?
+                                                e('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
+                                                    e('input', { type: 'text', className: 'form-input', placeholder: 'Escanea o escribe el ID del equipo...', style: { flex: 1, padding: '4px 8px', fontSize: '13px', fontFamily: 'IBM Plex Mono,monospace', textTransform: 'uppercase' }, onChange: function(ev) {
+                                                        const idClean = ev.target.value.toUpperCase();
+                                                        if (idClean.length > 8) {
+                                                            const activo = (state.activos || []).find(function(a) { return a.idEtiqueta === idClean; });
+                                                            if (activo && activo.estado === 'Almacen') {
+                                                                setSelectedEquipos(function(prev) { return prev.map(function(e, i) { return i === idx ? { id: activo.id, idEtiqueta: activo.idEtiqueta, nombre: activo.tipo + ' - ' + activo.modelo, tipo: activo.tipo, modelo: activo.modelo, esEquipo: true, pendienteEscaneo: false } : e; }); });
+                                                                showToast('✓ ' + idClean + ' vinculado', 'success');
+                                                            }
+                                                        }
+                                                    } }),
+                                                    e('button', { type: 'button', className: 'button button-primary', style: { padding: '4px 8px', fontSize: '12px' }, onClick: function() { startBarcodeScanner(function(code) { const activo = (state.activos || []).find(function(a) { return a.idEtiqueta === code.toUpperCase(); }); if (activo && activo.estado === 'Almacen') { setSelectedEquipos(function(prev) { return prev.map(function(e, i) { return i === idx ? { id: activo.id, idEtiqueta: activo.idEtiqueta, nombre: activo.tipo + ' - ' + activo.modelo, tipo: activo.tipo, modelo: activo.modelo, esEquipo: true, pendienteEscaneo: false } : e; }); }); showToast('✓ ' + code + ' vinculado', 'success'); } else { showToast('ID no válido o no disponible', 'error'); } }); } }, '📷')
+                                                ) :
+                                                e('span', { style: { color: 'var(--accent-blue)', fontSize: '11px', fontFamily: 'IBM Plex Mono,monospace' } }, eq.idEtiqueta)
                                         ),
-                                        e('button', { type: 'button', style: { background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: '20px', padding: '0 4px' }, onClick: function() { setSelectedEquipos(function(prev) { return prev.filter(function(e) { return e.idEtiqueta !== eq.idEtiqueta; }); }); } }, '×')
+                                        e('button', { type: 'button', style: { background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: '20px', padding: '0 4px' }, onClick: function() { setSelectedEquipos(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); } }, '×')
                                     );
                                 })
                             )
@@ -2050,14 +2190,82 @@
                         fld('Observaciones', inp('observaciones', 'Estado del material...'))
                     );
                 }
+                // BAJA DE EMPLEADO
+                if (modalType === 'baja-empleado') {
+                    const empleadoAsignaciones = bajaSelected ? (state.assignments || []).filter(function(a) { return a.emailEmpleado.toLowerCase() === bajaSelected.emailEmpleado.toLowerCase() && a.estado === 'Activo'; }) : [];
+                    const todosItems = empleadoAsignaciones.flatMap(function(a) { return (a.productosAsignados || []).map(function(p) { return Object.assign({}, p, { asignacionId: a.id }); }); });
+                    const handleBajaSearch = function(q) {
+                        setBajaQuery(q);
+                        const ql = q.toLowerCase();
+                        if (ql.length < 2) { setBajaResults([]); return; }
+                        const seen = new Set();
+                        const encontrados = [];
+                        (state.assignments || []).filter(function(a) { return a.estado === 'Activo'; }).forEach(function(a) {
+                            if (!seen.has(a.emailEmpleado) && ((a.nombreEmpleado||'').toLowerCase().includes(ql) || (a.emailEmpleado||'').toLowerCase().includes(ql))) {
+                                seen.add(a.emailEmpleado);
+                                encontrados.push({ nombreEmpleado: a.nombreEmpleado, emailEmpleado: a.emailEmpleado, departamento: a.departamento });
+                            }
+                        });
+                        setBajaResults(encontrados.slice(0, 8));
+                    };
+                    return e('div', null,
+                        tecnicoBanner(),
+                        e('div', { className: 'info-banner red', style: { marginBottom: '16px', background: 'rgba(239,68,68,.1)', border: '1px solid var(--accent-red)', borderRadius: '8px', padding: '12px 16px', color: 'var(--accent-red)', fontWeight: '600' } }, '👋 Baja de empleado — se devolverá todo el material activo y los equipos etiquetados volverán a Almacén.'),
+                        !bajaSelected ? e('div', null,
+                            e('div', { className: 'form-group', style: { position: 'relative' } },
+                                e('label', { className: 'form-label' }, 'Buscar empleado *'),
+                                e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre o email...', value: bajaQuery, onChange: function(ev) { handleBajaSearch(ev.target.value); } }),
+                                bajaResults.length > 0 && e('div', { className: 'user-search-dropdown' },
+                                    bajaResults.map(function(u, i) { return e('div', { key: i, className: 'user-search-item', onClick: function() {
+                                        setBajaSelected(u); setBajaQuery(''); setBajaResults([]);
+                                        const sel = {};
+                                        // Preseleccionar todo
+                                        const asigs = (state.assignments || []).filter(function(a) { return a.emailEmpleado.toLowerCase() === u.emailEmpleado.toLowerCase() && a.estado === 'Activo'; });
+                                        asigs.forEach(function(a) { (a.productosAsignados || []).forEach(function(p) { sel[p.barcode || p.idEtiqueta] = true; }); });
+                                        setBajaSelections(sel);
+                                    } },
+                                        e('div', { style: { fontWeight: '600' } }, u.nombreEmpleado),
+                                        e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, u.emailEmpleado + (u.departamento ? ' · ' + u.departamento : ''))
+                                    ); })
+                                )
+                            )
+                        ) : e('div', null,
+                            e('div', { style: { background: 'var(--bg-tertiary)', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                                e('div', null, e('div', { style: { fontWeight: '700' } }, bajaSelected.nombreEmpleado), e('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, bajaSelected.emailEmpleado)),
+                                e('button', { className: 'button button-secondary', onClick: function() { setBajaSelected(null); setBajaSelections({}); setBajaQuery(''); }, style: { padding: '6px 10px', fontSize: '12px' } }, 'Cambiar')
+                            ),
+                            todosItems.length === 0 ?
+                                e('div', { style: { background: 'rgba(63,185,80,.1)', border: '1px solid var(--accent-green)', borderRadius: '8px', padding: '12px 16px', color: 'var(--accent-green)', fontWeight: '600' } }, '✓ Este empleado no tiene material activo asignado.') :
+                                e('div', { style: { marginBottom: '16px' } },
+                                    e('div', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', textTransform: 'uppercase' } }, todosItems.length + ' item(s) — marca los que se devuelven'),
+                                    todosItems.map(function(prod, idx) {
+                                        const key = prod.barcode || prod.idEtiqueta;
+                                        const sel = !!bajaSelections[key];
+                                        return e('div', { key: (key || '') + idx, className: 'return-row ' + (sel ? 'selected' : ''), onClick: function() { setBajaSelections(function(prev) { const n = Object.assign({}, prev); n[key] = !prev[key]; return n; }); } },
+                                            e('input', { type: 'checkbox', checked: sel, onChange: function() {}, style: { width: '18px', height: '18px' } }),
+                                            e('div', { style: { flex: 1 } },
+                                                e('div', { style: { fontWeight: '600', fontSize: '14px' } },
+                                                    prod.esEquipo ? e('span', { style: { background: 'rgba(88,166,255,.15)', color: 'var(--accent-blue)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', marginRight: '6px', fontWeight: '700' } }, '💻') : e('span', { style: { background: 'rgba(63,185,80,.15)', color: 'var(--accent-green)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', marginRight: '6px', fontWeight: '700' } }, '📦'),
+                                                    prod.nombre
+                                                ),
+                                                e('div', { style: { fontSize: '12px', color: 'var(--accent-blue)', fontFamily: 'IBM Plex Mono,monospace' } }, prod.idEtiqueta || prod.barcode || '')
+                                            ),
+                                            sel && e('span', { style: { color: 'var(--accent-green)', fontSize: '20px' } }, '✓')
+                                        );
+                                    })
+                                ),
+                            fld('Motivo de baja', inp('observaciones', 'Ej: Fin de contrato, cambio de sede...'))
+                        )
+                    );
+                }
                 return e('div', { style: { textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' } }, 'Formulario no disponible');
             };
 
-            const titles = { 'entrada-new': '📦 Nuevo Producto', 'entrada-add': '➕ Añadir Stock', 'salida': '📤 Registrar Salida', 'editar': '✏️ Editar Producto', 'duplicar': '🔄 Duplicar Producto', 'tecnico': '👤 Nuevo Técnico', 'nueva-asignacion': '📋 Nueva Asignacion', 'nuevo-prestamo': '⏱️ Prestamo de Material', 'ver-asignacion': '📄 Documento de Asignacion', 'devolver-material': '↩️ Devolucion de Material' };
+            const titles = { 'entrada-new': '📦 Nuevo Producto', 'entrada-add': '➕ Añadir Stock', 'salida': '📤 Registrar Salida', 'editar': '✏️ Editar Producto', 'duplicar': '🔄 Duplicar Producto', 'tecnico': '👤 Nuevo Técnico', 'nueva-asignacion': '📋 Nueva Asignacion', 'nuevo-prestamo': '⏱️ Prestamo de Material', 'ver-asignacion': '📄 Documento de Asignacion', 'devolver-material': '↩️ Devolucion de Material', 'baja-empleado': '👋 Baja de Empleado' };
             const titleKey = modalType === 'entrada' ? (selectedItem ? 'entrada-add' : 'entrada-new') : modalType;
             const modalTitle = titles[titleKey] || 'Formulario';
             const isViewOnly = modalType === 'ver-asignacion';
-            const submitLabels = { 'entrada-new': 'Crear Producto', 'entrada-add': 'Añadir Stock', 'salida': 'Registrar Salida', 'editar': 'Guardar Cambios', 'duplicar': 'Duplicar Producto', 'tecnico': 'Crear Técnico', 'nueva-asignacion': 'Crear Asignacion', 'nuevo-prestamo': 'Registrar Prestamo', 'devolver-material': 'Confirmar Devolucion' };
+            const submitLabels = { 'entrada-new': 'Crear Producto', 'entrada-add': 'Añadir Stock', 'salida': 'Registrar Salida', 'editar': 'Guardar Cambios', 'duplicar': 'Duplicar Producto', 'tecnico': 'Crear Técnico', 'nueva-asignacion': 'Crear Asignacion', 'nuevo-prestamo': 'Registrar Prestamo', 'devolver-material': 'Confirmar Devolucion', 'baja-empleado': '👋 Confirmar Baja' };
             const submitLabel = submitLabels[titleKey] || 'Guardar';
             const submitClass = modalType === 'salida' ? 'button-warning' : modalType === 'devolver-material' ? 'button-success' : 'button-primary';
 
@@ -2568,6 +2776,11 @@
             const [newProv, setNewProv] = useState({ nombre: '', contacto: '', email: '', telefono: '' });
             const [editingProvId, setEditingProvId] = useState(null);
             const [editingProvData, setEditingProvData] = useState({});
+            // Packs
+            const [packs, setPacks] = useState(() => PacksManager.getAll());
+            const [newPack, setNewPack] = useState({ nombre: '', descripcion: '', equipos: [] });
+            const [newPackEquipo, setNewPackEquipo] = useState({ tipo: '', modelo: '' });
+            const refreshPacks = () => setPacks(PacksManager.getAll());
             // Búsqueda AD - técnicos
             const [tecnicoQuery, setTecnicoQuery] = useState('');
             const [tecnicoResults, setTecnicoResults] = useState([]);
@@ -2807,14 +3020,13 @@
                             style: { width: '100%' }
                         }, '+ Añadir Admin')
                     ),
-                    e('div', { className: 'info-banner orange', style: { marginBottom: '16px' } }, '⚠️ Ten cuidado al modificar admins. No te elimines a ti mismo.'),
+                    e('div', { className: 'info-banner orange', style: { marginBottom: '16px' } }, '🔒 Los administradores no se pueden eliminar desde la app. Para revocar acceso, desactívalos.'),
                     state.adminsAll.length === 0 ?
                         e('div', { style: { color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' } }, 'No hay admins') :
                         state.adminsAll.map(a => e('div', { key: a.id, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: a.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '8px', marginBottom: '6px', opacity: a.activo ? 1 : 0.6 } },
                             e('span', { style: { flex: 1, fontSize: '14px', fontWeight: '500' } }, a.email),
                             a.email.toLowerCase() === state.user?.email.toLowerCase() && e('span', { style: { fontSize: '11px', color: 'var(--accent-purple)', background: 'rgba(168,85,247,.1)', padding: '2px 8px', borderRadius: '4px' } }, 'Tú'),
-                            e('button', { className: 'button ' + (a.activo ? 'button-warning' : 'button-success'), onClick: () => act(() => dataManager.toggleAdmin(a.id, a.activo), a.activo ? 'Admin desactivado' : 'Admin activado'), disabled: loading || a.email.toLowerCase() === state.user?.email.toLowerCase(), style: { padding: '6px 12px', fontSize: '12px' } }, a.activo ? 'Desactivar' : 'Activar'),
-                            e('button', { className: 'button button-danger', onClick: () => act(() => dataManager.deleteAdmin(a.id), 'Admin eliminado'), disabled: loading || a.email.toLowerCase() === state.user?.email.toLowerCase(), style: { padding: '6px 10px', fontSize: '12px' } }, '🗑️')
+                            e('button', { className: 'button ' + (a.activo ? 'button-warning' : 'button-success'), onClick: () => act(() => dataManager.toggleAdmin(a.id, a.activo), a.activo ? 'Admin desactivado' : 'Admin activado'), disabled: loading || a.email.toLowerCase() === state.user?.email.toLowerCase(), style: { padding: '6px 12px', fontSize: '12px' } }, a.activo ? 'Desactivar' : 'Activar')
                         ))
                 )
             );
@@ -2908,6 +3120,61 @@
                 )
             );
 
+            const renderPacks = () => card('🎒 Packs de Incorporación',
+                e('div', null,
+                    e('div', { style: { marginBottom: '24px' } },
+                        e('div', { className: 'form-label', style: { marginBottom: '8px' } }, 'Nuevo Pack'),
+                        e('div', { className: 'form-row' },
+                            e('div', { className: 'form-group' }, e('label', { className: 'form-label' }, 'Nombre *'), e('input', { type: 'text', className: 'form-input', placeholder: 'Ej: Usuario Estándar', value: newPack.nombre, onChange: ev => setNewPack(p => ({ ...p, nombre: ev.target.value })) })),
+                            e('div', { className: 'form-group' }, e('label', { className: 'form-label' }, 'Descripción'), e('input', { type: 'text', className: 'form-input', placeholder: 'Ej: iPhone 16e + HP ProBook G11', value: newPack.descripcion, onChange: ev => setNewPack(p => ({ ...p, descripcion: ev.target.value })) }))
+                        ),
+                        e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '8px', padding: '12px', marginBottom: '10px' } },
+                            e('div', { className: 'form-label', style: { marginBottom: '8px' } }, 'Equipos del pack'),
+                            e('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' } },
+                                e('select', { className: 'form-select', value: newPackEquipo.tipo, onChange: ev => setNewPackEquipo(p => ({ ...p, tipo: ev.target.value, modelo: '' })), style: { flex: 1 } },
+                                    e('option', { value: '' }, '-- Tipo --'),
+                                    Object.keys(state.catalogoTipos || {}).filter(t => state.catalogoTipos[t].llevaEtiqueta).map(t => e('option', { key: t, value: t }, t))
+                                ),
+                                e('select', { className: 'form-select', value: newPackEquipo.modelo, onChange: ev => setNewPackEquipo(p => ({ ...p, modelo: ev.target.value })), disabled: !newPackEquipo.tipo, style: { flex: 1 } },
+                                    e('option', { value: '' }, '-- Modelo --'),
+                                    (state.catalogo[newPackEquipo.tipo] || []).map(m => e('option', { key: m, value: m }, m))
+                                ),
+                                e('button', { type: 'button', className: 'button button-success', onClick: () => {
+                                    if (!newPackEquipo.tipo || !newPackEquipo.modelo) return;
+                                    setNewPack(p => ({ ...p, equipos: p.equipos.concat([{ tipo: newPackEquipo.tipo, modelo: newPackEquipo.modelo }]) }));
+                                    setNewPackEquipo({ tipo: '', modelo: '' });
+                                }, disabled: !newPackEquipo.tipo || !newPackEquipo.modelo, style: { padding: '10px 16px' } }, '+ Añadir')
+                            ),
+                            newPack.equipos.length > 0 ? e('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+                                newPack.equipos.map((eq, idx) => e('div', { key: idx, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'var(--bg-primary)', borderRadius: '6px', fontSize: '13px' } },
+                                    e('span', null, eq.tipo + ' · ' + eq.modelo),
+                                    e('button', { type: 'button', style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-red)', fontSize: '16px' }, onClick: () => setNewPack(p => ({ ...p, equipos: p.equipos.filter((_, i) => i !== idx) })) }, '×')
+                                ))
+                            ) : e('div', { style: { color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center', padding: '8px' } }, 'Añade al menos un equipo')
+                        ),
+                        e('button', { className: 'button button-success', onClick: () => { PacksManager.create(newPack); refreshPacks(); setNewPack({ nombre: '', descripcion: '', equipos: [] }); showToast('Pack creado', 'success'); }, disabled: !newPack.nombre.trim() || newPack.equipos.length === 0, style: { width: '100%' } }, '+ Crear Pack')
+                    ),
+                    packs.length === 0 ? e('div', { style: { color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' } }, 'No hay packs. Crea el primero arriba.') :
+                    packs.map(pack => e('div', { key: pack.id, style: { background: 'var(--bg-primary)', borderRadius: '10px', padding: '16px', marginBottom: '12px', border: '1px solid var(--border)' } },
+                        e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' } },
+                            e('div', null,
+                                e('div', { style: { fontWeight: '700', fontSize: '15px' } }, '🎒 ' + pack.nombre),
+                                pack.descripcion && e('div', { style: { fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' } }, pack.descripcion)
+                            ),
+                            e('button', { className: 'button button-danger', onClick: () => { PacksManager.delete(pack.id); refreshPacks(); showToast('Pack eliminado', 'success'); }, style: { padding: '6px 10px', fontSize: '12px' } }, '🗑️')
+                        ),
+                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+                            (pack.equipos || []).map((eq, idx) => e('div', { key: idx, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'var(--bg-tertiary)', borderRadius: '6px', fontSize: '13px' } },
+                                e('span', { style: { width: '20px', height: '20px', background: 'var(--accent-blue)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: 'white', flexShrink: 0 } }, idx + 1),
+                                e('span', { style: { fontWeight: '500' } }, eq.tipo),
+                                e('span', { style: { color: 'var(--text-secondary)' } }, '·'),
+                                e('span', { style: { color: 'var(--accent-blue)' } }, eq.modelo)
+                            ))
+                        )
+                    ))
+                )
+            );
+
             return e('div', null,
                 e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } },
                     e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, '🛠️ Panel de Administración')
@@ -2917,6 +3184,7 @@
                         sectionBtn('ubicaciones', 'Ubicaciones', '📍'),
                         sectionBtn('sociedades', 'Sociedades', '🏢'),
                         sectionBtn('proveedores', 'Proveedores', '🚚'),
+                        sectionBtn('packs', 'Packs', '🎒'),
                         sectionBtn('catalogo', 'Catálogo', '📦'),
                         sectionBtn('tecnicos', 'Técnicos', '👤'),
                         sectionBtn('admins', 'Administradores', '🛡️'),
@@ -2927,6 +3195,7 @@
                         activeSection === 'ubicaciones' && renderUbicaciones(),
                         activeSection === 'sociedades' && renderSociedades(),
                         activeSection === 'proveedores' && renderProveedores(),
+                        activeSection === 'packs' && renderPacks(),
                         activeSection === 'catalogo' && renderCatalogo(),
                         activeSection === 'tecnicos' && renderTecnicos(),
                         activeSection === 'admins' && renderAdmins(),
@@ -2988,7 +3257,7 @@
 
         // ---- App ----
         function App() {
-            const [state, setState] = useState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, catalogoAccesorios: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], sociedades: [], proveedores: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2'), tabFilter: null });
+            const [state, setState] = useState({ user: null, isAdmin: false, accessDenied: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, catalogoAccesorios: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], sociedades: [], proveedores: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2'), tabFilter: null, lang: currentLang, globalSearch: '', showGlobalResults: false });
 
             useEffect(() => { initializeApp(); }, []);
 
@@ -3005,8 +3274,14 @@
                     const currentUser = await graphClient.getCurrentUser();
                     const data = await dataManager.loadAllData();
                     const isAdmin = data.admins.some(a => a.Email && a.Email.toLowerCase() === currentUser.mail.toLowerCase() && (a.Activo === true || a.Activo === 'Yes'));
+                    const isTechnician = data.technicians.some(t => t.email && t.email.toLowerCase() === currentUser.mail.toLowerCase() && t.activo);
+                    // Control de acceso: solo admins y técnicos autorizados
+                    if (!isAdmin && !isTechnician) {
+                        setState(s => ({ ...s, loading: false, accessDenied: true, user: { name: currentUser.displayName, email: currentUser.mail } }));
+                        return;
+                    }
                     setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, catalogoAccesorios: data.catalogoAccesorios || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], proveedores: data.proveedores || [], loading: false, syncing: false, lastSync: new Date() }));
-                    showToast('Bienvenido, ' + currentUser.displayName, 'success');
+                    showToast(T().welcome + ', ' + currentUser.displayName, 'success');
                 } catch(error) { console.error('Error inicializando app:', error); showToast('Error cargando la aplicacion', 'error'); setState(s => ({ ...s, loading: false })); }
             };
 
@@ -3064,43 +3339,100 @@
 
             const getLastSyncText = () => { if (!state.lastSync) return ''; const diff = Math.floor((new Date() - state.lastSync) / 1000); if (diff < 60) return 'Hace un momento'; if (diff < 3600) return 'Hace ' + Math.floor(diff/60) + ' min'; return 'Hace ' + Math.floor(diff/3600) + 'h'; };
 
-            if (state.loading) return e('div', { className: 'global-loading' }, e('div', { className: 'loading-spinner' }), e('p', { className: 'global-loading-text' }, 'Cargando sistema...'));
+            if (state.loading) return e('div', { className: 'global-loading' }, e('div', { className: 'loading-spinner' }), e('p', { className: 'global-loading-text' }, T().loading));
             if (!state.user) return e(LoginScreen, { onLogin: handleLogin });
 
+            // Acceso denegado
+            if (state.accessDenied) return e('div', { className: 'login-screen' },
+                e('div', { className: 'login-box', style: { borderColor: 'var(--accent-red)' } },
+                    e('span', { style: { fontSize: '64px', display: 'block', marginBottom: '16px' } }, '🚫'),
+                    e('h1', { style: { color: 'var(--accent-red)', marginBottom: '16px' } }, T().accessDenied),
+                    e('p', { style: { marginBottom: '8px' } }, T().accessDeniedMsg),
+                    e('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '32px' } }, T().accessDeniedSub),
+                    e('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '24px' } }, state.user.email),
+                    e('button', { className: 'button button-secondary', onClick: handleLogout, style: { width: '100%' } }, T().tryOtherAccount)
+                )
+            );
+
             const stats = { totalProductos: state.inventory.length, totalUnidades: state.inventory.reduce((s,i) => s+i.stock, 0), stockBajo: state.inventory.filter(i => i.stock > 0 && i.stock <= i.stockMinimo).length, movimientosHoy: state.history.filter(h => new Date(h.fecha).toDateString() === new Date().toDateString()).length };
-            const formModalTypes = ['entrada', 'salida', 'editar', 'tecnico', 'nueva-asignacion', 'nuevo-prestamo', 'ver-asignacion', 'devolver-material', 'duplicar'];
+            const formModalTypes = ['entrada', 'salida', 'editar', 'tecnico', 'nueva-asignacion', 'nuevo-prestamo', 'ver-asignacion', 'devolver-material', 'duplicar', 'baja-empleado'];
+
+            const toggleLang = () => {
+                const newLang = state.lang === 'es' ? 'en' : 'es';
+                currentLang = newLang;
+                localStorage.setItem('inv_lang', newLang);
+                setState(s => ({ ...s, lang: newLang }));
+            };
+
+            // Búsqueda global
+            const globalResults = state.globalSearch.length >= 2 ? (function() {
+                const q = state.globalSearch.toLowerCase();
+                const results = [];
+                (state.inventory || []).forEach(function(i) { if ((i.nombre||'').toLowerCase().includes(q)||(i.barcode||'').includes(q)) results.push({ type: 'inventory', icon: '📦', label: i.nombre, sub: i.barcode, tab: 'inventario' }); });
+                (state.activos || []).forEach(function(a) { if ((a.idEtiqueta||'').toLowerCase().includes(q)||(a.numSerie||'').toLowerCase().includes(q)||(a.modelo||'').toLowerCase().includes(q)) results.push({ type: 'equipo', icon: '💻', label: a.tipo + ' · ' + a.modelo, sub: a.idEtiqueta, tab: 'equipos' }); });
+                (state.assignments || []).filter(function(a){return a.estado==='Activo';}).forEach(function(a) { if ((a.nombreEmpleado||'').toLowerCase().includes(q)||(a.emailEmpleado||'').toLowerCase().includes(q)) results.push({ type: 'asignacion', icon: '📋', label: a.nombreEmpleado, sub: a.emailEmpleado, tab: 'asignaciones' }); });
+                return results.slice(0, 8);
+            })() : [];
 
             return e('div', { className: 'app-container' },
                 e('header', { className: 'header' },
                     e('div', { className: 'header-left' },
                         e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
                             e('span', { className: 'header-icon' }, '📦'),
-                            e('h1', null, 'Sistema de Inventario IT'),
+                            e('h1', null, T().appTitle),
                             e('span', { style: { fontSize: '12px', padding: '4px 8px', background: 'rgba(88,166,255,.15)', color: 'var(--accent-blue)', borderRadius: '6px', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '600' } }, 'v' + CONFIG.version)
                         ),
-                        e('div', { className: 'user-badges' }, e('span', { className: 'user-badge ' + (state.isAdmin ? 'admin' : 'technician') }, state.isAdmin ? '🛡️ Admin' : '🔧 Tecnico', ': ', state.user.name))
+                        e('div', { className: 'user-badges' }, e('span', { className: 'user-badge ' + (state.isAdmin ? 'admin' : 'technician') }, state.isAdmin ? '🛡️ Admin' : '🔧 Técnico', ': ', state.user.name))
+                    ),
+                    // Búsqueda global
+                    e('div', { style: { flex: 1, maxWidth: '400px', position: 'relative', margin: '0 16px' } },
+                        e('input', {
+                            type: 'text', className: 'search-bar',
+                            placeholder: T().globalSearch,
+                            value: state.globalSearch,
+                            onChange: function(ev) { setState(s => ({ ...s, globalSearch: ev.target.value, showGlobalResults: ev.target.value.length >= 2 })); },
+                            onBlur: function() { setTimeout(function() { setState(s => ({ ...s, showGlobalResults: false })); }, 200); },
+                            style: { width: '100%', paddingRight: '44px' }
+                        }),
+                        e('button', { style: { position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-secondary)' }, onClick: function() { startBarcodeScanner(function(code) { setState(s => ({ ...s, globalSearch: code, showGlobalResults: true })); }); } }, '📷'),
+                        state.showGlobalResults && globalResults.length > 0 && e('div', { className: 'user-search-dropdown', style: { top: '100%', zIndex: 9999 } },
+                            globalResults.map(function(r, idx) {
+                                return e('div', { key: idx, className: 'user-search-item', onMouseDown: function() {
+                                    setState(s => ({ ...s, activeTab: r.tab, globalSearch: '', showGlobalResults: false, tabFilter: null }));
+                                } },
+                                    e('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+                                        e('span', { style: { fontSize: '16px' } }, r.icon),
+                                        e('div', null,
+                                            e('div', { style: { fontWeight: '600', fontSize: '14px' } }, r.label),
+                                            e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'IBM Plex Mono,monospace' } }, r.sub)
+                                        )
+                                    )
+                                );
+                            })
+                        )
                     ),
                     e('div', { className: 'header-stats' },
-                        e('div', { className: 'stat-item' }, e('div', { className: 'stat-label' }, 'Productos'), e('div', { className: 'stat-value blue' }, stats.totalProductos)),
-                        e('div', { className: 'stat-item' }, e('div', { className: 'stat-label' }, 'Unidades'), e('div', { className: 'stat-value green' }, stats.totalUnidades)),
-                        e('div', { className: 'stat-item' }, e('div', { className: 'stat-label' }, 'Stock Bajo'), e('div', { className: 'stat-value orange' }, stats.stockBajo)),
+                        e('div', { className: 'stat-item' }, e('div', { className: 'stat-label' }, T().products), e('div', { className: 'stat-value blue' }, stats.totalProductos)),
+                        e('div', { className: 'stat-item' }, e('div', { className: 'stat-label' }, T().units), e('div', { className: 'stat-value green' }, stats.totalUnidades)),
+                        e('div', { className: 'stat-item' }, e('div', { className: 'stat-label' }, T().lowStock), e('div', { className: 'stat-value orange' }, stats.stockBajo)),
                         e('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } },
                             state.lastSync && e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)' } }, getLastSyncText()),
-                            e('button', { onClick: () => syncData(true), disabled: state.syncing, style: { background: state.syncing ? 'var(--bg-secondary)' : 'var(--accent-blue)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: state.syncing ? 'wait' : 'pointer', fontSize: '14px', fontWeight: '600' } }, state.syncing ? '⏳ Sync...' : '🔄 Sync')
+                            e('button', { onClick: () => syncData(true), disabled: state.syncing, style: { background: state.syncing ? 'var(--bg-secondary)' : 'var(--accent-blue)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: state.syncing ? 'wait' : 'pointer', fontSize: '14px', fontWeight: '600' } }, state.syncing ? T().syncing : T().sync)
                         ),
-                        e('button', { className: 'button button-secondary', onClick: handleLogout }, 'Salir')
+                        e('button', { onClick: toggleLang, title: 'Cambiar idioma / Change language', style: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', fontFamily: 'IBM Plex Mono,monospace' } }, state.lang === 'es' ? 'EN' : 'ES'),
+                        e('button', { className: 'button button-secondary', onClick: handleLogout }, T().logout)
                     )
                 ),
                 e('nav', { className: 'nav-tabs' },
                     ['dashboard', 'inventario', 'equipos', 'asignaciones', 'historial'].map(function(tab) {
-                        const labels = { dashboard: '📊 Dashboard', inventario: '📦 Inventario', equipos: '💻 Equipos', asignaciones: '📋 Asignaciones', historial: '📜 Historial' };
+                        const labels = { dashboard: T().dashboard, inventario: T().inventory, equipos: T().equipment, asignaciones: T().assignments, historial: T().history };
                         const pendientesCount = tab === 'equipos' ? (state.activos || []).filter(function(a) { return a.estado === 'Pendiente'; }).length : 0;
                         return e('button', { key: tab, className: 'tab-button ' + (state.activeTab === tab ? 'active' : ''), onClick: function() { handleTabChange(tab); } },
                             labels[tab],
                             pendientesCount > 0 ? e('span', { style: { background: 'var(--accent-orange)', color: 'white', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700', marginLeft: '4px' } }, pendientesCount) : null
                         );
                     }),
-                    state.isAdmin && e('button', { className: 'tab-button ' + (state.activeTab === 'admin' ? 'active' : ''), onClick: () => handleTabChange('admin'), style: { background: state.activeTab === 'admin' ? 'var(--accent-purple)' : '', borderColor: state.isAdmin ? 'var(--accent-purple)' : '' } }, '🛠️ Admin')
+                    state.isAdmin && e('button', { className: 'tab-button ' + (state.activeTab === 'admin' ? 'active' : ''), onClick: () => handleTabChange('admin'), style: { background: state.activeTab === 'admin' ? 'var(--accent-purple)' : '', borderColor: state.isAdmin ? 'var(--accent-purple)' : '' } }, T().admin)
                 ),
                 e('div', { className: 'content-section' },
                     state.activeTab === 'dashboard' && e(Dashboard, { state, onNavigate: handleNavigate }),
