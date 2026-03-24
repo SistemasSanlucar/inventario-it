@@ -11,6 +11,7 @@
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -222,7 +223,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.6.1'
+        version: '2.7.1'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -644,6 +645,131 @@
         link.download = filename + '_' + new Date().toISOString().split('T')[0] + '.csv';
         link.click();
         showToast('Archivo exportado correctamente', 'success');
+    }
+
+    function exportAuditoria(state, opts) {
+        if (typeof XLSX === 'undefined') { showToast('Librería Excel no disponible', 'error'); return; }
+        const { sociedad, desde, hasta } = opts || {};
+        const wb = XLSX.utils.book_new();
+        const fechaHoy = new Date().toISOString().split('T')[0];
+        const filtroSoc = function(v) { return !sociedad || !v || v === sociedad; };
+        const filtroFecha = function(f) {
+            if (!f) return true;
+            const d = new Date(f);
+            if (desde && d < new Date(desde)) return false;
+            if (hasta && d > new Date(hasta + 'T23:59:59')) return false;
+            return true;
+        };
+
+        // ── Hoja 1: Equipos etiquetados ───────────────────────────────────────
+        const equiposRows = (state.activos || [])
+            .filter(function(a) { return filtroSoc(a.sociedad); })
+            .map(function(a) { return {
+                'ID Etiqueta':    a.idEtiqueta || '',
+                'Tipo':           a.tipo || '',
+                'Modelo':         a.modelo || '',
+                'Nº Serie':       a.numSerie || '',
+                'Estado':         a.estado || '',
+                'Ubicación':      a.ubicacion || '',
+                'Sociedad':       a.sociedad || '',
+                'Asignado A':     a.asignadoA || '',
+                'Email Asignado': a.emailAsignadoA || '',
+                'Fecha Asignación': a.fechaAsignacion ? new Date(a.fechaAsignacion).toLocaleDateString('es-ES') : '',
+                'Proveedor':      a.proveedor || '',
+                'Nº Albarán':     a.numAlbaran || '',
+                'Fecha Compra':   a.fechaCompra ? new Date(a.fechaCompra).toLocaleDateString('es-ES') : '',
+                'Garantía hasta': a.fechaGarantia ? new Date(a.fechaGarantia).toLocaleDateString('es-ES') : '',
+                'Notas':          a.notas || '',
+            }; });
+        const wsEquipos = XLSX.utils.json_to_sheet(equiposRows.length ? equiposRows : [{ 'Sin datos': 'No hay equipos con estos filtros' }]);
+        // Ancho de columnas
+        wsEquipos['!cols'] = [14,14,18,16,12,16,10,20,26,16,16,14,13,14,30].map(function(w) { return { wch: w }; });
+        XLSX.utils.book_append_sheet(wb, wsEquipos, 'Equipos');
+
+        // ── Hoja 2: Inventario fungible ───────────────────────────────────────
+        const invRows = (state.inventory || []).map(function(i) { return {
+            'Nombre':       i.nombre || '',
+            'Categoría':    i.categoria || '',
+            'Cód. Barras':  i.barcode || '',
+            'Stock':        i.stock || 0,
+            'Stock Mínimo': i.stockMinimo || 0,
+            'Estado':       i.stock === 0 ? 'SIN STOCK' : i.stock <= i.stockMinimo ? 'BAJO' : 'OK',
+            'Ubicación':    i.ubicacion || '',
+        }; });
+        const wsInv = XLSX.utils.json_to_sheet(invRows.length ? invRows : [{ 'Sin datos': '' }]);
+        wsInv['!cols'] = [30,16,14,8,12,10,16].map(function(w) { return { wch: w }; });
+        XLSX.utils.book_append_sheet(wb, wsInv, 'Inventario');
+
+        // ── Hoja 3: Historial de movimientos ──────────────────────────────────
+        const histRows = (state.history || [])
+            .filter(function(h) { return filtroFecha(h.fecha); })
+            .sort(function(a, b) { return new Date(b.fecha) - new Date(a.fecha); })
+            .map(function(h) { return {
+                'Fecha':     h.fecha ? new Date(h.fecha).toLocaleDateString('es-ES') : '',
+                'Hora':      h.fecha ? new Date(h.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '',
+                'Tipo':      h.tipo || '',
+                'Producto':  h.producto || '',
+                'Cantidad':  h.cantidad || '',
+                'Técnico':   h.tecnico || '',
+                'Usuario':   h.usuario || '',
+                'Ticket':    h.ticket || '',
+                'ID Equipo': h.idEtiqueta || '',
+            }; });
+        const wsHist = XLSX.utils.json_to_sheet(histRows.length ? histRows : [{ 'Sin datos': 'No hay movimientos en este período' }]);
+        wsHist['!cols'] = [11,7,12,28,8,20,20,12,16].map(function(w) { return { wch: w }; });
+        XLSX.utils.book_append_sheet(wb, wsHist, 'Historial');
+
+        // ── Hoja 4: Asignaciones activas ──────────────────────────────────────
+        const asigRows = (state.assignments || [])
+            .filter(function(a) { return a.estado === 'Activo'; })
+            .map(function(a) { return {
+                'Empleado':     a.nombreEmpleado || '',
+                'Email':        a.emailEmpleado || '',
+                'Departamento': a.departamento || '',
+                'Puesto':       a.puesto || '',
+                'Tipo':         a.esPrestamo ? 'Préstamo' : 'Asignación',
+                'Estado':       a.estado || '',
+                'Fecha':        a.fechaAsignacion ? new Date(a.fechaAsignacion).toLocaleDateString('es-ES') : '',
+                'Técnico':      a.tecnicoResponsable || '',
+                'Material':     a.detalleProductos || '',
+                'Observaciones': a.observaciones || '',
+            }; });
+        const wsAsig = XLSX.utils.json_to_sheet(asigRows.length ? asigRows : [{ 'Sin datos': 'No hay asignaciones activas' }]);
+        wsAsig['!cols'] = [24,28,18,18,10,10,12,20,40,24].map(function(w) { return { wch: w }; });
+        XLSX.utils.book_append_sheet(wb, wsAsig, 'Asignaciones');
+
+        // ── Hoja 5: Resumen ejecutivo ─────────────────────────────────────────
+        const totalEquipos = equiposRows.length;
+        const asignados = equiposRows.filter(function(r) { return r['Estado'] === 'Asignado'; }).length;
+        const almacen   = equiposRows.filter(function(r) { return r['Estado'] === 'Almacen'; }).length;
+        const resumenData = [
+            { 'Concepto': 'RESUMEN EJECUTIVO IT', 'Valor': '', 'Detalle': 'Generado: ' + fechaHoy },
+            { 'Concepto': '', 'Valor': '', 'Detalle': '' },
+            { 'Concepto': '── EQUIPOS ──', 'Valor': '', 'Detalle': '' },
+            { 'Concepto': 'Total equipos etiquetados', 'Valor': totalEquipos, 'Detalle': '' },
+            { 'Concepto': 'Asignados a empleados', 'Valor': asignados, 'Detalle': Math.round(asignados / (totalEquipos || 1) * 100) + '%' },
+            { 'Concepto': 'En almacén', 'Valor': almacen, 'Detalle': '' },
+            { 'Concepto': 'Extraviados / Robados', 'Valor': equiposRows.filter(function(r) { return r['Estado'] === 'Extraviado' || r['Estado'] === 'Robado'; }).length, 'Detalle': '' },
+            { 'Concepto': '', 'Valor': '', 'Detalle': '' },
+            { 'Concepto': '── INVENTARIO ──', 'Valor': '', 'Detalle': '' },
+            { 'Concepto': 'Referencias de material', 'Valor': invRows.length, 'Detalle': '' },
+            { 'Concepto': 'Total unidades en stock', 'Valor': invRows.reduce(function(s, i) { return s + (i['Stock'] || 0); }, 0), 'Detalle': '' },
+            { 'Concepto': 'Productos sin stock', 'Valor': invRows.filter(function(i) { return i['Estado'] === 'SIN STOCK'; }).length, 'Detalle': '' },
+            { 'Concepto': 'Productos con stock bajo', 'Valor': invRows.filter(function(i) { return i['Estado'] === 'BAJO'; }).length, 'Detalle': '' },
+            { 'Concepto': '', 'Valor': '', 'Detalle': '' },
+            { 'Concepto': '── ACTIVIDAD ──', 'Valor': '', 'Detalle': '' },
+            { 'Concepto': 'Movimientos en período', 'Valor': histRows.length, 'Detalle': (desde || 'inicio') + ' → ' + (hasta || 'hoy') },
+            { 'Concepto': 'Asignaciones activas', 'Valor': asigRows.length, 'Detalle': '' },
+            { 'Concepto': 'Técnicos activos', 'Valor': (state.technicians || []).filter(function(t) { return t.activo; }).length, 'Detalle': '' },
+        ];
+        const wsResumen = XLSX.utils.json_to_sheet(resumenData);
+        wsResumen['!cols'] = [{ wch: 32 }, { wch: 10 }, { wch: 30 }];
+        XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
+
+        // ── Descargar ─────────────────────────────────────────────────────────
+        const filename = 'Auditoria_IT_' + (sociedad ? sociedad + '_' : '') + fechaHoy + '.xlsx';
+        XLSX.writeFile(wb, filename);
+        showToast('✅ Auditoría exportada — ' + filename, 'success');
     }
     // jsPDF usa Helvetica que no soporta caracteres latinos extendidos.
     // Esta función normaliza el texto para evitar caracteres corruptos en los PDFs.
@@ -3095,6 +3221,10 @@
             const [newModelo, setNewModelo] = useState('');
             const [newModeloTipo, setNewModeloTipo] = useState('');
             const [stockMinimoInput, setStockMinimoInput] = useState(String(state.stockMinimoDefault || 2));
+            // Export state
+            const [exportSoc, setExportSoc] = useState('');
+            const [exportDesde, setExportDesde] = useState('');
+            const [exportHasta, setExportHasta] = useState('');
             // Sociedades
             const [newSoc, setNewSoc] = useState({ nombre: '', codigo: '', pais: '' });
             const [editingSocId, setEditingSocId] = useState(null);
@@ -3358,6 +3488,60 @@
                 )
             );
 
+            const renderExportar = () => e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' } },
+                e('div', { style: { padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: '700', fontSize: '16px' } }, '📊 Exportar para Auditoría'),
+                e('div', { style: { padding: '24px' } },
+                    e('div', { style: { background: 'rgba(88,166,255,.07)', border: '1px solid rgba(88,166,255,.2)', borderRadius: '10px', padding: '14px 16px', marginBottom: '24px', fontSize: '13px', color: 'var(--accent-blue)', lineHeight: '1.6' } },
+                        '📁 Genera un archivo Excel con 5 pestañas: ', e('strong', null, 'Resumen ejecutivo'), ', ',
+                        e('strong', null, 'Equipos'), ', ', e('strong', null, 'Inventario'), ', ',
+                        e('strong', null, 'Historial'), ' y ', e('strong', null, 'Asignaciones activas'), '.'
+                    ),
+                    e('div', { className: 'form-row', style: { marginBottom: '16px' } },
+                        e('div', { className: 'form-group', style: { margin: 0 } },
+                            e('label', { className: 'form-label' }, 'Sociedad (opcional)'),
+                            e('select', { className: 'form-select', value: exportSoc, onChange: function(ev) { setExportSoc(ev.target.value); } },
+                                e('option', { value: '' }, 'Todas las sociedades'),
+                                (state.sociedades || []).filter(function(s) { return s.activo; }).map(function(s) {
+                                    return e('option', { key: s.id, value: s.nombre }, s.nombre);
+                                })
+                            )
+                        ),
+                        e('div', { className: 'form-group', style: { margin: 0 } },
+                            e('label', { className: 'form-label' }, 'Historial desde'),
+                            e('input', { type: 'date', className: 'form-input', value: exportDesde, onChange: function(ev) { setExportDesde(ev.target.value); } })
+                        ),
+                        e('div', { className: 'form-group', style: { margin: 0 } },
+                            e('label', { className: 'form-label' }, 'Historial hasta'),
+                            e('input', { type: 'date', className: 'form-input', value: exportHasta, onChange: function(ev) { setExportHasta(ev.target.value); } })
+                        )
+                    ),
+                    // Preview stats
+                    e('div', { style: { display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' } },
+                        [
+                            { label: 'Equipos', value: (state.activos || []).filter(function(a) { return !exportSoc || a.sociedad === exportSoc; }).length, color: '#58a6ff', icon: '💻' },
+                            { label: 'Inventario', value: (state.inventory || []).length, color: '#3fb950', icon: '📦' },
+                            { label: 'Movimientos', value: (state.history || []).filter(function(h) {
+                                if (exportDesde && new Date(h.fecha) < new Date(exportDesde)) return false;
+                                if (exportHasta && new Date(h.fecha) > new Date(exportHasta + 'T23:59:59')) return false;
+                                return true;
+                            }).length, color: '#a855f7', icon: '📜' },
+                            { label: 'Asignaciones', value: (state.assignments || []).filter(function(a) { return a.estado === 'Activo'; }).length, color: '#fbbf24', icon: '📋' },
+                        ].map(function(s, i) {
+                            return e('div', { key: i, style: { flex: 1, minWidth: '100px', background: 'var(--bg-secondary)', border: '1px solid ' + s.color + '33', borderRadius: '10px', padding: '14px 16px', textAlign: 'center' } },
+                                e('div', { style: { fontSize: '22px', marginBottom: '4px' } }, s.icon),
+                                e('div', { style: { fontSize: '24px', fontWeight: '800', fontFamily: 'IBM Plex Mono,monospace', color: s.color, lineHeight: 1 } }, s.value),
+                                e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', marginTop: '4px', textTransform: 'uppercase' } }, s.label)
+                            );
+                        })
+                    ),
+                    e('button', {
+                        className: 'button button-success',
+                        style: { width: '100%', fontSize: '16px', padding: '16px', gap: '10px' },
+                        onClick: function() { exportAuditoria(state, { sociedad: exportSoc || null, desde: exportDesde || null, hasta: exportHasta || null }); }
+                    }, '⬇️ Descargar Excel de Auditoría')
+                )
+            );
+
             const renderAjustes = () => card('⚙️ Ajustes Globales',
                 e('div', null,
                     e('div', { className: 'form-group' },
@@ -3516,6 +3700,7 @@
                         sectionBtn('tecnicos', 'Técnicos', '👤'),
                         sectionBtn('admins', 'Administradores', '🛡️'),
                         sectionBtn('ajustes', 'Ajustes', '⚙️'),
+                        sectionBtn('exportar', 'Exportar', '📊'),
                         sectionBtn('log', 'Log de Acciones', '📋')
                     ),
                     e('div', { style: { flex: 1, minWidth: '300px' } },
@@ -3527,6 +3712,7 @@
                         activeSection === 'tecnicos' && renderTecnicos(),
                         activeSection === 'admins' && renderAdmins(),
                         activeSection === 'ajustes' && renderAjustes(),
+                        activeSection === 'exportar' && renderExportar(),
                         activeSection === 'log' && e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' } },
                             e('div', { style: { padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: '700', fontSize: '16px' } }, '📋 Log de Acciones'),
                             e('div', { style: { padding: '20px' } },
