@@ -223,7 +223,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.7.1'
+        version: '2.7.2'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -2746,7 +2746,7 @@
         // EQUIPOS VIEW - v2.2.0
         // ==========================================
         function EquiposView({ state, onRefresh, initialFilter, deepLinkEquipo, onClearDeepLink }) {
-            const [view, setView] = useState('lista'); // 'lista' | 'pendientes' | 'recepcion'
+            const [view, setView] = useState('lista'); // 'lista' | 'pendientes' | 'recepcion' | 'scanner'
             const [search, setSearch] = useState('');
             const [filterTipo, setFilterTipo] = useState('all');
             const [filterEstado, setFilterEstado] = useState('all');
@@ -2757,6 +2757,11 @@
             // Inline N/S editing
             const [inlineNS, setInlineNS] = useState({});
             const [savingNS, setSavingNS] = useState({});
+            // Escáner continuo
+            const [scanLog, setScanLog] = useState([]);
+            const [scanCount, setScanCount] = useState(0);
+            const [scanLastId, setScanLastId] = useState('');
+            const [scanFlash, setScanFlash] = React.useState(false);
             // Cambiar estado
             const [cambioEstado, setCambioEstado] = useState(null); // { equipo, nuevoEstado }
             const [cambioMotivo, setCambioMotivo] = useState('');
@@ -2871,6 +2876,97 @@
                     showToast('✓ N/S guardado · Equipo listo para etiquetar', 'success');
                 } catch(err) { showToast('Error guardando N/S', 'error'); }
                 finally { setSavingNS(function(prev) { var n = Object.assign({}, prev); delete n[activo.id]; return n; }); }
+            };
+
+            // ---- Render: Escáner Rápido ----
+            const renderScannerRapido = function() {
+                // Al entrar en este modo, lanzar cámara en bucle
+                React.useEffect(function() {
+                    var active = true;
+                    function launchScanner() {
+                        if (!active) return;
+                        startBarcodeScanner(function(code) {
+                            if (!active) return;
+                            var id = code.trim().toUpperCase();
+                            // Extraer ID de etiqueta si viene como URL
+                            var urlMatch = id.match(/[?&]EQUIPO=([^&]+)/i);
+                            if (urlMatch) id = urlMatch[1];
+                            var activo = (state.activos || []).find(function(a) { return a.idEtiqueta === id; });
+                            var ts = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                            if (activo) {
+                                setScanLog(function(prev) { return [{ id, tipo: activo.tipo, modelo: activo.modelo, estado: activo.estado, ts, ok: true }].concat(prev).slice(0, 50); });
+                                setScanCount(function(n) { return n + 1; });
+                                setScanLastId(id);
+                                setScanFlash(true);
+                                setTimeout(function() { setScanFlash(false); }, 600);
+                            } else {
+                                setScanLog(function(prev) { return [{ id, tipo: '—', modelo: 'No encontrado en inventario', estado: '', ts, ok: false }].concat(prev).slice(0, 50); });
+                            }
+                            // Auto-relaunch after short delay
+                            setTimeout(function() { if (active) launchScanner(); }, 800);
+                        });
+                    }
+                    launchScanner();
+                    return function() { active = false; stopBarcodeScanner(); };
+                }, []);
+
+                return e('div', null,
+                    // Header con contador
+                    e('div', { style: {
+                        background: scanFlash ? 'rgba(63,185,80,.15)' : 'var(--bg-secondary)',
+                        border: '2px solid ' + (scanFlash ? 'var(--accent-green)' : 'var(--accent-purple)'),
+                        borderRadius: '16px', padding: '28px 32px', marginBottom: '20px',
+                        transition: 'all .3s ease', textAlign: 'center'
+                    } },
+                        e('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' } }, '⚡ Modo Escáner Rápido — Activo'),
+                        e('div', { style: { display: 'flex', justifyContent: 'center', gap: '48px', flexWrap: 'wrap' } },
+                            e('div', { style: { textAlign: 'center' } },
+                                e('div', { style: { fontSize: '56px', fontWeight: '800', fontFamily: 'IBM Plex Mono,monospace', color: 'var(--accent-green)', lineHeight: 1 } }, scanCount),
+                                e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', marginTop: '6px' } }, 'Escaneados')
+                            ),
+                            scanLastId && e('div', { style: { textAlign: 'center' } },
+                                e('div', { style: { fontSize: '22px', fontWeight: '800', fontFamily: 'IBM Plex Mono,monospace', color: 'var(--accent-blue)', lineHeight: 1 } }, scanLastId),
+                                e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', marginTop: '6px' } }, 'Último escaneado')
+                            )
+                        ),
+                        e('div', { style: { marginTop: '16px', fontSize: '13px', color: 'var(--text-secondary)' } }, '📷 Apunta la cámara al QR o código de barras — se registra automáticamente')
+                    ),
+
+                    // Log de escaneos
+                    scanLog.length > 0 && e('div', { style: { background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' } },
+                        e('div', { style: { padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                            e('span', { style: { fontWeight: '700', fontSize: '14px' } }, '📋 Registro de sesión'),
+                            e('button', { onClick: function() { setScanLog([]); setScanCount(0); setScanLastId(''); },
+                                style: { background: 'none', border: 'none', color: 'var(--accent-red)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' } }, 'Limpiar')
+                        ),
+                        e('div', { style: { maxHeight: '420px', overflowY: 'auto' } },
+                            scanLog.map(function(entry, i) {
+                                return e('div', { key: i, style: {
+                                    display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 20px',
+                                    borderBottom: '1px solid var(--border)',
+                                    background: i === 0 ? (entry.ok ? 'rgba(63,185,80,.05)' : 'rgba(239,68,68,.05)') : 'transparent',
+                                    transition: 'background .3s'
+                                } },
+                                    e('div', { style: { width: '26px', height: '26px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px',
+                                        background: entry.ok ? 'rgba(63,185,80,.15)' : 'rgba(239,68,68,.15)', flexShrink: 0 } }, entry.ok ? '✅' : '❌'),
+                                    e('div', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', fontWeight: '700', color: entry.ok ? 'var(--accent-green)' : 'var(--accent-red)', minWidth: '160px' } }, entry.id),
+                                    e('div', { style: { flex: 1 } },
+                                        e('div', { style: { fontSize: '13px', fontWeight: '600' } }, entry.tipo + (entry.modelo ? ' · ' + entry.modelo : '')),
+                                        entry.estado && e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' } }, 'Estado: ' + entry.estado)
+                                    ),
+                                    e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'IBM Plex Mono,monospace', flexShrink: 0 } }, entry.ts)
+                                );
+                            })
+                        )
+                    ),
+
+                    // Botón exportar log si hay entradas
+                    scanLog.length > 0 && e('div', { style: { marginTop: '12px', display: 'flex', gap: '12px', justifyContent: 'flex-end' } },
+                        e('button', { className: 'button button-secondary', onClick: function() {
+                            exportToCSV(scanLog.map(function(e) { return { 'ID': e.id, 'Tipo': e.tipo, 'Modelo': e.modelo, 'Estado': e.estado, 'Hora': e.ts, 'Resultado': e.ok ? 'OK' : 'No encontrado' }; }), 'scan_session');
+                        } }, '⬇️ Exportar log CSV')
+                    )
+                );
             };
 
             // ---- Render: Recepción en lote ----
@@ -3031,12 +3127,15 @@
                         }, '⚠️ Pendientes N/S (' + pendientes.length + ')'),
                         view === 'pendientes' && e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, '← Volver a lista'),
                         view === 'recepcion' && e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, '← Volver a lista'),
+                        view === 'scanner' && e('button', { className: 'button button-secondary', onClick: function() { stopBarcodeScanner(); setView('lista'); } }, '← Salir del escáner'),
+                        view === 'lista' && e('button', { className: 'button button-purple', onClick: function() { setScanLog([]); setScanCount(0); setScanLastId(''); setView('scanner'); } }, '⚡ Modo Escáner Rápido'),
                         view === 'lista' && e('button', { className: 'button button-primary', onClick: function() { setView('recepcion'); } }, '+ Recepción de lote')
                     )
                 ),
                 // Contenido según vista
                 view === 'recepcion' ? renderRecepcion() :
                 view === 'pendientes' ? renderPendientes() :
+                view === 'scanner' ? renderScannerRapido() :
                 filtered.length > 0 ? e('table', { className: 'history-table' },
                     e('thead', null, e('tr', null,
                         e('th', { style: { width: '165px' } }, 'ID Interno'),
