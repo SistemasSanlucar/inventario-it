@@ -222,7 +222,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.5.10'
+        version: '2.7.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -672,60 +672,34 @@
     const DYMO_URL = 'https://127.0.0.1:41951';
     const DYMO_PRINTER = 'DYMO LabelWriter 550';
 
-    async function buildDymoLabelXml(activo) {
-        // Obtener el XML base de DYMO para la etiqueta cargada actualmente
-        // Garantiza PaperName y dimensiones exactos para la etiqueta instalada
-        let paperName = '11356 Name Badge';
-        let drawW = 2325, drawH = 5045; // 41mm x 89mm portrait en twips
-        try {
-            const resp = await fetch(DYMO_URL + '/dcd/api/get-default-label/LabelWriterPrinter');
-            if (resp.ok) {
-                const data = await resp.json();
-                const rv = data.responseValue || {};
-                console.log('responseValue type:', typeof data.responseValue, '| stringify:', JSON.stringify(data.responseValue).slice(0,300));
-                const pmMatch = labelXml.match(/<PaperName>([^<]+)<\/PaperName>/);
-                if (pmMatch && pmMatch[1]) {
-                    paperName = pmMatch[1];
-                } else if (rv.name) {
-                    // rv.name = "Address30251" → PaperName = "30251 Address"
-                    const nameMatch = rv.name.match(/([A-Za-z]+)(\d+)/);
-                    if (nameMatch) paperName = nameMatch[2] + ' ' + nameMatch[1];
-                    else paperName = rv.name;
-                }
-                const rrMatch = labelXml.match(/Width="(\d+)"\s+Height="(\d+)"/);
-                if (rrMatch) { drawW = parseInt(rrMatch[1]); drawH = parseInt(rrMatch[2]); }
-                console.log('DYMO PaperName:', paperName, 'drawW:', drawW, 'drawH:', drawH);
-            }
-        } catch(e) { console.warn('get-default-label falló, usando fallback:', e.message); }
+    // Carga el framework JS de DYMO desde localhost (una sola vez)
+    let _dymoFrameworkLoaded = false;
+    async function loadDymoFramework() {
+        if (_dymoFrameworkLoaded) return;
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = DYMO_URL + '/DYMO/DLS/Printing/Label.framework.js';
+            script.onload = () => { _dymoFrameworkLoaded = true; resolve(); };
+            script.onerror = () => reject(new Error('No se pudo cargar el framework DYMO'));
+            document.head.appendChild(script);
+        });
+    }
 
-        // Dimensiones en landscape:
-        // drawW = lado corto (41mm=2325), drawH = lado largo (89mm=5045)
-        // QR izquierda, texto derecha
-        const QR_W = Math.round(drawW * 0.93); // casi toda la altura disponible
-        const QR_X = 50, QR_Y = 50;
-        const TX = Math.round(drawH * 0.43); // texto arranca al 43% del ancho
-        const TW = drawH - TX - 80; // ancho disponible texto
-
+    function buildDymoLabelXmlStatic(activo) {
+        // DYMO 11356 Name Badge 89x41mm landscape
+        // Twips: 89mm=5045 (ancho/largo), 41mm=2325 (alto/corto)
+        const W = 5045, H = 2325;
         const qrUrl = window.location.href.split('?')[0].split('#')[0] + '?equipo=' + activo.idEtiqueta;
         const id     = safePdfText(activo.idEtiqueta);
         const tipo   = safePdfText(activo.tipo);
-        const modelo = activo.modelo  ? safePdfText(activo.modelo)  : '';
+        const modelo = activo.modelo   ? safePdfText(activo.modelo)   : '';
         const ns     = activo.numSerie ? 'N/S: ' + safePdfText(activo.numSerie) : '';
         const soc    = activo.sociedad ? safePdfText(activo.sociedad) : '';
-
-        // Distribución vertical del texto (H=2325):
-        // Y=60  → EMPRESA (altura 220)
-        // Y=320 → ID (altura 420)
-        // Y=780 → TIPO (altura 360)
-        // Y=1180→ MODELO (altura 320)
-        // Y=1540→ N/S (altura 300)
-        // Y=1880→ SOCIEDAD (altura 260)
-
-        const txt = (name, str, x, y, w, h, size, bold, r, g, b) => !str ? '' : `
+        const TX = 2250, TW = 2700;
+        const t = (name, str, y, h, size, bold, r, g, b) => !str ? '' : `
   <ObjectInfo>
     <TextObject>
-      <n>${name}</n>
-      <ForeColor Alpha="255" Red="${r}" Green="${g}" Blue="${b}"/>
+      <n>${name}</n><ForeColor Alpha="255" Red="${r}" Green="${g}" Blue="${b}"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
       <LinkedObjectName></LinkedObjectName><Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored><IsVariable>False</IsVariable>
@@ -736,52 +710,57 @@
         <ForeColor Alpha="255" Red="${r}" Green="${g}" Blue="${b}"/>
       </Attributes></Element></StyledText>
     </TextObject>
-    <Bounds X="${x}" Y="${y}" Width="${w}" Height="${h}"/>
+    <Bounds X="${TX}" Y="${y}" Width="${TW}" Height="${h}"/>
   </ObjectInfo>`;
-
         return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Landscape</PaperOrientation>
   <Id>NameBadge</Id>
-  <PaperName>${paperName}</PaperName>
-  <DrawCommands><RoundRectangle X="0" Y="0" Width="${drawW}" Height="${drawH}" Rx="180" Ry="180"/></DrawCommands>
+  <PaperName>11356 Name Badge</PaperName>
+  <DrawCommands><RoundRectangle X="0" Y="0" Width="${W}" Height="${H}" Rx="180" Ry="180"/></DrawCommands>
   <ObjectInfo>
     <BarcodeObject>
-      <n>QR</n>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <n>QR</n><ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
       <LinkedObjectName></LinkedObjectName><Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored><IsVariable>False</IsVariable>
-      <Text>${qrUrl}</Text><Type>QRCode</Type><Size>Large</Size>
-      <TextPosition>None</TextPosition>
+      <Text>${qrUrl}</Text><Type>QRCode</Type><Size>Large</Size><TextPosition>None</TextPosition>
       <TextFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
       <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
       <BarcodeFormat>0</BarcodeFormat><AspectRatio>0</AspectRatio>
     </BarcodeObject>
-    <Bounds X="${QR_X}" Y="${QR_Y}" Width="${QR_W}" Height="${QR_W}"/>
+    <Bounds X="60" Y="60" Width="2100" Height="2200"/>
   </ObjectInfo>
-  ${txt('EMPRESA', 'SANLUCAR FRUIT · IT', TX, 80,  TW, 200, 7,  'False', 130,130,130)}
-  ${txt('ID',      id,                   TX, 310, TW, 380, 9,  'True',  0,  0,  0  )}
-  ${txt('TIPO',    tipo,                 TX, 730, TW, 320, 8,  'True',  30, 30, 30 )}
-  ${txt('MODELO',  modelo,               TX, 1090,TW, 290, 7,  'False', 70, 70, 70 )}
-  ${txt('NS',      ns,                   TX, 1420,TW, 270, 6.5,'False', 100,100,100)}
-  ${txt('SOC',     soc,                  TX, 1730,TW, 240, 6,  'False', 150,150,150)}
+  ${t('EMPRESA','SANLUCAR FRUIT · IT',80, 200,7,  'False',130,130,130)}
+  ${t('ID',     id,                        310,360,9,  'True', 0,  0,  0  )}
+  ${t('TIPO',   tipo,                      710,300,8,  'True', 30, 30, 30 )}
+  ${t('MODELO', modelo,                    1050,270,7, 'False',70, 70, 70 )}
+  ${t('NS',     ns,                        1360,250,6.5,'False',100,100,100)}
+  ${t('SOC',    soc,                       1650,230,6, 'False',150,150,150)}
 </DieCutLabel>`;
     }
+
     async function printDymoLabel(activo) {
-        const labelXml = await buildDymoLabelXml(activo);
+        const labelXml = buildDymoLabelXmlStatic(activo);
+        // Intentar framework JS de DYMO primero
+        try {
+            await loadDymoFramework();
+            if (window.dymo && window.dymo.label && window.dymo.label.framework) {
+                const label = window.dymo.label.framework.openLabelXml(labelXml);
+                label.print(DYMO_PRINTER);
+                return true;
+            }
+        } catch(e) { console.warn('DYMO framework no disponible, usando API REST:', e.message); }
+        // Fallback: API REST
         const body = JSON.stringify({ printerName: DYMO_PRINTER, labelXml: labelXml, copies: 1 });
         const resp = await fetch(DYMO_URL + '/dcd/api/print-label', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: body
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: body
         });
-        if (!resp.ok) throw new Error('DYMO error: ' + resp.status);
-        const data = await resp.json();
-        if (!data.status) throw new Error('DYMO rechazó la impresión: ' + (data.error || ''));
+        const text = await resp.text();
+        let data; try { data = JSON.parse(text); } catch(e) { data = { status: resp.ok }; }
+        if (!resp.ok || data.status === false) throw new Error('DYMO error ' + resp.status + ': ' + (data.error || text.slice(0,200)));
         return true;
     }
-
     let _dymoprinting = false;
     async function exportEtiquetaPDF(activos) {
         if (_dymoprinting) return;
@@ -970,126 +949,361 @@
 
         // ---- Dashboard ----
         function Dashboard({ state, onNavigate }) {
+            const [counters, setCounters] = React.useState({ equipos: 0, asignados: 0, almacen: 0, movHoy: 0, unidades: 0 });
+            const [animDone, setAnimDone] = React.useState(false);
+            const [hoveredSeg, setHoveredSeg] = React.useState(null);
             const hoy = new Date(); hoy.setHours(0,0,0,0);
-            const prestamosVencidos = state.assignments.filter(a => { if (!a.esPrestamo || a.estado !== 'Activo') return false; const f = new Date(a.fechaAsignacion); f.setHours(0,0,0,0); return f < hoy; });
-            const stats = {
-                totalProductos: state.inventory.length,
-                totalUnidades: state.inventory.reduce((s,i) => s + i.stock, 0),
+
+            // ── Stats ─────────────────────────────────────────────
+            const equiposAll = state.activos || [];
+            const eq = {
+                total: equiposAll.length,
+                almacen: equiposAll.filter(a => a.estado === 'Almacen').length,
+                asignado: equiposAll.filter(a => a.estado === 'Asignado').length,
+                pendiente: equiposAll.filter(a => a.estado === 'Pendiente').length,
+                transito: equiposAll.filter(a => a.estado === 'Transito').length,
+                reparacion: equiposAll.filter(a => a.estado === 'Reparacion').length,
+                extraviado: equiposAll.filter(a => a.estado === 'Extraviado').length,
+                robado: equiposAll.filter(a => a.estado === 'Robado').length,
+                baja: equiposAll.filter(a => a.estado === 'Baja').length,
+            };
+            const inv = {
+                total: state.inventory.length,
+                unidades: state.inventory.reduce((s, i) => s + (i.stock || 0), 0),
                 stockBajo: state.inventory.filter(i => i.stock > 0 && i.stock <= i.stockMinimo).length,
                 sinStock: state.inventory.filter(i => i.stock === 0).length,
-                movimientosHoy: state.history.filter(h => new Date(h.fecha).toDateString() === new Date().toDateString()).length,
-                tecnicosActivos: state.technicians.filter(t => t.activo).length,
-                prestamosActivos: state.assignments.filter(a => a.esPrestamo && a.estado === 'Activo').length
             };
-            const equiposStats = {
-                total: (state.activos || []).length,
-                almacen: (state.activos || []).filter(a => a.estado === 'Almacen').length,
-                asignados: (state.activos || []).filter(a => a.estado === 'Asignado').length,
-                pendientes: (state.activos || []).filter(a => a.estado === 'Pendiente').length,
-                reparacion: (state.activos || []).filter(a => a.estado === 'Reparacion').length,
-                transito: (state.activos || []).filter(a => a.estado === 'Transito').length,
-                extraviado: (state.activos || []).filter(a => a.estado === 'Extraviado').length,
-                robado: (state.activos || []).filter(a => a.estado === 'Robado').length
-            };
+            const movHoy = state.history.filter(h => new Date(h.fecha).toDateString() === new Date().toDateString()).length;
+            const prestamosVencidos = state.assignments.filter(a => a.esPrestamo && a.estado === 'Activo' && new Date(a.fechaAsignacion) < hoy);
 
-            const statCard = function(label, value, color, onClick) {
+            // ── Alertas ───────────────────────────────────────────
+            const alertas = [];
+            if (inv.sinStock > 0)            alertas.push({ tipo:'error',   icon:'📦', msg: inv.sinStock + ' producto(s) sin stock',         nav:() => onNavigate('inventario',{ tipo:'sinStock'}) });
+            if (inv.stockBajo > 0)           alertas.push({ tipo:'warning', icon:'⚠️', msg: inv.stockBajo + ' producto(s) con stock bajo',    nav:() => onNavigate('inventario',{ tipo:'stockBajo'}) });
+            if (eq.pendiente > 0)            alertas.push({ tipo:'warning', icon:'🔖', msg: eq.pendiente + ' equipo(s) sin número de serie',  nav:() => onNavigate('equipos',{ estado:'Pendiente'}) });
+            if (prestamosVencidos.length > 0) alertas.push({ tipo:'error',  icon:'⏰', msg: prestamosVencidos.length + ' préstamo(s) vencido(s)', nav:() => onNavigate('asignaciones',{ tipo:'prestamo', estado:'vencido'}) });
+            if (eq.extraviado > 0)           alertas.push({ tipo:'error',   icon:'🔍', msg: eq.extraviado + ' equipo(s) extraviado(s)',       nav:() => onNavigate('equipos',{ estado:'Extraviado'}) });
+            if (eq.transito > 0)             alertas.push({ tipo:'warning', icon:'🚚', msg: eq.transito + ' equipo(s) en tránsito',           nav:() => onNavigate('equipos',{ estado:'Transito'}) });
+
+            // ── Health score ──────────────────────────────────────
+            let health = 100;
+            health -= inv.sinStock * 10;
+            health -= inv.stockBajo * 3;
+            health -= eq.extraviado * 15;
+            health -= eq.robado * 15;
+            health -= prestamosVencidos.length * 5;
+            health = Math.max(0, Math.min(100, health));
+            const healthColor = health >= 80 ? '#3fb950' : health >= 55 ? '#fbbf24' : '#ef4444';
+            const healthLabel = health >= 80 ? 'Óptimo' : health >= 55 ? 'Atención' : 'Crítico';
+
+            // ── Animated counters ─────────────────────────────────
+            React.useEffect(function() {
+                if (animDone) return;
+                const targets = { equipos: eq.total, asignados: eq.asignado, almacen: eq.almacen, movHoy, unidades: inv.unidades };
+                const steps = 45, duration = 1200;
+                let step = 0;
+                const timer = setInterval(function() {
+                    step++;
+                    const ease = 1 - Math.pow(1 - step / steps, 3);
+                    setCounters({
+                        equipos:   Math.round(targets.equipos * ease),
+                        asignados: Math.round(targets.asignados * ease),
+                        almacen:   Math.round(targets.almacen * ease),
+                        movHoy:    Math.round(targets.movHoy * ease),
+                        unidades:  Math.round(targets.unidades * ease),
+                    });
+                    if (step >= steps) { clearInterval(timer); setAnimDone(true); }
+                }, duration / steps);
+                return function() { clearInterval(timer); };
+            }, []);
+
+            // ── Donut chart ───────────────────────────────────────
+            const donutSegs = [
+                { label:'Almacén',   value: eq.almacen,    color:'#3fb950' },
+                { label:'Asignado',  value: eq.asignado,   color:'#58a6ff' },
+                { label:'Pendiente', value: eq.pendiente,  color:'#f97316' },
+                { label:'Tránsito',  value: eq.transito,   color:'#fbbf24' },
+                { label:'Reparación',value: eq.reparacion, color:'#a855f7' },
+                { label:'Extraviado',value: eq.extraviado, color:'#ef4444' },
+                { label:'Robado',    value: eq.robado,     color:'#dc2626' },
+                { label:'Baja',      value: eq.baja,       color:'#6b7280' },
+            ].filter(function(s) { return s.value > 0; });
+            const donutTotal = donutSegs.reduce(function(s, seg) { return s + seg.value; }, 0) || 1;
+            const r = 60, CX = 80, CY = 80;
+            const circ = 2 * Math.PI * r;
+            let acc = 0;
+            const donutPaths = donutSegs.map(function(seg) {
+                const pct = seg.value / donutTotal;
+                const arcLen = pct * circ;
+                const dashArray = arcLen + ' ' + (circ - arcLen);
+                const dashOffset = circ * 0.25 - acc;
+                acc += arcLen;
+                return Object.assign({}, seg, { dashArray, dashOffset });
+            });
+
+            // ── Last 7 days activity ──────────────────────────────
+            const last7 = [];
+            for (var di = 6; di >= 0; di--) {
+                var d = new Date(); d.setDate(d.getDate() - di); d.setHours(0,0,0,0);
+                var next = new Date(d); next.setDate(next.getDate() + 1);
+                var cnt = state.history.filter(function(h) { var hd = new Date(h.fecha); return hd >= d && hd < next; }).length;
+                last7.push({ label: di === 0 ? 'Hoy' : ['D','L','M','X','J','V','S'][d.getDay()], count: cnt, isToday: di === 0 });
+            }
+            const maxDay = Math.max.apply(null, last7.map(function(d) { return d.count; }).concat([1]));
+
+            // ── Top técnicos this month ───────────────────────────
+            const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+            const techAct = state.technicians.filter(function(t) { return t.activo; }).map(function(t) {
+                return { nombre: t.nombre.split(' ')[0], count: state.history.filter(function(h) { return h.tecnico === t.nombre && new Date(h.fecha) >= monthStart; }).length };
+            }).sort(function(a,b) { return b.count - a.count; }).slice(0,5);
+            const maxTech = Math.max.apply(null, techAct.map(function(t) { return t.count; }).concat([1]));
+
+            // ── Recent history ────────────────────────────────────
+            const recentH = state.history.slice().sort(function(a,b) { return new Date(b.fecha) - new Date(a.fecha); }).slice(0,6);
+
+            // ── Hero KPI card ─────────────────────────────────────
+            const kpi = function(label, value, color, icon, onClick, sub) {
                 return e('div', {
                     onClick: onClick || null,
-                    style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px', cursor: onClick ? 'pointer' : 'default', transition: 'all .15s', border: '1px solid transparent' },
-                    onMouseEnter: onClick ? function(ev) { ev.currentTarget.style.borderColor = color; ev.currentTarget.style.transform = 'translateY(-1px)'; } : null,
-                    onMouseLeave: onClick ? function(ev) { ev.currentTarget.style.borderColor = 'transparent'; ev.currentTarget.style.transform = ''; } : null
+                    style: {
+                        background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
+                        border: '1px solid ' + color + '33',
+                        borderRadius: '16px', padding: '22px 18px',
+                        cursor: onClick ? 'pointer' : 'default',
+                        transition: 'all .2s ease', position: 'relative', overflow: 'hidden', flex: 1, minWidth: '130px',
+                    },
+                    onMouseEnter: onClick ? function(ev) { ev.currentTarget.style.transform='translateY(-4px)'; ev.currentTarget.style.boxShadow='0 16px 40px '+color+'22'; ev.currentTarget.style.borderColor=color+'88'; } : null,
+                    onMouseLeave: onClick ? function(ev) { ev.currentTarget.style.transform=''; ev.currentTarget.style.boxShadow=''; ev.currentTarget.style.borderColor=color+'33'; } : null,
                 },
-                    e('span', { style: { color: 'var(--text-secondary)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' } }, onClick ? '🔗 ' : '', label),
-                    e('span', { style: { color, fontSize: '18px', fontWeight: '700', fontFamily: 'IBM Plex Mono,monospace' } }, value)
+                    e('div', { style:{ position:'absolute', top:'-15px', right:'-15px', width:'70px', height:'70px', borderRadius:'50%', background:color+'18', filter:'blur(16px)' } }),
+                    e('div', { style:{ fontSize:'26px', marginBottom:'6px' } }, icon),
+                    e('div', { style:{ fontSize:'34px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color, lineHeight:1, marginBottom:'5px' } }, value),
+                    e('div', { style:{ fontSize:'11px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px' } }, label),
+                    sub && e('div', { style:{ fontSize:'11px', color:color+'99', marginTop:'4px', fontWeight:'600' } }, sub)
                 );
             };
 
-            return e('div', null,
-                // Alerta préstamos vencidos
-                prestamosVencidos.length > 0 && e('div', { style: { background: 'rgba(239,68,68,.15)', border: '2px solid var(--accent-red)', borderRadius: '12px', padding: '20px', marginBottom: '24px', animation: 'pulse 2s infinite' } },
-                    e('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' } },
-                        e('div', { style: { fontSize: '40px' } }, '⚠️'),
-                        e('div', { style: { flex: 1 } },
-                            e('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--accent-red)', marginBottom: '4px' } }, prestamosVencidos.length + ' PRÉSTAMO' + (prestamosVencidos.length > 1 ? 'S' : '') + ' VENCIDO' + (prestamosVencidos.length > 1 ? 'S' : '')),
-                            e('div', { style: { fontSize: '14px', color: 'var(--text-secondary)' } }, 'Material pendiente de devolución desde ayer o antes')
+            // ── Section card wrapper ──────────────────────────────
+            const card = function(children, extraStyle) {
+                return e('div', { style: Object.assign({ background:'var(--bg-secondary)', border:'1px solid var(--border)', borderRadius:'16px', padding:'24px' }, extraStyle || {}) }, children);
+            };
+            const cardTitle = function(text) {
+                return e('div', { style:{ fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'20px' } }, text);
+            };
+
+            return e('div', { style:{ display:'flex', flexDirection:'column', gap:'24px' } },
+
+                // ── Header ──────────────────────────────────────────
+                e('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'16px' } },
+                    e('div', null,
+                        e('h2', { style:{ fontSize:'26px', fontWeight:'800', marginBottom:'4px', background:'linear-gradient(135deg, var(--text-primary), var(--text-secondary))', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' } }, '🎛️ Mission Control'),
+                        e('div', { style:{ fontSize:'13px', color:'var(--text-secondary)' } }, 'Última sincronización: ' + (state.lastSync ? state.lastSync.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : '—'))
+                    ),
+                    // Health badge
+                    e('div', { style:{ display:'flex', alignItems:'center', gap:'16px', background:'var(--bg-secondary)', border:'2px solid '+healthColor+'44', borderRadius:'16px', padding:'14px 20px' } },
+                        e('div', { style:{ textAlign:'center' } },
+                            e('div', { style:{ fontSize:'10px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'3px' } }, 'Estado General'),
+                            e('div', { style:{ fontSize:'30px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color:healthColor, lineHeight:1 } }, health + '%'),
+                            e('div', { style:{ fontSize:'11px', fontWeight:'700', color:healthColor, marginTop:'2px' } }, healthLabel)
                         ),
-                        e('button', { className: 'button button-danger', onClick: function() { onNavigate('asignaciones', { tipo: 'prestamo', estado: 'vencido' }); } }, 'Ver préstamos vencidos')
+                        e('div', { style:{ width:'8px', height:'56px', background:'var(--bg-primary)', borderRadius:'4px', overflow:'hidden', position:'relative' } },
+                            e('div', { style:{ position:'absolute', bottom:0, width:'100%', height:health+'%', background:healthColor, borderRadius:'4px', transition:'height 1.2s ease' } })
+                        )
                     )
                 ),
-                e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' } },
-                    e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, '📊 Dashboard'),
-                    e('button', { className: 'button button-success', onClick: () => exportToCSV(state.inventory, 'inventario_completo') }, 'Exportar Inventario')
+
+                // ── Hero KPIs ────────────────────────────────────────
+                e('div', { style:{ display:'flex', gap:'14px', flexWrap:'wrap' } },
+                    kpi('Equipos', counters.equipos, '#58a6ff', '💻', function() { onNavigate('equipos', {}); }, eq.total + ' etiquetados'),
+                    kpi('Asignados', counters.asignados, '#3fb950', '✅', function() { onNavigate('equipos', { estado:'Asignado' }); }, Math.round(eq.asignado/(eq.total||1)*100)+'% del total'),
+                    kpi('En Almacén', counters.almacen, '#a855f7', '🏪', function() { onNavigate('equipos', { estado:'Almacen' }); }, 'disponibles'),
+                    kpi('Unidades', counters.unidades, '#fbbf24', '📦', function() { onNavigate('inventario', {}); }, inv.total + ' referencias'),
+                    kpi('Hoy', counters.movHoy, alertas.length > 0 ? '#f97316' : '#3fb950', alertas.length > 0 ? '🚨' : '⚡', null, alertas.length > 0 ? alertas.length + ' alerta(s)' : 'sin alertas')
                 ),
-                e('div', { className: 'dashboard-grid' },
-                    // Inventario fungible
-                    e('div', { className: 'dashboard-card' },
-                        e('h3', null, '📦 Inventario Fungible'),
-                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-                            statCard('Total Productos', stats.totalProductos, 'var(--accent-blue)'),
-                            statCard('Total Unidades', stats.totalUnidades, 'var(--accent-green)'),
-                            statCard('Stock Bajo', stats.stockBajo, 'var(--accent-orange)', stats.stockBajo > 0 ? function() { onNavigate('inventario', { tipo: 'stockBajo' }); } : null),
-                            statCard('Sin Stock', stats.sinStock, 'var(--accent-red)', stats.sinStock > 0 ? function() { onNavigate('inventario', { tipo: 'sinStock' }); } : null)
-                        )
-                    ),
-                    // Actividad
-                    e('div', { className: 'dashboard-card' },
-                        e('h3', null, '📋 Actividad'),
-                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-                            statCard('Movimientos Hoy', stats.movimientosHoy, 'var(--accent-purple)', stats.movimientosHoy > 0 ? function() { onNavigate('historial', { tipo: 'hoy' }); } : null),
-                            statCard('Total Movimientos', state.history.length, 'var(--accent-blue)', state.history.length > 0 ? function() { onNavigate('historial', {}); } : null),
-                            statCard('Técnicos Activos', stats.tecnicosActivos, 'var(--accent-green)'),
-                            statCard('Préstamos Activos', stats.prestamosActivos, 'var(--accent-orange)', stats.prestamosActivos > 0 ? function() { onNavigate('asignaciones', { tipo: 'prestamo', estado: 'Activo' }); } : null)
-                        )
-                    ),
-                    // Equipos etiquetados
-                    e('div', { className: 'dashboard-card' },
-                        e('h3', null, '💻 Equipos con Etiqueta'),
-                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-                            statCard('Total Equipos', equiposStats.total, 'var(--accent-blue)', equiposStats.total > 0 ? function() { onNavigate('equipos', {}); } : null),
-                            statCard('En Almacén', equiposStats.almacen, 'var(--accent-green)', equiposStats.almacen > 0 ? function() { onNavigate('equipos', { estado: 'Almacen' }); } : null),
-                            statCard('Asignados', equiposStats.asignados, 'var(--accent-blue)', equiposStats.asignados > 0 ? function() { onNavigate('equipos', { estado: 'Asignado' }); } : null),
-                            equiposStats.pendientes > 0 && statCard('⚠️ Pendientes N/S', equiposStats.pendientes, 'var(--accent-orange)', function() { onNavigate('equipos', { estado: 'Pendiente' }); })
-                        )
-                    ),
-                    // Equipos - situación crítica
-                    (equiposStats.reparacion + equiposStats.transito + equiposStats.extraviado + equiposStats.robado) > 0 && e('div', { className: 'dashboard-card' },
-                        e('h3', null, '🚨 Situaciones Especiales'),
-                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-                            equiposStats.reparacion > 0 && statCard('En Reparación', equiposStats.reparacion, 'var(--accent-purple)', function() { onNavigate('equipos', { estado: 'Reparacion' }); }),
-                            equiposStats.transito > 0 && statCard('En Tránsito', equiposStats.transito, 'var(--accent-yellow)', function() { onNavigate('equipos', { estado: 'Transito' }); }),
-                            equiposStats.extraviado > 0 && statCard('Extraviados', equiposStats.extraviado, 'var(--accent-red)', function() { onNavigate('equipos', { estado: 'Extraviado' }); }),
-                            equiposStats.robado > 0 && statCard('Robados', equiposStats.robado, 'var(--accent-red)', function() { onNavigate('equipos', { estado: 'Robado' }); })
-                        )
-                    ),
-                    // Top 5 productos
-                    e('div', { className: 'dashboard-card' },
-                        e('h3', null, 'Top 5 Productos'),
-                        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-                            state.inventory.map(item => ({ ...item, count: state.history.filter(h => h.producto === item.nombre && h.tipo === 'Salida').length })).sort((a,b) => b.count - a.count).slice(0,5).map((item, idx) =>
-                                e('div', { key: item.id, style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                    e('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, (idx+1) + '. ' + item.nombre),
-                                    e('span', { style: { color: 'var(--accent-yellow)', fontSize: '18px', fontWeight: '700', fontFamily: 'IBM Plex Mono,monospace' } }, item.count)
+
+                // ── Charts row ───────────────────────────────────────
+                e('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'18px' } },
+
+                    // Donut — equipos por estado
+                    card(e('div', null,
+                        cardTitle('💻 Equipos por Estado'),
+                        eq.total > 0 ? e('div', { style:{ display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap' } },
+                            e('div', { style:{ position:'relative', flexShrink:0 } },
+                                e('svg', { width:'160', height:'160', viewBox:'0 0 160 160' },
+                                    e('circle', { cx:CX, cy:CY, r, fill:'none', stroke:'var(--bg-primary)', strokeWidth:'16' }),
+                                    donutPaths.map(function(seg, i) {
+                                        return e('circle', { key:i, cx:CX, cy:CY, r, fill:'none', stroke:seg.color,
+                                            strokeWidth: hoveredSeg === i ? 22 : 16,
+                                            strokeDasharray: seg.dashArray, strokeDashoffset: seg.dashOffset,
+                                            style:{ transition:'stroke-width .2s ease', cursor:'pointer' },
+                                            onMouseEnter: function() { setHoveredSeg(i); },
+                                            onMouseLeave: function() { setHoveredSeg(null); }
+                                        });
+                                    })
+                                ),
+                                e('div', { style:{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', textAlign:'center', pointerEvents:'none' } },
+                                    hoveredSeg !== null && donutPaths[hoveredSeg] ?
+                                        e('div', null,
+                                            e('div', { style:{ fontSize:'22px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color:donutPaths[hoveredSeg].color, lineHeight:1 } }, donutPaths[hoveredSeg].value),
+                                            e('div', { style:{ fontSize:'9px', color:'var(--text-secondary)', fontWeight:'700', marginTop:'2px' } }, donutPaths[hoveredSeg].label.toUpperCase())
+                                        ) :
+                                        e('div', null,
+                                            e('div', { style:{ fontSize:'26px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color:'var(--text-primary)', lineHeight:1 } }, eq.total),
+                                            e('div', { style:{ fontSize:'9px', color:'var(--text-secondary)', fontWeight:'700', marginTop:'2px' } }, 'TOTAL')
+                                        )
                                 )
+                            ),
+                            e('div', { style:{ display:'flex', flexDirection:'column', gap:'6px', flex:1 } },
+                                donutPaths.map(function(seg, i) {
+                                    return e('div', { key:i, style:{ display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', padding:'4px 8px', borderRadius:'6px', background: hoveredSeg===i ? seg.color+'18' : 'transparent', transition:'background .15s' },
+                                        onMouseEnter: function() { setHoveredSeg(i); }, onMouseLeave: function() { setHoveredSeg(null); } },
+                                        e('div', { style:{ width:'8px', height:'8px', borderRadius:'50%', background:seg.color, flexShrink:0 } }),
+                                        e('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', flex:1 } }, seg.label),
+                                        e('div', { style:{ fontSize:'13px', fontWeight:'700', fontFamily:'IBM Plex Mono,monospace', color:seg.color } }, seg.value)
+                                    );
+                                })
                             )
+                        ) : e('div', { style:{ textAlign:'center', padding:'40px', color:'var(--text-secondary)' } }, 'Sin equipos registrados')
+                    )),
+
+                    // Bar chart — actividad 7 días
+                    card(e('div', null,
+                        cardTitle('⚡ Actividad — Últimos 7 días'),
+                        e('div', { style:{ display:'flex', flexDirection:'column', gap:'9px' } },
+                            last7.map(function(day, i) {
+                                var pct = day.count / maxDay * 100;
+                                var color = day.isToday ? '#58a6ff' : '#58a6ff55';
+                                return e('div', { key:i, style:{ display:'flex', alignItems:'center', gap:'10px' } },
+                                    e('div', { style:{ width:'28px', fontSize:'10px', color: day.isToday ? '#58a6ff' : 'var(--text-secondary)', fontWeight:'700', textAlign:'right', flexShrink:0 } }, day.label),
+                                    e('div', { style:{ flex:1, height:'22px', background:'var(--bg-primary)', borderRadius:'6px', overflow:'hidden' } },
+                                        e('div', { style:{ height:'100%', width: Math.max(pct, day.count > 0 ? 3 : 0)+'%', background: day.isToday ? 'linear-gradient(90deg,#58a6ff,#a855f7)' : 'linear-gradient(90deg,#58a6ff33,#58a6ff66)', borderRadius:'6px', transition:'width 1s ease' } })
+                                    ),
+                                    e('div', { style:{ width:'22px', fontSize:'12px', fontWeight:'700', fontFamily:'IBM Plex Mono,monospace', color: day.isToday ? '#58a6ff' : 'var(--text-secondary)', textAlign:'right' } }, day.count)
+                                );
+                            })
+                        ),
+                        e('div', { style:{ marginTop:'14px', paddingTop:'14px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' } },
+                            e('span', { style:{ fontSize:'12px', color:'var(--text-secondary)' } }, 'Total semana'),
+                            e('span', { style:{ fontSize:'18px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color:'#58a6ff' } }, last7.reduce(function(s,d) { return s+d.count; }, 0))
                         )
-                    ),
-                    // Productos críticos
-                    e('div', { className: 'dashboard-card' },
-                        e('h3', null, 'Productos Críticos'),
-                        state.inventory.filter(i => i.stock > 0 && i.stock <= i.stockMinimo).length > 0 ?
-                            e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-                                state.inventory.filter(i => i.stock > 0 && i.stock <= i.stockMinimo).slice(0,5).map(item =>
-                                    e('div', { key: item.id, style: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' } },
-                                        e('span', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, item.nombre),
-                                        e('span', { style: { color: 'var(--accent-orange)', fontSize: '18px', fontWeight: '700', fontFamily: 'IBM Plex Mono,monospace' } }, item.stock + '/' + item.stockMinimo)
-                                    )
-                                )
+                    )),
+
+                    // Alertas
+                    card(e('div', null,
+                        cardTitle('🚨 Alertas Activas'),
+                        alertas.length === 0 ?
+                            e('div', { style:{ textAlign:'center', padding:'28px 0' } },
+                                e('div', { style:{ fontSize:'44px', marginBottom:'10px' } }, '✅'),
+                                e('div', { style:{ color:'#3fb950', fontWeight:'700', fontSize:'15px' } }, 'Todo en orden'),
+                                e('div', { style:{ color:'var(--text-secondary)', fontSize:'12px', marginTop:'4px' } }, 'No hay alertas activas')
                             ) :
-                            e('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' } }, '✓ Todo el stock está en niveles óptimos')
-                    )
+                            e('div', { style:{ display:'flex', flexDirection:'column', gap:'8px' } },
+                                alertas.map(function(a, i) {
+                                    var col = a.tipo==='error' ? '#ef4444' : '#f97316';
+                                    return e('div', { key:i, onClick:a.nav, style:{ display:'flex', alignItems:'center', gap:'10px', padding:'11px 13px', background:col+'0d', border:'1px solid '+col+'33', borderRadius:'10px', cursor:'pointer', transition:'all .15s' },
+                                        onMouseEnter: function(ev) { ev.currentTarget.style.transform='translateX(4px)'; ev.currentTarget.style.borderColor=col+'66'; },
+                                        onMouseLeave: function(ev) { ev.currentTarget.style.transform=''; ev.currentTarget.style.borderColor=col+'33'; }
+                                    },
+                                        e('span', { style:{ fontSize:'18px' } }, a.icon),
+                                        e('span', { style:{ fontSize:'13px', fontWeight:'600', color:col, flex:1 } }, a.msg),
+                                        e('span', { style:{ color:'var(--text-secondary)', fontSize:'14px', fontWeight:'700' } }, '→')
+                                    );
+                                })
+                            )
+                    ), { border: '1px solid ' + (alertas.length > 0 ? '#ef444433' : '#3fb95033') })
+                ),
+
+                // ── Bottom row ───────────────────────────────────────
+                e('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px, 1fr))', gap:'18px' } },
+
+                    // Top técnicos
+                    card(e('div', null,
+                        cardTitle('🏆 Top Técnicos — Este Mes'),
+                        techAct.length === 0 ?
+                            e('div', { style:{ textAlign:'center', padding:'20px', color:'var(--text-secondary)', fontSize:'13px' } }, 'Sin actividad este mes') :
+                            e('div', { style:{ display:'flex', flexDirection:'column', gap:'12px' } },
+                                techAct.map(function(t, i) {
+                                    var medals = ['🥇','🥈','🥉'];
+                                    var barColors = ['linear-gradient(90deg,#fbbf24,#f97316)', 'linear-gradient(90deg,#9ca3af,#6b7280)', 'linear-gradient(90deg,#cd7c2f,#92400e)', 'linear-gradient(90deg,#58a6ff,#3b82f6)', 'linear-gradient(90deg,#3fb950,#16a34a)'];
+                                    var labelColor = ['#fbbf24','#9ca3af','#cd7c2f','#58a6ff','#3fb950'];
+                                    return e('div', { key:i, style:{ display:'flex', alignItems:'center', gap:'10px' } },
+                                        e('div', { style:{ width:'26px', height:'26px', borderRadius:'50%', background:'var(--bg-primary)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', flexShrink:0 } }, i < 3 ? medals[i] : i+1),
+                                        e('div', { style:{ flex:1 } },
+                                            e('div', { style:{ fontSize:'13px', fontWeight:'600', marginBottom:'5px', color:'var(--text-primary)' } }, t.nombre),
+                                            e('div', { style:{ height:'5px', background:'var(--bg-primary)', borderRadius:'3px', overflow:'hidden' } },
+                                                e('div', { style:{ height:'100%', width:(t.count/maxTech*100)+'%', background:barColors[i], borderRadius:'3px', transition:'width 1s ease' } })
+                                            )
+                                        ),
+                                        e('div', { style:{ fontSize:'14px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color:labelColor[i], minWidth:'28px', textAlign:'right' } }, t.count)
+                                    );
+                                })
+                            )
+                    )),
+
+                    // Historial reciente
+                    card(e('div', null,
+                        e('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' } },
+                            e('div', { style:{ fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px' } }, '📜 Actividad Reciente'),
+                            e('button', { onClick: function() { onNavigate('historial', {}); }, style:{ background:'none', border:'none', color:'#58a6ff', fontSize:'12px', fontWeight:'700', cursor:'pointer' } }, 'Ver todo →')
+                        ),
+                        recentH.length === 0 ?
+                            e('div', { style:{ textAlign:'center', padding:'20px', color:'var(--text-secondary)', fontSize:'13px' } }, 'Sin movimientos registrados') :
+                            e('div', { style:{ display:'flex', flexDirection:'column' } },
+                                recentH.map(function(mov, i) {
+                                    var tCol = { 'Entrada':'#3fb950', 'Salida':'#ef4444', 'Asignacion':'#58a6ff', 'Devolucion':'#a855f7', 'Prestamo':'#fbbf24' }[mov.tipo] || 'var(--text-secondary)';
+                                    var tIcon = { 'Entrada':'↑', 'Salida':'↓', 'Asignacion':'→', 'Devolucion':'←', 'Prestamo':'⏱' }[mov.tipo] || '•';
+                                    return e('div', { key:i, style:{ display:'flex', alignItems:'center', gap:'10px', padding:'9px 0', borderBottom: i<recentH.length-1 ? '1px solid var(--border)' : 'none' } },
+                                        e('div', { style:{ width:'26px', height:'26px', borderRadius:'7px', background:tCol+'1a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', color:tCol, fontWeight:'700', flexShrink:0 } }, tIcon),
+                                        e('div', { style:{ flex:1, minWidth:0 } },
+                                            e('div', { style:{ fontSize:'12px', fontWeight:'600', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, mov.producto),
+                                            e('div', { style:{ fontSize:'10px', color:'var(--text-secondary)', marginTop:'1px' } }, mov.tecnico || '—')
+                                        ),
+                                        e('div', { style:{ textAlign:'right', flexShrink:0 } },
+                                            e('div', { style:{ fontSize:'10px', fontWeight:'700', color:tCol } }, mov.tipo),
+                                            e('div', { style:{ fontSize:'10px', color:'var(--text-secondary)', marginTop:'1px' } }, new Date(mov.fecha).toLocaleDateString('es-ES', { day:'2-digit', month:'2-digit' }))
+                                        )
+                                    );
+                                })
+                            )
+                    )),
+
+                    // Stock crítico
+                    card(e('div', null,
+                        e('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' } },
+                            e('div', { style:{ fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px' } }, '📦 Stock Crítico'),
+                            e('button', { onClick: function() { onNavigate('inventario', { tipo:'stockBajo' }); }, style:{ background:'none', border:'none', color:'#58a6ff', fontSize:'12px', fontWeight:'700', cursor:'pointer' } }, 'Ver todo →')
+                        ),
+                        inv.stockBajo === 0 && inv.sinStock === 0 ?
+                            e('div', { style:{ textAlign:'center', padding:'28px 0' } },
+                                e('div', { style:{ fontSize:'40px', marginBottom:'8px' } }, '✅'),
+                                e('div', { style:{ color:'#3fb950', fontWeight:'700', fontSize:'14px' } }, 'Stock en niveles óptimos')
+                            ) :
+                            e('div', { style:{ display:'flex', flexDirection:'column', gap:'9px' } },
+                                state.inventory
+                                    .filter(function(i) { return i.stock === 0 || i.stock <= i.stockMinimo; })
+                                    .sort(function(a,b) { return (a.stock/(a.stockMinimo||1)) - (b.stock/(b.stockMinimo||1)); })
+                                    .slice(0,5)
+                                    .map(function(item, i) {
+                                        var sinStock = item.stock === 0;
+                                        var pct = Math.min(100, Math.round(item.stock / (item.stockMinimo||1) * 100));
+                                        var col = sinStock ? '#ef4444' : '#f97316';
+                                        return e('div', { key:i, style:{ padding:'10px 12px', background:col+'0d', border:'1px solid '+col+'33', borderRadius:'8px' } },
+                                            e('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' } },
+                                                e('span', { style:{ fontSize:'12px', fontWeight:'600', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'68%' } }, item.nombre),
+                                                e('span', { style:{ fontSize:'12px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color:col, flexShrink:0 } }, sinStock ? '🔴 AGOTADO' : item.stock+'/'+item.stockMinimo)
+                                            ),
+                                            e('div', { style:{ height:'4px', background:'var(--bg-primary)', borderRadius:'2px', overflow:'hidden' } },
+                                                e('div', { style:{ height:'100%', width:pct+'%', background:col, borderRadius:'2px', transition:'width 1s ease' } })
+                                            )
+                                        );
+                                    })
+                            )
+                    ))
                 )
             );
         }
+
+
 
         // ---- InventoryView ----
         function InventoryView({ state, onRefresh, onOpenModal, initialFilter }) {
