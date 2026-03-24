@@ -212,7 +212,8 @@
                 catalogo: 'StockControl_Catalogo',
                 ubicaciones: 'StockControl_Ubicaciones',
                 activos: 'StockControl_Activos',
-                sociedades: 'StockControl_Sociedades'
+                sociedades: 'StockControl_Sociedades',
+                proveedores: 'StockControl_Proveedores'
             }
         },
         msal: {
@@ -221,7 +222,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.3.0'
+        version: '2.4.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -317,7 +318,7 @@
         constructor(graphClient) { this.graph = graphClient; }
         async loadAllData() {
             try {
-                const [inventario, tecnicos, historial, admins, asignaciones, catalogo, ubicacionesRaw, activosRaw, sociedadesRaw] = await Promise.all([
+                const [inventario, tecnicos, historial, admins, asignaciones, catalogo, ubicacionesRaw, activosRaw, sociedadesRaw, proveedoresRaw] = await Promise.all([
                     this.graph.getListItems(CONFIG.sharepoint.lists.inventario),
                     this.graph.getListItems(CONFIG.sharepoint.lists.tecnicos),
                     this.graph.getListItems(CONFIG.sharepoint.lists.historial),
@@ -326,11 +327,12 @@
                     this.graph.getListItems(CONFIG.sharepoint.lists.catalogo).catch(() => []),
                     this.graph.getListItems(CONFIG.sharepoint.lists.ubicaciones).catch(() => []),
                     this.graph.getListItems(CONFIG.sharepoint.lists.activos).catch(() => []),
-                    this.graph.getListItems(CONFIG.sharepoint.lists.sociedades).catch(() => [])
+                    this.graph.getListItems(CONFIG.sharepoint.lists.sociedades).catch(() => []),
+                    this.graph.getListItems(CONFIG.sharepoint.lists.proveedores).catch(() => [])
                 ]);
-                // Catálogo: modelos por tipo + metadatos del tipo (LlevaEtiqueta)
                 const catalogoProcessed = {};
-                const catalogoTipos = {}; // tipo -> { llevaEtiqueta }
+                const catalogoTipos = {};
+                const catalogoAccesorios = {}; // tipo+modelo -> accesorios string
                 catalogo.forEach(item => {
                     const tipo = item.Title, modelo = item.Modelo;
                     const activo = item.Activo !== 'No' && item.Activo !== false;
@@ -340,6 +342,7 @@
                     if (activo && tipo && modelo) {
                         if (!catalogoProcessed[tipo]) catalogoProcessed[tipo] = [];
                         catalogoProcessed[tipo].push(modelo);
+                        if (item.Accesorios) catalogoAccesorios[tipo + '|' + modelo] = item.Accesorios;
                     }
                 });
                 return {
@@ -347,9 +350,10 @@
                     technicians: tecnicos.map(item => ({ id: item.sharePointId, nombre: item.NombreTecnico || item.Title, codigo: item.CodigoTecnico, email: item.Email, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })),
                     history: historial.map(item => ({ id: item.sharePointId, fecha: item.FechaHora || item.Created, tipo: item.TipoMovimiento, producto: item.Producto, cantidad: parseInt(item.Cantidad) || 0, ticket: item.Ticket || '', usuario: item.Usuario || '', tecnico: item.Tecnico || '', firma: item.Firma || null, idEtiqueta: item.IDEtiqueta || '', motivo: item.MotivoIncidencia || '' })).sort((a,b) => new Date(b.fecha) - new Date(a.fecha)),
                     assignments: asignaciones.map(item => ({ id: item.sharePointId, nombreEmpleado: item.NombreEmpleado, emailEmpleado: item.EmailEmpleado, departamento: item.Departamento, puesto: item.Puesto, fechaIncorporacion: item.FechaIncorporacion, productosAsignados: JSON.parse(item.ProductosAsignados || '[]'), cantidadProductos: parseInt(item.CantidadProductos) || 0, firmaEmpleado: item.FirmaEmpleado, tecnicoResponsable: item.TecnicoResponsable, fechaAsignacion: item.FechaAsignacion, estado: item.Estado, observaciones: item.Observaciones || '', esPrestamo: item.EsPrestamo === 'Si' })).sort((a,b) => new Date(b.fechaAsignacion) - new Date(a.fechaAsignacion)),
-                    activos: activosRaw.map(item => ({ id: item.sharePointId, idEtiqueta: item.IDEtiqueta || '', tipo: item.TipoMaterial || '', modelo: item.ModeloMaterial || '', estado: item.EstadoActivo || 'Almacen', ubicacion: item.UbicacionActivo || '', numSerie: item.NumSerie || '', notas: item.Notas || '', sociedad: item.Sociedad || '', asignadoA: item.AsignadoA || '', emailAsignadoA: item.EmailAsignadoA || '', fechaAsignacion: item.FechaAsignacion || null, transitoDestino: item.TransitoDestino || '', motivoIncidencia: item.MotivoIncidencia || '' })),
+                    activos: activosRaw.map(item => ({ id: item.sharePointId, idEtiqueta: item.IDEtiqueta || '', tipo: item.TipoMaterial || '', modelo: item.ModeloMaterial || '', estado: item.EstadoActivo || 'Almacen', ubicacion: item.UbicacionActivo || '', numSerie: item.NumSerie || '', notas: item.Notas || '', sociedad: item.Sociedad || '', asignadoA: item.AsignadoA || '', emailAsignadoA: item.EmailAsignadoA || '', fechaAsignacion: item.FechaAsignacion || null, transitoDestino: item.TransitoDestino || '', motivoIncidencia: item.MotivoIncidencia || '', proveedor: item.Proveedor || '', numAlbaran: item.NumAlbaran || '', fechaCompra: item.FechaCompra || null, fechaGarantia: item.FechaGarantia || null, accesorios: item.Accesorios || '' })),
                     sociedades: sociedadesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, codigo: (item.Codigo || '').toUpperCase(), pais: item.Pais || '', activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })).sort((a,b) => a.nombre.localeCompare(b.nombre)),
-                    admins, catalogo: catalogoProcessed, catalogoTipos,
+                    proveedores: proveedoresRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, contacto: item.Contacto || '', email: item.Email || '', telefono: item.Telefono || '', activo: item.Activo === true || item.Activo === 'Yes' || item.Activo === 'Si' })).filter(p => p.activo).sort((a,b) => a.nombre.localeCompare(b.nombre)),
+                    admins, catalogo: catalogoProcessed, catalogoTipos, catalogoAccesorios,
                     ubicaciones: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })).filter(u => u.activo).sort((a,b) => a.nombre.localeCompare(b.nombre)),
                     ubicacionesAll: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })),
                     adminsAll: admins.map(item => ({ id: item.sharePointId, email: item.Email, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' }))
@@ -447,27 +451,45 @@
             await this.graph.updateListItem(CONFIG.sharepoint.lists.activos, itemId, { EstadoActivo: estado, UbicacionActivo: ubicacion || '' });
         }
         async updateActivoNS(itemId, numSerie) {
-            // Al añadir N/S, el equipo pasa automáticamente de Pendiente → Almacen
             await this.graph.updateListItem(CONFIG.sharepoint.lists.activos, itemId, { NumSerie: numSerie, EstadoActivo: 'Almacen' });
         }
+        async updateActivoAccesorios(itemId, accesorios) {
+            await this.graph.updateListItem(CONFIG.sharepoint.lists.activos, itemId, { Accesorios: accesorios });
+        }
+        async updateCatalogAccesorios(itemId, accesorios) {
+            await this.graph.updateListItem(CONFIG.sharepoint.lists.catalogo, itemId, { Accesorios: accesorios });
+        }
         async deleteActivo(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.activos, itemId); }
+        // PROVEEDORES CRUD
+        async createProveedor(data) { return await this.graph.createListItem(CONFIG.sharepoint.lists.proveedores, { Title: data.nombre, Contacto: data.contacto || '', Email: data.email || '', Telefono: data.telefono || '', Activo: true }); }
+        async updateProveedor(itemId, data) { await this.graph.updateListItem(CONFIG.sharepoint.lists.proveedores, itemId, { Title: data.nombre, Contacto: data.contacto || '', Email: data.email || '', Telefono: data.telefono || '' }); }
+        async toggleProveedor(itemId, activo) { await this.graph.updateListItem(CONFIG.sharepoint.lists.proveedores, itemId, { Activo: !activo }); }
+        async deleteProveedor(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.proveedores, itemId); }
         async createAssignment(data) {
             const titulo = data.esPrestamo ? 'Prestamo - ' + data.nombreEmpleado : 'Asignacion - ' + data.nombreEmpleado + ' - ' + new Date().toLocaleDateString('es-ES');
-            const detalleProductos = (data.productosAsignados || []).map((p, i) => (i + 1) + '. ' + p.nombre + ' (Cod: ' + p.barcode + ')').join('\n');
-            return await this.graph.createListItem(CONFIG.sharepoint.lists.asignaciones, { Title: titulo, NombreEmpleado: data.nombreEmpleado, EmailEmpleado: data.emailEmpleado, Departamento: data.departamento, Puesto: data.puesto, FechaIncorporacion: data.fechaIncorporacion, ProductosAsignados: JSON.stringify(data.productosAsignados), CantidadProductos: data.productosAsignados.length, FirmaEmpleado: data.firmaEmpleado, TecnicoResponsable: data.tecnicoResponsable, FechaAsignacion: new Date().toISOString(), Estado: 'Activo', Observaciones: data.observaciones || '', EsPrestamo: data.esPrestamo ? 'Si' : 'No', DetalleProductos: detalleProductos, Foto1: data.foto1 || '', Foto2: data.foto2 || '', Foto3: data.foto3 || '' });
+            const todosProductos = (data.productosAsignados || []).concat(data.equiposAsignados || []);
+            const detalleProductos = todosProductos.map((p, i) => (i + 1) + '. ' + p.nombre + ' (Cod: ' + (p.barcode || p.idEtiqueta || '') + ')').join('\n');
+            return await this.graph.createListItem(CONFIG.sharepoint.lists.asignaciones, { Title: titulo, NombreEmpleado: data.nombreEmpleado, EmailEmpleado: data.emailEmpleado, Departamento: data.departamento, Puesto: data.puesto, FechaIncorporacion: data.fechaIncorporacion, ProductosAsignados: JSON.stringify(todosProductos), CantidadProductos: todosProductos.length, FirmaEmpleado: data.firmaEmpleado, TecnicoResponsable: data.tecnicoResponsable, FechaAsignacion: new Date().toISOString(), Estado: 'Activo', Observaciones: data.observaciones || '', EsPrestamo: data.esPrestamo ? 'Si' : 'No', DetalleProductos: detalleProductos, Foto1: '', Foto2: '', Foto3: '' });
         }
         async updateAssignmentStatus(itemId, nuevoEstado) { await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, itemId, { Estado: nuevoEstado }); }
         async deleteAssignment(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.asignaciones, itemId); }
         async searchUsers(searchTerm) { return await this.graph.searchUsers(searchTerm); }
-        async returnMaterial(assignmentId, returnedProducts, allProducts, observaciones, tecnico, inventoryData) {
+        async returnMaterial(assignmentId, returnedProducts, allProducts, observaciones, tecnico, inventoryData, activosData) {
             const fullyReturned = returnedProducts.length === allProducts.length;
             const newState = fullyReturned ? 'Devuelto' : 'Parcial';
             await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, assignmentId, { Estado: newState, Observaciones: observaciones });
             for (const prod of returnedProducts) {
-                // Resuelve en cliente con los datos ya cargados — sin llamadas extra a la API
-                const inventoryItem = (inventoryData || []).find(i => i.barcode === prod.barcode);
-                if (inventoryItem) await this.graph.updateListItem(CONFIG.sharepoint.lists.inventario, inventoryItem.id, { Stock: (inventoryItem.stock || 0) + 1 });
-                await this.graph.createListItem(CONFIG.sharepoint.lists.historial, { Title: 'Devolucion - ' + prod.nombre, TipoMovimiento: 'Devolucion', Producto: prod.nombre, Cantidad: 1, Usuario: '', Tecnico: tecnico, FechaHora: new Date().toISOString() });
+                if (prod.esEquipo) {
+                    // Equipo etiquetado — vuelve a Almacén
+                    const activo = (activosData || []).find(a => a.idEtiqueta === prod.idEtiqueta);
+                    if (activo) await this.cambiarEstadoActivo(activo.id, 'Almacen', {});
+                    await this.addToHistory({ tipo: 'Devolucion', producto: prod.nombre, cantidad: 1, usuario: '', tecnico, idEtiqueta: prod.idEtiqueta || '' });
+                } else {
+                    // Material fungible — devuelve al stock
+                    const inventoryItem = (inventoryData || []).find(i => i.barcode === prod.barcode);
+                    if (inventoryItem) await this.graph.updateListItem(CONFIG.sharepoint.lists.inventario, inventoryItem.id, { Stock: (inventoryItem.stock || 0) + 1 });
+                    await this.addToHistory({ tipo: 'Devolucion', producto: prod.nombre, cantidad: 1, usuario: '', tecnico });
+                }
             }
             return newState;
         }
@@ -1348,6 +1370,9 @@
             const [salidaUserResults, setSalidaUserResults] = useState([]);
             const [salidaUserLoading, setSalidaUserLoading] = useState(false);
             const [selectedProducts, setSelectedProducts] = useState([]);
+            const [selectedEquipos, setSelectedEquipos] = useState([]);
+            const [equipoInput, setEquipoInput] = useState('');
+            const [equipoError, setEquipoError] = useState('');
             const [barcodeInput, setBarcodeInput] = useState('');
             const [barcodeError, setBarcodeError] = useState('');
             const [returnSelections, setReturnSelections] = useState({});
@@ -1604,20 +1629,30 @@
 
                     } else if (modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo') {
                         if (!formData.nombreEmpleado.trim()) { showToast('Selecciona un empleado', 'error'); setLoading(false); return; }
-                        if (selectedProducts.length === 0) { showToast('Añade al menos un producto', 'error'); setLoading(false); return; }
+                        const totalItems = selectedProducts.length + selectedEquipos.length;
+                        if (totalItems === 0) { showToast('Añade al menos un producto o equipo', 'error'); setLoading(false); return; }
+                        // Material fungible — descuenta stock
                         for (var i = 0; i < selectedProducts.length; i++) {
                             const prod = selectedProducts[i];
                             const invItem = state.inventory.find(function(inv) { return inv.id === prod.id; });
                             if (invItem) await dataManager.updateInventoryItem(invItem.id, { Stock: invItem.stock - 1 });
                             await dataManager.addToHistory({ tipo: formData.esPrestamo ? 'Prestamo' : 'Asignacion', producto: prod.nombre, cantidad: 1, ticket: '', usuario: formData.nombreEmpleado, tecnico: tecnicoActual, firma: signature || '' });
                         }
-                        await dataManager.createAssignment({ nombreEmpleado: formData.nombreEmpleado, emailEmpleado: formData.emailEmpleado, departamento: formData.departamento, puesto: formData.puesto, fechaIncorporacion: formData.fechaIncorporacion, productosAsignados: selectedProducts, firmaEmpleado: signature || '', tecnicoResponsable: tecnicoActual, observaciones: formData.observaciones, esPrestamo: formData.esPrestamo, foto1: '', foto2: '', foto3: '' });
+                        // Equipos etiquetados — cambia estado a Asignado
+                        for (var j = 0; j < selectedEquipos.length; j++) {
+                            const eq = selectedEquipos[j];
+                            await dataManager.cambiarEstadoActivo(eq.id, 'Asignado', { asignadoA: formData.nombreEmpleado, emailAsignadoA: formData.emailEmpleado, fechaAsignacion: new Date().toISOString() });
+                            await dataManager.addToHistory({ tipo: formData.esPrestamo ? 'Prestamo' : 'Asignacion', producto: eq.nombre, cantidad: 1, ticket: '', usuario: formData.nombreEmpleado, tecnico: tecnicoActual, firma: signature || '', idEtiqueta: eq.idEtiqueta });
+                        }
+                        // Crea la asignación con todos los items
+                        const equiposParaAsignacion = selectedEquipos.map(function(eq) { return { nombre: eq.nombre, idEtiqueta: eq.idEtiqueta, esEquipo: true }; });
+                        await dataManager.createAssignment({ nombreEmpleado: formData.nombreEmpleado, emailEmpleado: formData.emailEmpleado, departamento: formData.departamento, puesto: formData.puesto, fechaIncorporacion: formData.fechaIncorporacion, productosAsignados: selectedProducts, equiposAsignados: equiposParaAsignacion, firmaEmpleado: signature || '', tecnicoResponsable: tecnicoActual, observaciones: formData.observaciones, esPrestamo: formData.esPrestamo });
                         showToast(formData.esPrestamo ? 'Préstamo registrado' : 'Asignación creada', 'success');
 
                     } else if (modalType === 'devolver-material') {
-                        const toReturn = (selectedItem.productosAsignados || []).filter(function(p) { return returnSelections[p.barcode]; });
+                        const toReturn = (selectedItem.productosAsignados || []).filter(function(p) { return returnSelections[p.barcode || p.idEtiqueta]; });
                         if (toReturn.length === 0) { showToast('Selecciona al menos un producto', 'warning'); setLoading(false); return; }
-                        await dataManager.returnMaterial(selectedItem.id, toReturn, selectedItem.productosAsignados || [], formData.observaciones || '', tecnicoActual, state.inventory);
+                        await dataManager.returnMaterial(selectedItem.id, toReturn, selectedItem.productosAsignados || [], formData.observaciones || '', tecnicoActual, state.inventory, state.activos);
                         showToast('Devolución registrada: ' + toReturn.length + ' producto(s)', 'success');
                     }
 
@@ -1849,6 +1884,17 @@
                 }
                 // ASIGNACION / PRESTAMO
                 if (modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo') {
+                    // addEquipoById: busca en activos por ID de etiqueta
+                    const addEquipoById = function(id) {
+                        const idClean = (id || '').trim().toUpperCase();
+                        if (!idClean) return;
+                        const activo = (state.activos || []).find(function(a) { return a.idEtiqueta === idClean; });
+                        if (!activo) { setEquipoError('ID no encontrado: ' + idClean); return; }
+                        if (activo.estado !== 'Almacen') { setEquipoError('Equipo no disponible (estado: ' + activo.estado + ')'); return; }
+                        if (selectedEquipos.find(function(e) { return e.idEtiqueta === idClean; })) { setEquipoError('Equipo ya añadido'); return; }
+                        setSelectedEquipos(function(prev) { return prev.concat([{ id: activo.id, idEtiqueta: activo.idEtiqueta, nombre: activo.tipo + ' - ' + activo.modelo, tipo: activo.tipo, modelo: activo.modelo, esEquipo: true }]); });
+                        setEquipoInput(''); setEquipoError('');
+                    };
                     return e('div', null,
                         tecnicoBanner(),
                         formData.esPrestamo ? e('div', { className: 'info-banner orange' }, '⏱️ PRÉSTAMO: Este material debe ser devuelto hoy.') : null,
@@ -1865,22 +1911,42 @@
                             ),
                             fld('Fecha incorporacion', e('input', { type: 'date', className: 'form-input', value: formData.fechaIncorporacion, onChange: function(ev) { upd('fechaIncorporacion', ev.target.value); } }))
                         ) : null,
-                        e('div', { style: { marginBottom: '8px' } }, e('label', { className: 'form-label' }, 'Productos', e('span', { className: 'required-asterisk' }, ' *'))),
-                        // Grid de productos fungibles (toca para añadir)
-                        productsGrid(),
-                        // Separador para material etiquetado
-                        e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', margin: '12px 0' } },
-                            e('div', { style: { flex: 1, height: '1px', background: 'var(--border)' } }),
-                            e('span', { style: { fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' } }, '🏷️ Material con etiqueta — escanea o escribe el ID'),
-                            e('div', { style: { flex: 1, height: '1px', background: 'var(--border)' } })
+                        // SECCIÓN 1: Equipos con etiqueta
+                        e('div', { style: { marginBottom: '16px' } },
+                            e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' } },
+                                e('div', { style: { flex: 1, height: '1px', background: 'var(--border)' } }),
+                                e('span', { style: { fontSize: '12px', color: 'var(--accent-blue)', whiteSpace: 'nowrap', fontWeight: '700', textTransform: 'uppercase' } }, '💻 Equipos con etiqueta'),
+                                e('div', { style: { flex: 1, height: '1px', background: 'var(--border)' } })
+                            ),
+                            e('div', { style: { display: 'flex', gap: '8px', marginBottom: '6px' } },
+                                e('input', { type: 'text', className: 'form-input', value: equipoInput, placeholder: 'ID etiqueta (SLF-26-XXXXXXXX) — escribe o escanea QR', style: { flex: 1, fontFamily: 'IBM Plex Mono,monospace', textTransform: 'uppercase' }, onChange: function(ev) { setEquipoInput(ev.target.value.toUpperCase()); setEquipoError(''); }, onKeyDown: function(ev) { if (ev.key === 'Enter') { ev.preventDefault(); addEquipoById(equipoInput); } } }),
+                                e('button', { type: 'button', className: 'button button-primary', onClick: function() { startBarcodeScanner(function(code) { addEquipoById(code); }); } }, '📷'),
+                                e('button', { type: 'button', className: 'button button-success', onClick: function() { addEquipoById(equipoInput); } }, '+ Añadir')
+                            ),
+                            equipoError ? e('div', { style: { color: 'var(--accent-red)', fontSize: '13px', marginBottom: '6px' } }, '⚠️ ' + equipoError) : null,
+                            selectedEquipos.length > 0 && e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '8px', padding: '10px', marginBottom: '8px', border: '2px solid var(--accent-blue)' } },
+                                selectedEquipos.map(function(eq, idx) {
+                                    return e('div', { key: eq.idEtiqueta, className: 'product-row-assigned' },
+                                        e('div', null,
+                                            e('span', { style: { fontWeight: '600', marginRight: '8px' } }, (idx + 1) + '. ' + eq.nombre),
+                                            e('span', { style: { color: 'var(--accent-blue)', fontSize: '11px', fontFamily: 'IBM Plex Mono,monospace' } }, eq.idEtiqueta)
+                                        ),
+                                        e('button', { type: 'button', style: { background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: '20px', padding: '0 4px' }, onClick: function() { setSelectedEquipos(function(prev) { return prev.filter(function(e) { return e.idEtiqueta !== eq.idEtiqueta; }); }); } }, '×')
+                                    );
+                                })
+                            )
                         ),
-                        e('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } },
-                            e('input', { type: 'text', className: 'form-input', value: barcodeInput, placeholder: 'ID etiqueta (SLF-SP-26-XXXXX) o código de barras...', style: { flex: 1, fontFamily: 'IBM Plex Mono,monospace' }, onChange: function(ev) { setBarcodeInput(ev.target.value); setBarcodeError(''); }, onKeyDown: function(ev) { if (ev.key === 'Enter') { ev.preventDefault(); addProductByBarcode(barcodeInput.trim()); } } }),
-                            e('button', { type: 'button', className: 'button button-primary', onClick: function() { startBarcodeScanner(function(code) { addProductByBarcode(code); }); } }, '📷 Cámara')
+                        // SECCIÓN 2: Material fungible
+                        e('div', { style: { marginBottom: '8px' } },
+                            e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' } },
+                                e('div', { style: { flex: 1, height: '1px', background: 'var(--border)' } }),
+                                e('span', { style: { fontSize: '12px', color: 'var(--accent-green)', whiteSpace: 'nowrap', fontWeight: '700', textTransform: 'uppercase' } }, '📦 Material fungible (consumibles)'),
+                                e('div', { style: { flex: 1, height: '1px', background: 'var(--border)' } })
+                            ),
+                            productsGrid()
                         ),
-                        barcodeError ? e('div', { style: { color: 'var(--accent-red)', fontSize: '13px', marginBottom: '8px' } }, '⚠️ ' + barcodeError) : null,
                         selectedProducts.length > 0 ? e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '8px', padding: '12px', marginBottom: '16px', border: '2px solid var(--accent-green)' } },
-                            e('div', { style: { fontWeight: '600', fontSize: '12px', color: 'var(--accent-green)', marginBottom: '8px', textTransform: 'uppercase' } }, '✓ ' + selectedProducts.length + ' producto(s) seleccionado(s)'),
+                            e('div', { style: { fontWeight: '600', fontSize: '12px', color: 'var(--accent-green)', marginBottom: '8px', textTransform: 'uppercase' } }, '✓ ' + selectedProducts.length + ' consumible(s)'),
                             selectedProducts.map(function(prod, idx) {
                                 return e('div', { key: prod.barcode, className: 'product-row-assigned' },
                                     e('div', null,
@@ -1891,6 +1957,12 @@
                                 );
                             })
                         ) : null,
+                        (selectedEquipos.length + selectedProducts.length) > 0 && e('div', { style: { padding: '10px 14px', background: 'rgba(88,166,255,.1)', border: '1px solid var(--accent-blue)', borderRadius: '8px', marginBottom: '12px', fontSize: '13px' } },
+                            e('strong', null, selectedEquipos.length + selectedProducts.length), ' item(s) total — ',
+                            e('span', { style: { color: 'var(--accent-blue)' } }, selectedEquipos.length + ' equipo(s)'),
+                            ' + ',
+                            e('span', { style: { color: 'var(--accent-green)' } }, selectedProducts.length + ' consumible(s)')
+                        ),
                         fld('Observaciones', inp('observaciones', 'Opcional')),
                         signatureBlock()
                     );
@@ -1953,21 +2025,26 @@
                             e('div', { style: { color: 'var(--text-secondary)', fontSize: '14px' } }, selectedItem.emailEmpleado + ' · ' + selectedItem.departamento)
                         ),
                         e('div', { style: { marginBottom: '20px' } },
-                            e('div', { style: { fontWeight: '700', marginBottom: '12px', textTransform: 'uppercase', fontSize: '12px', color: 'var(--text-secondary)' } }, 'Selecciona los productos a devolver'),
+                            e('div', { style: { fontWeight: '700', marginBottom: '12px', textTransform: 'uppercase', fontSize: '12px', color: 'var(--text-secondary)' } }, 'Selecciona los items a devolver'),
                             productos.map(function(prod) {
-                                const sel = !!returnSelections[prod.barcode];
-                                return e('div', { key: prod.barcode, className: 'return-row ' + (sel ? 'selected' : ''), onClick: function() { setReturnSelections(function(prev) { var n = Object.assign({}, prev); n[prod.barcode] = !prev[prod.barcode]; return n; }); } },
+                                const key = prod.barcode || prod.idEtiqueta;
+                                const sel = !!returnSelections[key];
+                                const esEquipo = !!prod.esEquipo;
+                                return e('div', { key: key, className: 'return-row ' + (sel ? 'selected' : ''), onClick: function() { setReturnSelections(function(prev) { var n = Object.assign({}, prev); n[key] = !prev[key]; return n; }); } },
                                     e('input', { type: 'checkbox', checked: sel, onChange: function() {}, style: { width: '18px', height: '18px', cursor: 'pointer' } }),
                                     e('div', { style: { flex: 1 } },
-                                        e('div', { style: { fontWeight: '600', fontSize: '14px' } }, prod.nombre),
-                                        e('div', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', color: 'var(--accent-blue)' } }, prod.barcode)
+                                        e('div', { style: { fontWeight: '600', fontSize: '14px' } },
+                                            esEquipo ? e('span', { style: { background: 'rgba(88,166,255,.15)', color: 'var(--accent-blue)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', marginRight: '6px', fontWeight: '700' } }, '💻 EQUIPO') : e('span', { style: { background: 'rgba(63,185,80,.15)', color: 'var(--accent-green)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', marginRight: '6px', fontWeight: '700' } }, '📦 FUNGIBLE'),
+                                            prod.nombre
+                                        ),
+                                        e('div', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', color: 'var(--accent-blue)' } }, prod.idEtiqueta || prod.barcode || '')
                                     ),
                                     sel ? e('span', { style: { color: 'var(--accent-green)', fontSize: '20px' } }, '✓') : null
                                 );
                             }),
                             e('div', { style: { marginTop: '8px', padding: '8px 12px', background: 'var(--bg-primary)', borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)' } },
                                 e('strong', { style: { color: selectedCount > 0 ? 'var(--accent-green)' : 'var(--text-secondary)' } }, selectedCount),
-                                ' de ' + productos.length + ' productos seleccionados'
+                                ' de ' + productos.length + ' items seleccionados'
                             )
                         ),
                         fld('Observaciones', inp('observaciones', 'Estado del material...'))
@@ -2366,15 +2443,32 @@
                                         { label: 'Sociedad', value: fichaEquipo.sociedad || '-' },
                                         { label: 'Ubicación', value: fichaEquipo.ubicacion || '-' },
                                         fichaEquipo.asignadoA ? { label: 'Asignado a', value: fichaEquipo.asignadoA } : null,
-                                        fichaEquipo.transitoDestino ? { label: 'Destino tránsito', value: fichaEquipo.transitoDestino } : null
+                                        fichaEquipo.transitoDestino ? { label: 'Destino tránsito', value: fichaEquipo.transitoDestino } : null,
+                                        fichaEquipo.proveedor ? { label: 'Proveedor', value: fichaEquipo.proveedor } : null,
+                                        fichaEquipo.numAlbaran ? { label: 'Nº Albarán', value: fichaEquipo.numAlbaran } : null,
+                                        fichaEquipo.fechaCompra ? { label: 'Fecha Compra', value: new Date(fichaEquipo.fechaCompra).toLocaleDateString('es-ES') } : null,
+                                        fichaEquipo.fechaGarantia ? { label: 'Garantía hasta', value: new Date(fichaEquipo.fechaGarantia).toLocaleDateString('es-ES'), warn: new Date(fichaEquipo.fechaGarantia) < new Date(Date.now() + 30*24*60*60*1000) } : null
                                     ].filter(Boolean).map(function(info, idx) {
                                         return e('div', { key: idx },
                                             e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '2px' } }, info.label),
-                                            e('div', { style: { fontWeight: '600', fontSize: '14px' } }, info.value)
+                                            e('div', { style: { fontWeight: '600', fontSize: '14px', color: info.warn ? 'var(--accent-orange)' : 'inherit' } }, info.warn ? '⚠️ ' + info.value : info.value)
                                         );
                                     })
                                 )
                             ),
+                            // Accesorios
+                            e('div', { style: { marginBottom: '20px' } },
+                                e('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px', letterSpacing: '.5px' } }, '🔌 Accesorios incluidos'),
+                                e('textarea', {
+                                    className: 'form-textarea',
+                                    placeholder: 'Ej: Cargador USB-C 65W\nFunda protectora\nCable HDMI',
+                                    value: fichaEquipo.accesorios || '',
+                                    onChange: function(ev) { setFichaEquipo(function(p) { return Object.assign({}, p, { accesorios: ev.target.value }); }); },
+                                    style: { minHeight: '80px', fontSize: '14px' }
+                                }),
+                                e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' } }, 'Un accesorio por línea. Se guarda al cerrar con "Guardar cambios".')
+                            ),
+                            // Historial
                             e('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '12px', letterSpacing: '.5px' } }, '📋 Historial del equipo'),
                             (function() {
                                 const hEq = state.history.filter(function(h) { return h.idEtiqueta === fichaEquipo.idEtiqueta; });
@@ -2394,6 +2488,14 @@
                         e('div', { className: 'modal-footer' },
                             fichaEquipo.numSerie && e('button', { className: 'button button-success', onClick: function() { exportEtiquetaPDF([fichaEquipo]); } }, '🖨️ Imprimir etiqueta'),
                             !['Robado','Baja','Pendiente'].includes(fichaEquipo.estado) && e('button', { className: 'button button-secondary', onClick: function() { setCambioEstado({ equipo: fichaEquipo, nuevoEstado: '' }); setCambioMotivo(''); setCambioDestino(''); setFichaEquipo(null); } }, '🔄 Cambiar estado'),
+                            e('button', { className: 'button button-primary', onClick: async function() {
+                                // Guardar accesorios si han cambiado
+                                const original = (state.activos || []).find(function(a) { return a.id === fichaEquipo.id; });
+                                if (original && original.accesorios !== fichaEquipo.accesorios) {
+                                    try { await dataManager.updateActivoAccesorios(fichaEquipo.id, fichaEquipo.accesorios || ''); await onRefresh(); showToast('Accesorios guardados', 'success'); } catch(err) { showToast('Error guardando accesorios', 'error'); }
+                                }
+                                setFichaEquipo(null);
+                            } }, 'Guardar cambios'),
                             e('button', { className: 'button button-secondary', onClick: function() { setFichaEquipo(null); } }, 'Cerrar')
                         )
                     )
@@ -2462,6 +2564,10 @@
             const [newSoc, setNewSoc] = useState({ nombre: '', codigo: '', pais: '' });
             const [editingSocId, setEditingSocId] = useState(null);
             const [editingSocData, setEditingSocData] = useState({});
+            // Proveedores
+            const [newProv, setNewProv] = useState({ nombre: '', contacto: '', email: '', telefono: '' });
+            const [editingProvId, setEditingProvId] = useState(null);
+            const [editingProvData, setEditingProvData] = useState({});
             // Búsqueda AD - técnicos
             const [tecnicoQuery, setTecnicoQuery] = useState('');
             const [tecnicoResults, setTecnicoResults] = useState([]);
@@ -2726,116 +2832,79 @@
                 )
             );
 
-            return e('div', null,
-                e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } },
-                    e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, '🛠️ Panel de Administración')
-                ),
-                e('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } },
-                    // Sidebar
-                    e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '180px' } },
-                        sectionBtn('ubicaciones', 'Ubicaciones', '📍'),
-                        sectionBtn('catalogo', 'Catálogo', '📦'),
-                        sectionBtn('tecnicos', 'Técnicos', '👤'),
-                        sectionBtn('admins', 'Administradores', '🛡️'),
-                        sectionBtn('ajustes', 'Ajustes', '⚙️'),
-                        sectionBtn('log', 'Log de Acciones', '📋')
-                    ),
-                    // Content
-                    e('div', { style: { flex: 1, minWidth: '300px' } },
-                        activeSection === 'ubicaciones' && renderUbicaciones(),
-                        activeSection === 'catalogo' && renderCatalogo(),
-                        activeSection === 'tecnicos' && renderTecnicos(),
-                        activeSection === 'admins' && renderAdmins(),
-                        activeSection === 'ajustes' && renderAjustes(),
-                        activeSection === 'log' && e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' } },
-                            e('div', { style: { padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: '700', fontSize: '16px' } }, '📋 Log de Acciones'),
-                            e('div', { style: { padding: '20px' } },
-                                e('div', { style: { display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' } },
-                                    e('select', { className: 'filter-select', style: { flex: 1 }, defaultValue: 'all', onChange: ev => { window._logTecnico = ev.target.value; } },
-                                        e('option', { value: 'all' }, 'Todos los técnicos'),
-                                        state.technicians.map(t => e('option', { key: t.id, value: t.nombre }, t.nombre))
-                                    ),
-                                    e('select', { className: 'filter-select', defaultValue: 'all', onChange: ev => { window._logTipo = ev.target.value; } },
-                                        e('option', { value: 'all' }, 'Todos los tipos'),
-                                        ['Entrada', 'Salida', 'Asignacion', 'Prestamo', 'Devolucion'].map(t => e('option', { key: t, value: t }, t))
-                                    )
-                                ),
-                                e('div', { style: { maxHeight: '500px', overflowY: 'auto' } },
-                                    (function() {
-                                        const logTec = window._logTecnico || 'all';
-                                        const logTip = window._logTipo || 'all';
-                                        return state.history
-                                            .filter(h => (logTec === 'all' || h.tecnico === logTec) && (logTip === 'all' || h.tipo === logTip))
-                                            .slice(0, 200)
-                                            .map(h => e('div', { key: h.id, style: { display: 'flex', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' } },
-                                                e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', minWidth: '120px', fontFamily: 'IBM Plex Mono,monospace' } }, new Date(h.fecha).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
-                                                e('span', { className: 'movement-badge ' + h.tipo, style: { minWidth: '80px', textAlign: 'center' } }, h.tipo),
-                                                e('span', { style: { flex: 1, fontSize: '13px', fontWeight: '500' } }, h.producto),
-                                                h.idEtiqueta ? e('span', { style: { fontSize: '11px', color: 'var(--accent-blue)', fontFamily: 'IBM Plex Mono,monospace' } }, h.idEtiqueta) : null,
-                                                e('span', { style: { fontSize: '12px', color: 'var(--accent-green)' } }, h.tecnico || '-'),
-                                                h.usuario ? e('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, '→ ' + h.usuario) : null
-                                            ));
-                                    })()
-                                )
-                            )
-                        )
-                    )
-                )
-            );
-
             const renderSociedades = () => card('🏢 Sociedades',
                 e('div', null,
                     e('div', { style: { marginBottom: '20px' } },
                         e('div', { className: 'form-label', style: { marginBottom: '8px' } }, 'Nueva Sociedad'),
                         e('div', { style: { display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px', marginBottom: '8px' } },
-                            e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre completo (ej: SanLucar Fruit Import Netherlands B.V.)', value: newSoc.nombre, onChange: ev => setNewSoc(s => ({ ...s, nombre: ev.target.value })) }),
-                            e('input', { type: 'text', className: 'form-input', placeholder: 'Código (3)', maxLength: 3, value: newSoc.codigo, onChange: ev => setNewSoc(s => ({ ...s, codigo: ev.target.value.toUpperCase() })), style: { width: '80px', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '700', textTransform: 'uppercase' } }),
-                            e('input', { type: 'text', className: 'form-input', placeholder: 'País', value: newSoc.pais, onChange: ev => setNewSoc(s => ({ ...s, pais: ev.target.value })), style: { width: '120px' } })
+                            e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre completo', value: newSoc.nombre, onChange: ev => setNewSoc(s => ({ ...s, nombre: ev.target.value })) }),
+                            e('input', { type: 'text', className: 'form-input', placeholder: 'Cód (3)', maxLength: 3, value: newSoc.codigo, onChange: ev => setNewSoc(s => ({ ...s, codigo: ev.target.value.toUpperCase() })), style: { width: '80px', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '700' } }),
+                            e('input', { type: 'text', className: 'form-input', placeholder: 'País', value: newSoc.pais, onChange: ev => setNewSoc(s => ({ ...s, pais: ev.target.value })), style: { width: '110px' } })
                         ),
-                        (function() {
-                            const codigoExiste = newSoc.codigo.length === 3 && (state.sociedades || []).some(s => s.codigo === newSoc.codigo.toUpperCase());
-                            return codigoExiste ? e('div', { style: { color: 'var(--accent-red)', fontSize: '13px', marginBottom: '8px' } }, '⚠️ El código "' + newSoc.codigo + '" ya existe. Elige otro.') : null;
-                        })(),
-                        e('button', {
-                            className: 'button button-success',
-                            onClick: () => {
-                                const codigoExiste = (state.sociedades || []).some(s => s.codigo === newSoc.codigo.toUpperCase());
-                                if (codigoExiste) { showToast('Código duplicado', 'error'); return; }
-                                act(() => dataManager.createSociedad(newSoc), 'Sociedad añadida').then(() => setNewSoc({ nombre: '', codigo: '', pais: '' }));
-                            },
-                            disabled: loading || !newSoc.nombre.trim() || newSoc.codigo.length !== 3 || !newSoc.pais.trim(),
-                            style: { width: '100%' }
-                        }, loading ? e('span', { className: 'loading-spinner' }) : '+ Añadir Sociedad')
+                        newSoc.codigo.length === 3 && (state.sociedades || []).some(s => s.codigo === newSoc.codigo) ? e('div', { style: { color: 'var(--accent-red)', fontSize: '13px', marginBottom: '8px' } }, '⚠️ Código "' + newSoc.codigo + '" ya existe.') : null,
+                        e('button', { className: 'button button-success', onClick: () => { if ((state.sociedades||[]).some(s=>s.codigo===newSoc.codigo)){showToast('Código duplicado','error');return;} act(()=>dataManager.createSociedad(newSoc),'Sociedad añadida').then(()=>setNewSoc({nombre:'',codigo:'',pais:''})); }, disabled: loading||!newSoc.nombre.trim()||newSoc.codigo.length!==3||!newSoc.pais.trim(), style:{width:'100%'} }, '+ Añadir Sociedad')
                     ),
-                    state.sociedades.length === 0 ?
-                        e('div', { style: { color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' } }, 'No hay sociedades') :
-                        state.sociedades.map(s => {
-                            const isEditing = editingSocId === s.id;
-                            return e('div', { key: s.id, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: s.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '8px', marginBottom: '6px', opacity: s.activo ? 1 : 0.6 } },
-                                e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', fontWeight: '700', color: 'var(--accent-purple)', minWidth: '40px' } }, s.codigo),
-                                isEditing ?
-                                    e('div', { style: { flex: 1, display: 'flex', gap: '8px' } },
-                                        e('input', { type: 'text', className: 'form-input', value: editingSocData.nombre || '', onChange: ev => setEditingSocData(d => ({ ...d, nombre: ev.target.value })), style: { flex: 1, padding: '6px 10px', fontSize: '14px' } }),
-                                        e('input', { type: 'text', className: 'form-input', maxLength: 3, value: editingSocData.codigo || '', onChange: ev => setEditingSocData(d => ({ ...d, codigo: ev.target.value.toUpperCase() })), style: { width: '70px', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '700', padding: '6px 10px', fontSize: '14px' } }),
-                                        e('input', { type: 'text', className: 'form-input', value: editingSocData.pais || '', onChange: ev => setEditingSocData(d => ({ ...d, pais: ev.target.value })), style: { width: '100px', padding: '6px 10px', fontSize: '14px' } })
-                                    ) :
-                                    e('div', { style: { flex: 1 } },
-                                        e('div', { style: { fontWeight: '600', fontSize: '14px' } }, s.nombre),
-                                        e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, s.pais)
-                                    ),
-                                isEditing ?
-                                    e('button', { className: 'button button-success', onClick: () => {
-                                        const codigoExiste = editingSocData.codigo !== s.codigo && (state.sociedades || []).some(x => x.codigo === editingSocData.codigo);
-                                        if (codigoExiste) { showToast('Código duplicado', 'error'); return; }
-                                        act(() => dataManager.updateSociedad(s.id, editingSocData), 'Sociedad actualizada').then(() => setEditingSocId(null));
-                                    }, style: { padding: '6px 12px', fontSize: '12px' } }, '✓') :
-                                    e('button', { className: 'button button-secondary', onClick: () => { setEditingSocId(s.id); setEditingSocData({ nombre: s.nombre, codigo: s.codigo, pais: s.pais }); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✏️'),
-                                isEditing ?
-                                    e('button', { className: 'button button-secondary', onClick: () => setEditingSocId(null), style: { padding: '6px 10px', fontSize: '12px' } }, '✕') :
-                                    e('button', { className: 'button ' + (s.activo ? 'button-warning' : 'button-success'), onClick: () => act(() => dataManager.toggleSociedad(s.id, s.activo), s.activo ? 'Desactivada' : 'Activada'), disabled: loading, style: { padding: '6px 10px', fontSize: '12px' } }, s.activo ? 'Desactivar' : 'Activar'),
-                                !isEditing && e('button', { className: 'button button-danger', onClick: () => act(() => dataManager.deleteSociedad(s.id), 'Eliminada'), disabled: loading, style: { padding: '6px 10px', fontSize: '12px' } }, '🗑️')
-                            );
-                        })
+                    state.sociedades.length === 0 ? e('div', {style:{color:'var(--text-secondary)',textAlign:'center',padding:'20px'}},'No hay sociedades') :
+                    state.sociedades.map(s => {
+                        const isEditing = editingSocId === s.id;
+                        return e('div', { key: s.id, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: s.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '8px', marginBottom: '6px', opacity: s.activo ? 1 : 0.6 } },
+                            e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', fontWeight: '700', color: 'var(--accent-purple)', minWidth: '40px' } }, s.codigo),
+                            isEditing ? e('div', { style: { flex: 1, display: 'flex', gap: '8px' } },
+                                e('input', { type: 'text', className: 'form-input', value: editingSocData.nombre||'', onChange: ev=>setEditingSocData(d=>({...d,nombre:ev.target.value})), style:{flex:1,padding:'6px 10px',fontSize:'14px'} }),
+                                e('input', { type: 'text', className: 'form-input', maxLength:3, value: editingSocData.codigo||'', onChange: ev=>setEditingSocData(d=>({...d,codigo:ev.target.value.toUpperCase()})), style:{width:'70px',fontFamily:'IBM Plex Mono,monospace',fontWeight:'700',padding:'6px 10px',fontSize:'14px'} }),
+                                e('input', { type: 'text', className: 'form-input', value: editingSocData.pais||'', onChange: ev=>setEditingSocData(d=>({...d,pais:ev.target.value})), style:{width:'100px',padding:'6px 10px',fontSize:'14px'} })
+                            ) : e('div', { style: { flex: 1 } }, e('div', { style: { fontWeight: '600', fontSize: '14px' } }, s.nombre), e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, s.pais)),
+                            isEditing ? e('button', { className: 'button button-success', onClick: () => { const dup=editingSocData.codigo!==s.codigo&&(state.sociedades||[]).some(x=>x.codigo===editingSocData.codigo); if(dup){showToast('Código duplicado','error');return;} act(()=>dataManager.updateSociedad(s.id,editingSocData),'Actualizada').then(()=>setEditingSocId(null)); }, style:{padding:'6px 12px',fontSize:'12px'} }, '✓') :
+                                e('button', { className: 'button button-secondary', onClick: ()=>{setEditingSocId(s.id);setEditingSocData({nombre:s.nombre,codigo:s.codigo,pais:s.pais});}, style:{padding:'6px 10px',fontSize:'12px'} }, '✏️'),
+                            isEditing ? e('button', { className: 'button button-secondary', onClick: ()=>setEditingSocId(null), style:{padding:'6px 10px',fontSize:'12px'} }, '✕') :
+                                e('button', { className: 'button '+(s.activo?'button-warning':'button-success'), onClick: ()=>act(()=>dataManager.toggleSociedad(s.id,s.activo),s.activo?'Desactivada':'Activada'), disabled:loading, style:{padding:'6px 10px',fontSize:'12px'} }, s.activo?'Desactivar':'Activar'),
+                            !isEditing && e('button', { className: 'button button-danger', onClick: ()=>act(()=>dataManager.deleteSociedad(s.id),'Eliminada'), disabled:loading, style:{padding:'6px 10px',fontSize:'12px'} }, '🗑️')
+                        );
+                    })
+                )
+            );
+
+            const renderProveedores = () => card('🚚 Proveedores',
+                e('div', null,
+                    e('div', { style: { marginBottom: '20px' } },
+                        e('div', { className: 'form-label', style: { marginBottom: '8px' } }, 'Nuevo Proveedor'),
+                        e('div', { className: 'form-row' },
+                            e('div', { className: 'form-group' }, e('label', { className: 'form-label' }, 'Nombre *'), e('input', { type: 'text', className: 'form-input', placeholder: 'Ej: Telefónica', value: newProv.nombre, onChange: ev => setNewProv(s => ({ ...s, nombre: ev.target.value })) })),
+                            e('div', { className: 'form-group' }, e('label', { className: 'form-label' }, 'Contacto'), e('input', { type: 'text', className: 'form-input', placeholder: 'Persona de contacto', value: newProv.contacto, onChange: ev => setNewProv(s => ({ ...s, contacto: ev.target.value })) }))
+                        ),
+                        e('div', { className: 'form-row' },
+                            e('div', { className: 'form-group' }, e('label', { className: 'form-label' }, 'Email'), e('input', { type: 'email', className: 'form-input', placeholder: 'contacto@proveedor.com', value: newProv.email, onChange: ev => setNewProv(s => ({ ...s, email: ev.target.value })) })),
+                            e('div', { className: 'form-group' }, e('label', { className: 'form-label' }, 'Teléfono'), e('input', { type: 'text', className: 'form-input', placeholder: '+34 600 000 000', value: newProv.telefono, onChange: ev => setNewProv(s => ({ ...s, telefono: ev.target.value })) }))
+                        ),
+                        e('button', { className: 'button button-success', onClick: () => act(()=>dataManager.createProveedor(newProv),'Proveedor añadido').then(()=>setNewProv({nombre:'',contacto:'',email:'',telefono:''})), disabled: loading||!newProv.nombre.trim(), style:{width:'100%'} }, '+ Añadir Proveedor')
+                    ),
+                    (!state.proveedores || state.proveedores.length === 0) ? e('div', {style:{color:'var(--text-secondary)',textAlign:'center',padding:'20px'}},'No hay proveedores') :
+                    (state.proveedores||[]).map(p => {
+                        const isEditing = editingProvId === p.id;
+                        return e('div', { key: p.id, style: { background: 'var(--bg-primary)', borderRadius: '8px', padding: '12px 14px', marginBottom: '8px' } },
+                            isEditing ? e('div', null,
+                                e('div', { className: 'form-row' },
+                                    e('div', { className: 'form-group' }, e('label', { className: 'form-label' }, 'Nombre'), e('input', { type: 'text', className: 'form-input', value: editingProvData.nombre||'', onChange: ev=>setEditingProvData(d=>({...d,nombre:ev.target.value})) })),
+                                    e('div', { className: 'form-group' }, e('label', { className: 'form-label' }, 'Contacto'), e('input', { type: 'text', className: 'form-input', value: editingProvData.contacto||'', onChange: ev=>setEditingProvData(d=>({...d,contacto:ev.target.value})) }))
+                                ),
+                                e('div', { className: 'form-row' },
+                                    e('div', { className: 'form-group' }, e('label', { className: 'form-label' }, 'Email'), e('input', { type: 'email', className: 'form-input', value: editingProvData.email||'', onChange: ev=>setEditingProvData(d=>({...d,email:ev.target.value})) })),
+                                    e('div', { className: 'form-group' }, e('label', { className: 'form-label' }, 'Teléfono'), e('input', { type: 'text', className: 'form-input', value: editingProvData.telefono||'', onChange: ev=>setEditingProvData(d=>({...d,telefono:ev.target.value})) }))
+                                ),
+                                e('div', { style: { display: 'flex', gap: '8px' } },
+                                    e('button', { className: 'button button-success', onClick: ()=>act(()=>dataManager.updateProveedor(p.id,editingProvData),'Actualizado').then(()=>setEditingProvId(null)), style:{padding:'8px 16px',fontSize:'13px'} }, '✓ Guardar'),
+                                    e('button', { className: 'button button-secondary', onClick: ()=>setEditingProvId(null), style:{padding:'8px 12px',fontSize:'13px'} }, '✕ Cancelar')
+                                )
+                            ) : e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
+                                e('div', { style: { flex: 1 } },
+                                    e('div', { style: { fontWeight: '600', fontSize: '14px' } }, p.nombre),
+                                    e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, [p.contacto, p.email, p.telefono].filter(Boolean).join(' · '))
+                                ),
+                                e('button', { className: 'button button-secondary', onClick: ()=>{setEditingProvId(p.id);setEditingProvData({nombre:p.nombre,contacto:p.contacto,email:p.email,telefono:p.telefono});}, style:{padding:'6px 10px',fontSize:'12px'} }, '✏️'),
+                                e('button', { className: 'button button-danger', onClick: ()=>act(()=>dataManager.deleteProveedor(p.id),'Eliminado'), disabled:loading, style:{padding:'6px 10px',fontSize:'12px'} }, '🗑️')
+                            )
+                        );
+                    })
                 )
             );
 
@@ -2847,6 +2916,7 @@
                     e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '180px' } },
                         sectionBtn('ubicaciones', 'Ubicaciones', '📍'),
                         sectionBtn('sociedades', 'Sociedades', '🏢'),
+                        sectionBtn('proveedores', 'Proveedores', '🚚'),
                         sectionBtn('catalogo', 'Catálogo', '📦'),
                         sectionBtn('tecnicos', 'Técnicos', '👤'),
                         sectionBtn('admins', 'Administradores', '🛡️'),
@@ -2856,6 +2926,7 @@
                     e('div', { style: { flex: 1, minWidth: '300px' } },
                         activeSection === 'ubicaciones' && renderUbicaciones(),
                         activeSection === 'sociedades' && renderSociedades(),
+                        activeSection === 'proveedores' && renderProveedores(),
                         activeSection === 'catalogo' && renderCatalogo(),
                         activeSection === 'tecnicos' && renderTecnicos(),
                         activeSection === 'admins' && renderAdmins(),
@@ -2894,9 +2965,9 @@
                         )
                     )
                 )
+
             );
         }
-
 
         function ConfirmModal({ message, onConfirm, onCancel, loading }) {
             return e('div', { className: 'modal-overlay', onClick: ev => { if (ev.target === ev.currentTarget) onCancel(); } },
@@ -2917,7 +2988,7 @@
 
         // ---- App ----
         function App() {
-            const [state, setState] = useState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], sociedades: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2'), tabFilter: null });
+            const [state, setState] = useState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, catalogoAccesorios: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], sociedades: [], proveedores: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2'), tabFilter: null });
 
             useEffect(() => { initializeApp(); }, []);
 
@@ -2934,7 +3005,7 @@
                     const currentUser = await graphClient.getCurrentUser();
                     const data = await dataManager.loadAllData();
                     const isAdmin = data.admins.some(a => a.Email && a.Email.toLowerCase() === currentUser.mail.toLowerCase() && (a.Activo === true || a.Activo === 'Yes'));
-                    setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], loading: false, syncing: false, lastSync: new Date() }));
+                    setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, catalogoAccesorios: data.catalogoAccesorios || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], proveedores: data.proveedores || [], loading: false, syncing: false, lastSync: new Date() }));
                     showToast('Bienvenido, ' + currentUser.displayName, 'success');
                 } catch(error) { console.error('Error inicializando app:', error); showToast('Error cargando la aplicacion', 'error'); setState(s => ({ ...s, loading: false })); }
             };
@@ -2946,7 +3017,7 @@
                 if (!dataManager) return;
                 try {
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], lastSync: new Date() }));
+                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, catalogoAccesorios: data.catalogoAccesorios || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], proveedores: data.proveedores || [], lastSync: new Date() }));
                 } catch(e) { console.error('Error refreshing:', e); }
             };
             const handleLogout = async () => { await logout(); setState({ user: null, isAdmin: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], activeTab: 'dashboard', loading: false, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: 2 }); showToast('Sesion cerrada correctamente', 'success'); };
@@ -2956,7 +3027,7 @@
                 setState(s => ({ ...s, syncing: true }));
                 try {
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], syncing: false, lastSync: new Date() }));
+                    setState(s => ({ ...s, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, catalogoAccesorios: data.catalogoAccesorios || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], proveedores: data.proveedores || [], syncing: false, lastSync: new Date() }));
                     if (showMsg) showToast('Sincronizado correctamente', 'success');
                 } catch(e) { setState(s => ({ ...s, syncing: false })); }
             };
@@ -2985,7 +3056,7 @@
                     setState(s => ({ ...s, showConfirm: false, confirmAction: null }));
                     // Refresh completo: incluye activos y ubicaciones para que la UI sea consistente
                     const data = await dataManager.loadAllData();
-                    setState(s => ({ ...s, inventory: data.inventory, history: data.history, technicians: data.technicians, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], sociedades: data.sociedades || [], lastSync: new Date() }));
+                    setState(s => ({ ...s, inventory: data.inventory, history: data.history, technicians: data.technicians, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, catalogoAccesorios: data.catalogoAccesorios || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], sociedades: data.sociedades || [], proveedores: data.proveedores || [], lastSync: new Date() }));
                 } catch(error) { console.error('Error:', error); showToast('Error: ' + error.message, 'error'); }
             };
 
