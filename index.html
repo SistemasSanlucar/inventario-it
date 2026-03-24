@@ -222,7 +222,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.5.1'
+        version: '2.5.2'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -670,60 +670,58 @@
     async function exportEtiquetaPDF(activos) {
         if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF no disponible', 'error'); return; }
         try {
-            const W = 41, H = 89;
-            const doc = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: [W, H] });
+            const W = 89, H = 41;
+            const baseUrl = window.location.href.split('?')[0].split('#')[0];
+            const doc = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: [H, W] });
             for (let idx = 0; idx < activos.length; idx++) {
                 const activo = activos[idx];
-                if (idx > 0) doc.addPage([W, H], 'portrait');
+                if (idx > 0) doc.addPage([H, W], 'landscape');
                 doc.setFillColor(255, 255, 255);
                 doc.rect(0, 0, W, H, 'F');
 
-                // Cabecera — empresa
-                doc.setFillColor(0, 0, 0);
-                doc.rect(0, 0, W, 9, 'F');
-                doc.setFontSize(7); doc.setFont(undefined, 'bold'); doc.setTextColor(255, 255, 255);
-                doc.text('SANLUCAR FRUIT · IT', W / 2, 5.8, { align: 'center' });
-
-                // QR centrado (30x30mm)
-                doc.setTextColor(0, 0, 0);
+                // QR izquierda — contiene URL completa con parámetro equipo
+                const qrUrl = baseUrl + '?equipo=' + activo.idEtiqueta;
                 try {
-                    const qrDataUrl = await QRCode.toDataURL(activo.idEtiqueta, { margin: 1, width: 200, color: { dark: '#000000', light: '#FFFFFF' } });
-                    doc.addImage(qrDataUrl, 'PNG', 5.5, 11, 30, 30);
+                    const qrDataUrl = await QRCode.toDataURL(qrUrl, { margin: 1, width: 200, color: { dark: '#000000', light: '#FFFFFF' } });
+                    doc.addImage(qrDataUrl, 'PNG', 1, 1, 38, 38);
                 } catch(e) {}
 
+                // Separador vertical
+                doc.setDrawColor(220, 220, 220);
+                doc.line(41, 3, 41, H - 3);
+
+                // Contenido derecha
+                const xT = 44;
+
+                // Cabecera empresa
+                doc.setFontSize(6); doc.setFont(undefined, 'bold'); doc.setTextColor(120, 120, 120);
+                doc.text('SANLUCAR FRUIT  ·  IT DEPT', xT, 7);
+
                 // ID etiqueta
-                doc.setFontSize(6.5); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
-                doc.text(safePdfText(activo.idEtiqueta), W / 2, 46, { align: 'center' });
+                doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+                doc.text(safePdfText(activo.idEtiqueta), xT, 15);
 
-                // Separador
-                doc.setDrawColor(200, 200, 200);
-                doc.line(4, 49, W - 4, 49);
+                // Tipo
+                doc.setFontSize(7.5); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 30, 30);
+                doc.text(safePdfText(activo.tipo), xT, 22);
 
-                // Tipo · Modelo
-                doc.setFontSize(7.5); doc.setFont(undefined, 'bold');
-                doc.text(safePdfText(activo.tipo), W / 2, 55, { align: 'center' });
+                // Modelo
                 if (activo.modelo) {
-                    doc.setFontSize(6.5); doc.setFont(undefined, 'normal'); doc.setTextColor(60, 60, 60);
-                    doc.text(safePdfText(activo.modelo), W / 2, 61, { align: 'center' });
+                    doc.setFontSize(6.5); doc.setFont(undefined, 'normal'); doc.setTextColor(70, 70, 70);
+                    doc.text(safePdfText(activo.modelo), xT, 27.5);
                 }
 
                 // N/S
                 if (activo.numSerie) {
-                    doc.setFontSize(5.5); doc.setFont(undefined, 'normal'); doc.setTextColor(100, 100, 100);
-                    doc.text('N/S: ' + safePdfText(activo.numSerie), W / 2, 67.5, { align: 'center' });
+                    doc.setFontSize(5.5); doc.setFont(undefined, 'normal'); doc.setTextColor(110, 110, 110);
+                    doc.text('N/S: ' + safePdfText(activo.numSerie), xT, 33);
                 }
 
                 // Sociedad
                 if (activo.sociedad) {
-                    doc.setFontSize(5.5); doc.setTextColor(130, 130, 130);
-                    doc.text(safePdfText(activo.sociedad), W / 2, 72.5, { align: 'center' });
+                    doc.setFontSize(5); doc.setTextColor(160, 160, 160);
+                    doc.text(safePdfText(activo.sociedad), xT, 38.5);
                 }
-
-                // Pie
-                doc.setFillColor(240, 240, 240);
-                doc.rect(0, H - 8, W, 8, 'F');
-                doc.setFontSize(5); doc.setTextColor(120, 120, 120);
-                doc.text('IT Dept · ' + new Date().getFullYear(), W / 2, H - 3.5, { align: 'center' });
             }
             doc.save('Etiquetas_' + new Date().toISOString().split('T')[0] + '.pdf');
             showToast(activos.length + ' etiqueta(s) generada(s)', 'success');
@@ -2348,7 +2346,7 @@
         // ==========================================
         // EQUIPOS VIEW - v2.2.0
         // ==========================================
-        function EquiposView({ state, onRefresh, initialFilter }) {
+        function EquiposView({ state, onRefresh, initialFilter, deepLinkEquipo, onClearDeepLink }) {
             const [view, setView] = useState('lista'); // 'lista' | 'pendientes' | 'recepcion'
             const [search, setSearch] = useState('');
             const [filterTipo, setFilterTipo] = useState('all');
@@ -2374,6 +2372,13 @@
                 if (initialFilter.estado) setFilterEstado(initialFilter.estado);
                 if (initialFilter.estado === 'Pendiente') setView('pendientes');
             }, []);
+
+            useEffect(function() {
+                if (deepLinkEquipo) {
+                    setFichaEquipo(deepLinkEquipo);
+                    if (onClearDeepLink) onClearDeepLink();
+                }
+            }, [deepLinkEquipo]);
 
             const pendientes = (state.activos || []).filter(function(a) { return a.estado === 'Pendiente'; });
             const tiposConEtiqueta = Object.keys(state.catalogoTipos || {}).filter(function(t) { return (state.catalogoTipos[t] || {}).llevaEtiqueta; });
@@ -3306,7 +3311,7 @@
 
         // ---- App ----
         function App() {
-            const [state, setState] = useState({ user: null, isAdmin: false, accessDenied: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, catalogoAccesorios: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], sociedades: [], proveedores: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2'), tabFilter: null, lang: currentLang, globalSearch: '', showGlobalResults: false });
+            const [state, setState] = useState({ user: null, isAdmin: false, accessDenied: false, inventory: [], technicians: [], history: [], assignments: [], catalogo: {}, catalogoTipos: {}, catalogoAccesorios: {}, activos: [], ubicaciones: [], ubicacionesAll: [], adminsAll: [], sociedades: [], proveedores: [], activeTab: 'dashboard', loading: true, syncing: false, lastSync: null, modalType: null, selectedItem: null, showConfirm: false, confirmAction: null, stockMinimoDefault: parseInt(localStorage.getItem('stockMinimoDefault') || '2'), tabFilter: null, lang: currentLang, globalSearch: '', showGlobalResults: false, deepLinkEquipo: null });
 
             useEffect(() => { initializeApp(); }, []);
 
@@ -3331,6 +3336,19 @@
                     }
                     setState(s => ({ ...s, user: { name: currentUser.displayName, email: currentUser.mail }, isAdmin, inventory: data.inventory, technicians: data.technicians, history: data.history, assignments: data.assignments, catalogo: data.catalogo || {}, catalogoTipos: data.catalogoTipos || {}, catalogoAccesorios: data.catalogoAccesorios || {}, activos: data.activos || [], ubicaciones: data.ubicaciones || [], ubicacionesAll: data.ubicacionesAll || [], adminsAll: data.adminsAll || [], sociedades: data.sociedades || [], proveedores: data.proveedores || [], loading: false, syncing: false, lastSync: new Date() }));
                     showToast(T().welcome + ', ' + currentUser.displayName, 'success');
+                    // Si la URL contiene ?equipo=ID, navegar directamente a la ficha
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const equipoId = urlParams.get('equipo');
+                    if (equipoId) {
+                        const activo = (data.activos || []).find(function(a) { return a.idEtiqueta === equipoId.toUpperCase(); });
+                        if (activo) {
+                            setState(s => ({ ...s, activeTab: 'equipos', deepLinkEquipo: activo }));
+                        } else {
+                            showToast('Equipo no encontrado: ' + equipoId, 'warning');
+                        }
+                        // Limpiar el parámetro de la URL sin recargar
+                        window.history.replaceState({}, '', window.location.pathname);
+                    }
                 } catch(error) { console.error('Error inicializando app:', error); showToast('Error cargando la aplicacion', 'error'); setState(s => ({ ...s, loading: false })); }
             };
 
@@ -3486,7 +3504,7 @@
                 e('div', { className: 'content-section' },
                     state.activeTab === 'dashboard' && e(Dashboard, { state, onNavigate: handleNavigate }),
                     state.activeTab === 'inventario' && e(InventoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal, initialFilter: state.tabFilter }),
-                    state.activeTab === 'equipos' && e(EquiposView, { state, onRefresh: refreshData, initialFilter: state.tabFilter }),
+                    state.activeTab === 'equipos' && e(EquiposView, { state, onRefresh: refreshData, initialFilter: state.tabFilter, deepLinkEquipo: state.deepLinkEquipo, onClearDeepLink: function() { setState(s => ({ ...s, deepLinkEquipo: null })); } }),
                     state.activeTab === 'asignaciones' && e(AssignmentsView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal, initialFilter: state.tabFilter }),
                     state.activeTab === 'historial' && e(HistoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal, initialFilter: state.tabFilter }),
                     state.activeTab === 'admin' && state.isAdmin && e(AdminPanel, {
