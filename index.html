@@ -222,7 +222,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.5.0'
+        version: '2.5.1'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -670,26 +670,60 @@
     async function exportEtiquetaPDF(activos) {
         if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF no disponible', 'error'); return; }
         try {
-            const doc = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: [89, 25] });
+            const W = 41, H = 89;
+            const doc = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: [W, H] });
             for (let idx = 0; idx < activos.length; idx++) {
                 const activo = activos[idx];
-                if (idx > 0) doc.addPage([89, 25], 'landscape');
+                if (idx > 0) doc.addPage([W, H], 'portrait');
                 doc.setFillColor(255, 255, 255);
-                doc.rect(0, 0, 89, 25, 'F');
-                // QR code (lado izquierdo, 23x23mm)
+                doc.rect(0, 0, W, H, 'F');
+
+                // Cabecera — empresa
+                doc.setFillColor(0, 0, 0);
+                doc.rect(0, 0, W, 9, 'F');
+                doc.setFontSize(7); doc.setFont(undefined, 'bold'); doc.setTextColor(255, 255, 255);
+                doc.text('SANLUCAR FRUIT · IT', W / 2, 5.8, { align: 'center' });
+
+                // QR centrado (30x30mm)
+                doc.setTextColor(0, 0, 0);
                 try {
-                    const qrDataUrl = await QRCode.toDataURL(activo.idEtiqueta, { margin: 1, width: 128, color: { dark: '#000000', light: '#FFFFFF' } });
-                    doc.addImage(qrDataUrl, 'PNG', 1, 1, 23, 23);
+                    const qrDataUrl = await QRCode.toDataURL(activo.idEtiqueta, { margin: 1, width: 200, color: { dark: '#000000', light: '#FFFFFF' } });
+                    doc.addImage(qrDataUrl, 'PNG', 5.5, 11, 30, 30);
                 } catch(e) {}
-                // Texto lado derecho
-                doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
-                doc.text(activo.idEtiqueta, 26, 8);
-                doc.setFontSize(6.5); doc.setFont(undefined, 'normal');
-                doc.text(activo.tipo + (activo.modelo ? ' \xB7 ' + activo.modelo : ''), 26, 13.5);
-                if (activo.numSerie) { doc.setFontSize(5.5); doc.setTextColor(80, 80, 80); doc.text('N/S: ' + activo.numSerie, 26, 18.5); }
-                // Logo SLF
-                doc.setFontSize(5.5); doc.setTextColor(150, 150, 150);
-                doc.text('SLF', 82, 6); doc.text('IT', 83, 10);
+
+                // ID etiqueta
+                doc.setFontSize(6.5); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
+                doc.text(safePdfText(activo.idEtiqueta), W / 2, 46, { align: 'center' });
+
+                // Separador
+                doc.setDrawColor(200, 200, 200);
+                doc.line(4, 49, W - 4, 49);
+
+                // Tipo · Modelo
+                doc.setFontSize(7.5); doc.setFont(undefined, 'bold');
+                doc.text(safePdfText(activo.tipo), W / 2, 55, { align: 'center' });
+                if (activo.modelo) {
+                    doc.setFontSize(6.5); doc.setFont(undefined, 'normal'); doc.setTextColor(60, 60, 60);
+                    doc.text(safePdfText(activo.modelo), W / 2, 61, { align: 'center' });
+                }
+
+                // N/S
+                if (activo.numSerie) {
+                    doc.setFontSize(5.5); doc.setFont(undefined, 'normal'); doc.setTextColor(100, 100, 100);
+                    doc.text('N/S: ' + safePdfText(activo.numSerie), W / 2, 67.5, { align: 'center' });
+                }
+
+                // Sociedad
+                if (activo.sociedad) {
+                    doc.setFontSize(5.5); doc.setTextColor(130, 130, 130);
+                    doc.text(safePdfText(activo.sociedad), W / 2, 72.5, { align: 'center' });
+                }
+
+                // Pie
+                doc.setFillColor(240, 240, 240);
+                doc.rect(0, H - 8, W, 8, 'F');
+                doc.setFontSize(5); doc.setTextColor(120, 120, 120);
+                doc.text('IT Dept · ' + new Date().getFullYear(), W / 2, H - 3.5, { align: 'center' });
             }
             doc.save('Etiquetas_' + new Date().toISOString().split('T')[0] + '.pdf');
             showToast(activos.length + ' etiqueta(s) generada(s)', 'success');
