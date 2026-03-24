@@ -222,7 +222,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.5.6'
+        version: '2.5.8'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -673,14 +673,29 @@
     const DYMO_PRINTER = 'DYMO LabelWriter 550';
 
     async function buildDymoLabelXml(activo) {
-        // 89x41mm landscape. 1mm = 56.692 twips
-        // W = 89mm = 5045 twips, H = 41mm = 2325 twips
-        const W = 5045, H = 2325;
-        // QR ocupa columna izquierda: 38mm = 2154 twips
-        const QR_W = 2154, QR_H = H - 100;
-        // Texto arranca en X = QR_W + 120 (gap)
-        const TX = QR_W + 120;
-        const TW = W - TX - 60; // ancho disponible para texto
+        // Obtener el XML base de DYMO para la etiqueta cargada actualmente
+        // Garantiza PaperName y dimensiones exactos para la etiqueta instalada
+        let paperName = '11356 Name Badge';
+        let drawW = 2325, drawH = 5045; // 41mm x 89mm portrait en twips
+        try {
+            const resp = await fetch(DYMO_URL + '/dcd/api/get-default-label/LabelWriterPrinter');
+            if (resp.ok) {
+                const data = await resp.json();
+                const xml = data.labelXml || data.responseValue || '';
+                const pmMatch = xml.match(/<PaperName>([^<]+)<\/PaperName>/);
+                if (pmMatch) paperName = pmMatch[1];
+                const rrMatch = xml.match(/Width="(\d+)"\s+Height="(\d+)"/);
+                if (rrMatch) { drawW = parseInt(rrMatch[1]); drawH = parseInt(rrMatch[2]); }
+            }
+        } catch(e) { console.warn('get-default-label falló, usando fallback:', e.message); }
+
+        // Dimensiones en landscape:
+        // drawW = lado corto (41mm=2325), drawH = lado largo (89mm=5045)
+        // QR izquierda, texto derecha
+        const QR_W = Math.round(drawW * 0.93); // casi toda la altura disponible
+        const QR_X = 50, QR_Y = 50;
+        const TX = Math.round(drawH * 0.43); // texto arranca al 43% del ancho
+        const TW = drawH - TX - 80; // ancho disponible texto
 
         const qrUrl = window.location.href.split('?')[0].split('#')[0] + '?equipo=' + activo.idEtiqueta;
         const id     = safePdfText(activo.idEtiqueta);
@@ -718,9 +733,9 @@
         return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>LargeAddress</Id>
-  <PaperName>30256 Shipping</PaperName>
-  <DrawCommands><RoundRectangle X="0" Y="0" Width="${W}" Height="${H}" Rx="180" Ry="180"/></DrawCommands>
+  <Id>NameBadge</Id>
+  <PaperName>${paperName}</PaperName>
+  <DrawCommands><RoundRectangle X="0" Y="0" Width="${drawW}" Height="${drawH}" Rx="180" Ry="180"/></DrawCommands>
   <ObjectInfo>
     <BarcodeObject>
       <n>QR</n>
@@ -734,14 +749,14 @@
       <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
       <BarcodeFormat>0</BarcodeFormat><AspectRatio>0</AspectRatio>
     </BarcodeObject>
-    <Bounds X="50" Y="50" Width="${QR_W}" Height="${QR_H}"/>
+    <Bounds X="${QR_X}" Y="${QR_Y}" Width="${QR_W}" Height="${QR_W}"/>
   </ObjectInfo>
-  ${txt('EMPRESA', 'SANLUCAR FRUIT · IT', TX, 60,  TW, 220, 7,  'False', 130,130,130)}
-  ${txt('ID',      id,                   TX, 320, TW, 420, 10, 'True',  0,  0,  0  )}
-  ${txt('TIPO',    tipo,                 TX, 780, TW, 360, 9,  'True',  30, 30, 30 )}
-  ${txt('MODELO',  modelo,               TX, 1180,TW, 320, 8,  'False', 70, 70, 70 )}
-  ${txt('NS',      ns,                   TX, 1540,TW, 300, 7,  'False', 100,100,100)}
-  ${txt('SOC',     soc,                  TX, 1880,TW, 260, 7,  'False', 150,150,150)}
+  ${txt('EMPRESA', 'SANLUCAR FRUIT · IT', TX, 80,  TW, 200, 7,  'False', 130,130,130)}
+  ${txt('ID',      id,                   TX, 310, TW, 380, 9,  'True',  0,  0,  0  )}
+  ${txt('TIPO',    tipo,                 TX, 730, TW, 320, 8,  'True',  30, 30, 30 )}
+  ${txt('MODELO',  modelo,               TX, 1090,TW, 290, 7,  'False', 70, 70, 70 )}
+  ${txt('NS',      ns,                   TX, 1420,TW, 270, 6.5,'False', 100,100,100)}
+  ${txt('SOC',     soc,                  TX, 1730,TW, 240, 6,  'False', 150,150,150)}
 </DieCutLabel>`;
     }
     async function printDymoLabel(activo) {
@@ -770,7 +785,7 @@
                     showToast('✓ Etiqueta enviada a DYMO LabelWriter 550', 'success');
                     return;
                 } catch(e) {
-                    console.warn('DYMO directo falló, usando PDF:', e.message);
+                    console.error('DYMO directo falló:', e.message, e);
                     showToast('⚠️ DYMO no disponible. Generando PDF...', 'warning');
                 }
             }
@@ -786,9 +801,10 @@
                 doc.rect(0, 0, W, H, 'F');
                 const qrUrl = baseUrl + '?equipo=' + activo.idEtiqueta;
                 try {
-                    const qrDataUrl = await QRCode.toDataURL(qrUrl, { margin: 1, width: 200, color: { dark: '#000000', light: '#FFFFFF' } });
+                    const QRLib = window.QRCode || QRCode;
+                    const qrDataUrl = await QRLib.toDataURL(qrUrl, { margin: 1, width: 256, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#FFFFFF' } });
                     doc.addImage(qrDataUrl, 'PNG', 1, 1, 38, 38);
-                } catch(e) {}
+                } catch(e) { console.error('QR error:', e); }
                 doc.setDrawColor(220, 220, 220);
                 doc.line(41, 3, 41, H - 3);
                 const xT = 44;
