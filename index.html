@@ -482,9 +482,24 @@
         async toggleAdmin(itemId, activo) { await this.graph.updateListItem(CONFIG.sharepoint.lists.admins, itemId, { Activo: activo ? 'No' : 'Si' }); }
         async deleteAdmin(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.admins, itemId); }
         async createTechnician(data) {
-            return await this.graph.createListItem(CONFIG.sharepoint.lists.tecnicos, { Title: data.nombre, NombreTecnico: data.nombre, CodigoTecnico: data.codigo, Email: data.email, Activo: 'Si' });
+            // Activo puede ser booleano (Sí/No SharePoint) o elección ('Si'/'No')
+            // Enviamos true — si el campo es boolean SharePoint lo acepta; si es texto, intentar con 'Si'
+            try {
+                return await this.graph.createListItem(CONFIG.sharepoint.lists.tecnicos, { Title: data.nombre, NombreTecnico: data.nombre, CodigoTecnico: data.codigo, Email: data.email, Activo: true });
+            } catch(e) {
+                if (e.message && e.message.includes('General exception')) {
+                    return await this.graph.createListItem(CONFIG.sharepoint.lists.tecnicos, { Title: data.nombre, NombreTecnico: data.nombre, CodigoTecnico: data.codigo, Email: data.email, Activo: 'Si' });
+                }
+                throw e;
+            }
         }
-        async toggleTechnicianStatus(itemId, currentStatus) { await this.graph.updateListItem(CONFIG.sharepoint.lists.tecnicos, itemId, { Activo: currentStatus ? 'No' : 'Si' }); }
+        async toggleTechnicianStatus(itemId, currentStatus) {
+            try {
+                await this.graph.updateListItem(CONFIG.sharepoint.lists.tecnicos, itemId, { Activo: !currentStatus });
+            } catch(e) {
+                await this.graph.updateListItem(CONFIG.sharepoint.lists.tecnicos, itemId, { Activo: currentStatus ? 'No' : 'Si' });
+            }
+        }
         async deleteHistoryItem(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.historial, itemId); }
         // ACTIVOS (etiquetas individuales)
         async getNextEtiquetaId(codigoSociedad) {
