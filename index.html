@@ -682,9 +682,7 @@
             if (resp.ok) {
                 const data = await resp.json();
                 const rv = data.responseValue || {};
-                // PaperName: intentar extraerlo del XML del label, o derivarlo del name
-                const labelXml = String(rv.label || '');
-                console.log('rv.name:', rv.name, '| rv.paperName:', rv.paperName, '| label[0:100]:', labelXml.slice(0,100));
+                console.log('responseValue type:', typeof data.responseValue, '| stringify:', JSON.stringify(data.responseValue).slice(0,300));
                 const pmMatch = labelXml.match(/<PaperName>([^<]+)<\/PaperName>/);
                 if (pmMatch && pmMatch[1]) {
                     paperName = pmMatch[1];
