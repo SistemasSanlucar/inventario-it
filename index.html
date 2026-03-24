@@ -223,7 +223,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.7.2'
+        version: '2.7.3'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -288,7 +288,7 @@
         }
     };
     let currentLang = localStorage.getItem('inv_lang') || 'es';
-    const T = () => TRANSLATIONS[currentLang] || TRANSLATIONS.es;
+    const T = (lang) => TRANSLATIONS[lang || currentLang] || TRANSLATIONS.es;
 
     // ==========================================
     // PACKS — almacenados en localStorage
@@ -4009,8 +4009,7 @@
             const stats = { totalProductos: state.inventory.length, totalUnidades: state.inventory.reduce((s,i) => s+i.stock, 0), stockBajo: state.inventory.filter(i => i.stock > 0 && i.stock <= i.stockMinimo).length, movimientosHoy: state.history.filter(h => new Date(h.fecha).toDateString() === new Date().toDateString()).length };
             const formModalTypes = ['entrada', 'salida', 'editar', 'tecnico', 'nueva-asignacion', 'nuevo-prestamo', 'ver-asignacion', 'devolver-material', 'duplicar', 'baja-empleado'];
 
-            const toggleLang = () => {
-                const newLang = state.lang === 'es' ? 'en' : 'es';
+            const setLang = (newLang) => {
                 currentLang = newLang;
                 localStorage.setItem('inv_lang', newLang);
                 setState(s => ({ ...s, lang: newLang }));
@@ -4026,7 +4025,7 @@
                 return results.slice(0, 8);
             })() : [];
 
-            return e('div', { className: 'app-container' },
+            return e('div', { key: 'app-' + state.lang, className: 'app-container' },
                 e('header', { className: 'header' },
                     e('div', { className: 'header-left' },
                         e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
@@ -4071,7 +4070,14 @@
                             state.lastSync && e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)' } }, getLastSyncText()),
                             e('button', { onClick: () => syncData(true), disabled: state.syncing, style: { background: state.syncing ? 'var(--bg-secondary)' : 'var(--accent-blue)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: state.syncing ? 'wait' : 'pointer', fontSize: '14px', fontWeight: '600' } }, state.syncing ? T().syncing : T().sync)
                         ),
-                        e('button', { onClick: toggleLang, title: 'Cambiar idioma / Change language', style: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', fontFamily: 'IBM Plex Mono,monospace' } }, state.lang === 'es' ? 'EN' : 'ES'),
+                        e('select', {
+                            value: state.lang,
+                            onChange: function(ev) { setLang(ev.target.value); },
+                            style: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', fontFamily: 'IBM Plex Mono,monospace', outline: 'none' }
+                        },
+                            e('option', { value: 'es' }, '🇪🇸 Español'),
+                            e('option', { value: 'en' }, '🇬🇧 English')
+                        ),
                         e('button', { className: 'button button-secondary', onClick: handleLogout }, T().logout)
                     )
                 ),
