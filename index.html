@@ -222,7 +222,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.5.8'
+        version: '2.5.9'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -681,7 +681,8 @@
             const resp = await fetch(DYMO_URL + '/dcd/api/get-default-label/LabelWriterPrinter');
             if (resp.ok) {
                 const data = await resp.json();
-                const xml = data.labelXml || data.responseValue || '';
+                console.log('get-default-label response:', JSON.stringify(data).slice(0, 500));
+                const xml = String(data.labelXml || data.responseValue || '');
                 const pmMatch = xml.match(/<PaperName>([^<]+)<\/PaperName>/);
                 if (pmMatch) paperName = pmMatch[1];
                 const rrMatch = xml.match(/Width="(\d+)"\s+Height="(\d+)"/);
@@ -801,7 +802,8 @@
                 doc.rect(0, 0, W, H, 'F');
                 const qrUrl = baseUrl + '?equipo=' + activo.idEtiqueta;
                 try {
-                    const QRLib = window.QRCode || QRCode;
+                    const QRLib = (typeof QRCode !== 'undefined' ? QRCode : null) || (typeof window.QRCode !== 'undefined' ? window.QRCode : null);
+                    if (!QRLib) throw new Error('QRCode lib not loaded');
                     const qrDataUrl = await QRLib.toDataURL(qrUrl, { margin: 1, width: 256, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#FFFFFF' } });
                     doc.addImage(qrDataUrl, 'PNG', 1, 1, 38, 38);
                 } catch(e) { console.error('QR error:', e); }
