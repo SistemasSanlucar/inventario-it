@@ -223,7 +223,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.8.0'
+        version: '2.8.1'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -1863,8 +1863,8 @@
             const [filterDept, setFilterDept] = useState('all');
             const [filterEstado, setFilterEstado] = useState('all');
             const [filterTipo, setFilterTipo] = useState('all');
-            const [sortCol, setSortCol] = useState('fechaAsignacion');
-            const [sortDir, setSortDir] = useState('desc');
+            const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
+            const [expandedId, setExpandedId] = useState(null);
 
             useEffect(function() {
                 if (!initialFilter) return;
@@ -1873,23 +1873,11 @@
                 if (initialFilter.estado === 'vencido') { setFilterTipo('prestamo'); setFilterEstado('vencido'); }
             }, []);
 
-            const toggleSort = function(col) {
-                if (sortCol === col) { setSortDir(function(d) { return d === 'asc' ? 'desc' : 'asc'; }); }
-                else { setSortCol(col); setSortDir('asc'); }
-            };
-            const sortIcon = function(col) {
-                if (sortCol !== col) return e('span', { style: { color: 'var(--text-secondary)', marginLeft: '4px', opacity: 0.4 } }, '⇅');
-                return e('span', { style: { color: 'var(--accent-blue)', marginLeft: '4px' } }, sortDir === 'asc' ? '↑' : '↓');
-            };
-            const thSort = function(label, col, style) {
-                return e('th', { style: Object.assign({ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }, style || {}), onClick: function() { toggleSort(col); } },
-                    label, sortIcon(col)
-                );
-            };
-
             const hoy = new Date(); hoy.setHours(0,0,0,0);
-            const filtered = (state.assignments || []).filter(a => {
-                const matchesSearch = a.nombreEmpleado.toLowerCase().includes(search.toLowerCase()) || a.emailEmpleado.toLowerCase().includes(search.toLowerCase()) || (a.puesto || '').toLowerCase().includes(search.toLowerCase());
+
+            const filtered = (state.assignments || []).filter(function(a) {
+                const q = search.toLowerCase();
+                const matchesSearch = !q || a.nombreEmpleado.toLowerCase().includes(q) || (a.emailEmpleado||'').toLowerCase().includes(q) || (a.puesto||'').toLowerCase().includes(q) || (a.departamento||'').toLowerCase().includes(q);
                 const matchesDept = filterDept === 'all' || a.departamento === filterDept;
                 let matchesEstado = true;
                 if (filterEstado === 'vencido') {
@@ -1900,91 +1888,275 @@
                 }
                 const matchesTipo = filterTipo === 'all' || (filterTipo === 'prestamo' && a.esPrestamo) || (filterTipo === 'asignacion' && !a.esPrestamo);
                 return matchesSearch && matchesDept && matchesEstado && matchesTipo;
-            }).sort(function(a, b) {
-                let av, bv;
-                if (sortCol === 'fechaAsignacion') { av = new Date(a.fechaAsignacion); bv = new Date(b.fechaAsignacion); }
-                else if (sortCol === 'nombreEmpleado') { av = a.nombreEmpleado; bv = b.nombreEmpleado; }
-                else if (sortCol === 'departamento') { av = a.departamento || ''; bv = b.departamento || ''; }
-                else if (sortCol === 'cantidadProductos') { av = a.cantidadProductos; bv = b.cantidadProductos; }
-                else if (sortCol === 'estado') { av = a.estado; bv = b.estado; }
-                else { av = new Date(a.fechaAsignacion); bv = new Date(b.fechaAsignacion); }
-                if (av < bv) return sortDir === 'asc' ? -1 : 1;
-                if (av > bv) return sortDir === 'asc' ? 1 : -1;
-                return 0;
-            });
+            }).sort(function(a, b) { return new Date(b.fechaAsignacion) - new Date(a.fechaAsignacion); });
 
             const departamentos = [...new Set((state.assignments || []).map(a => a.departamento))].filter(Boolean);
-            return e('div', null,
-                e('div', { className: 'toolbar' },
-                    e('div', { className: 'toolbar-left' },
-                        e('input', { type: 'text', className: 'search-bar', placeholder: 'Buscar asignaciones...', value: search, onChange: ev => setSearch(ev.target.value) }),
-                        e('select', { className: 'filter-select', value: filterTipo, onChange: ev => setFilterTipo(ev.target.value) }, e('option', { value: 'all' }, 'Todos los tipos'), e('option', { value: 'asignacion' }, 'Asignaciones'), e('option', { value: 'prestamo' }, 'Prestamos')),
-                        e('select', { className: 'filter-select', value: filterDept, onChange: ev => setFilterDept(ev.target.value) }, e('option', { value: 'all' }, 'Todos los departamentos'), departamentos.map(d => e('option', { key: d, value: d }, d))),
-                        e('select', { className: 'filter-select', value: filterEstado, onChange: ev => setFilterEstado(ev.target.value) }, e('option', { value: 'all' }, 'Todos los estados'), e('option', { value: 'Activo' }, 'Activo'), e('option', { value: 'Devuelto' }, 'Devuelto'), e('option', { value: 'Parcial' }, 'Parcial')),
-                        e('span', { className: 'results-count' }, e('strong', null, filtered.length), ' asignaciones')
+            const prestamosActivos = (state.assignments || []).filter(a => a.esPrestamo && a.estado === 'Activo');
+            const vencidos = prestamosActivos.filter(function(a) { const f = new Date(a.fechaAsignacion); f.setHours(0,0,0,0); return f < hoy; });
+
+            // ── Avatar con iniciales ──────────────────────────────────────────
+            const avatarColors = ['#58a6ff','#3fb950','#a855f7','#fbbf24','#f97316','#ef4444','#06b6d4','#84cc16'];
+            const avatarColor = function(name) {
+                var hash = 0;
+                for (var i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+                return avatarColors[Math.abs(hash) % avatarColors.length];
+            };
+            const initials = function(name) {
+                return name.split(' ').map(function(n) { return n[0]; }).slice(0,2).join('').toUpperCase();
+            };
+
+            // ── Días transcurridos ────────────────────────────────────────────
+            const diasDesde = function(fecha) {
+                var d = Math.round((hoy - new Date(fecha).setHours(0,0,0,0)) / (1000*60*60*24));
+                if (d === 0) return 'Hoy';
+                if (d === 1) return 'Ayer';
+                if (d < 30) return 'Hace ' + d + 'd';
+                if (d < 365) return 'Hace ' + Math.round(d/30) + 'mes';
+                return 'Hace ' + Math.round(d/365) + 'a';
+            };
+
+            // ── Material chips ────────────────────────────────────────────────
+            const materialChips = function(a) {
+                var prods = [];
+                try { prods = JSON.parse(a.productosAsignados || '[]'); } catch(e) {}
+                if (!prods.length) return null;
+                const tipoIcon = function(nombre) {
+                    var n = (nombre||'').toLowerCase();
+                    if (n.includes('portátil') || n.includes('laptop') || n.includes('macbook')) return '💻';
+                    if (n.includes('ipad') || n.includes('tablet')) return '📱';
+                    if (n.includes('ratón') || n.includes('mouse')) return '🖱️';
+                    if (n.includes('teclado') || n.includes('keyboard')) return '⌨️';
+                    if (n.includes('monitor') || n.includes('pantalla')) return '🖥️';
+                    if (n.includes('auricular') || n.includes('headset')) return '🎧';
+                    if (n.includes('cable') || n.includes('adaptador')) return '🔌';
+                    if (n.includes('cargador')) return '🔋';
+                    return '📦';
+                };
+                return e('div', { style:{ display:'flex', flexWrap:'wrap', gap:'5px', marginTop:'8px' } },
+                    prods.slice(0,4).map(function(p, i) {
+                        return e('span', { key:i, style:{ display:'inline-flex', alignItems:'center', gap:'4px', background:'var(--bg-primary)', border:'1px solid var(--border)', borderRadius:'20px', padding:'3px 10px', fontSize:'11px', fontWeight:'600', color:'var(--text-secondary)' } },
+                            tipoIcon(p.nombre), p.nombre
+                        );
+                    }),
+                    prods.length > 4 && e('span', { style:{ display:'inline-flex', alignItems:'center', background:'var(--bg-primary)', border:'1px solid var(--border)', borderRadius:'20px', padding:'3px 10px', fontSize:'11px', fontWeight:'600', color:'var(--accent-blue)' } }, '+' + (prods.length - 4) + ' más')
+                );
+            };
+
+            // ── Card de asignación ────────────────────────────────────────────
+            const assignCard = function(a) {
+                const fa = new Date(a.fechaAsignacion); fa.setHours(0,0,0,0);
+                const vencido = a.esPrestamo && a.estado === 'Activo' && fa < hoy;
+                const isExpanded = expandedId === a.id;
+                const col = avatarColor(a.nombreEmpleado);
+                const estadoColor = { 'Activo':'#3fb950', 'Devuelto':'#6b7280', 'Parcial':'#fbbf24' }[a.estado] || '#6b7280';
+                const borderCol = vencido ? '#ef4444' : a.estado === 'Activo' ? col + '44' : 'var(--border)';
+
+                return e('div', { key: a.id, style:{
+                    background:'var(--bg-secondary)', border:'1px solid ' + borderCol,
+                    borderRadius:'16px', padding:'20px', transition:'all .2s ease',
+                    borderLeft: vencido ? '4px solid #ef4444' : a.esPrestamo ? '4px solid #fbbf24' : '4px solid ' + col,
+                    opacity: a.estado === 'Devuelto' ? 0.7 : 1,
+                }},
+                    // ── Header card ──
+                    e('div', { style:{ display:'flex', alignItems:'flex-start', gap:'14px' } },
+                        // Avatar
+                        e('div', { style:{ width:'46px', height:'46px', borderRadius:'14px', background: col + '22', border:'2px solid ' + col + '44', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'16px', fontWeight:'800', color:col, flexShrink:0, fontFamily:'IBM Plex Mono,monospace' } },
+                            initials(a.nombreEmpleado)
+                        ),
+                        // Info principal
+                        e('div', { style:{ flex:1, minWidth:0 } },
+                            e('div', { style:{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap', marginBottom:'3px' } },
+                                e('div', { style:{ fontWeight:'700', fontSize:'15px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, a.nombreEmpleado),
+                                // Badge tipo
+                                e('span', { style:{ padding:'2px 8px', borderRadius:'20px', fontSize:'11px', fontWeight:'700',
+                                    background: vencido ? 'rgba(239,68,68,.15)' : a.esPrestamo ? 'rgba(251,191,36,.15)' : 'rgba(88,166,255,.15)',
+                                    color: vencido ? '#ef4444' : a.esPrestamo ? '#fbbf24' : '#58a6ff',
+                                    border: '1px solid ' + (vencido ? '#ef444433' : a.esPrestamo ? '#fbbf2433' : '#58a6ff33')
+                                } }, vencido ? '⚠️ VENCIDO' : a.esPrestamo ? '⏱ Préstamo' : '📋 Asignación'),
+                                // Badge estado
+                                e('span', { style:{ padding:'2px 8px', borderRadius:'20px', fontSize:'11px', fontWeight:'700', background:estadoColor+'22', color:estadoColor, border:'1px solid '+estadoColor+'33' } }, a.estado)
+                            ),
+                            e('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', display:'flex', gap:'10px', flexWrap:'wrap' } },
+                                e('span', null, '✉️ ' + a.emailEmpleado),
+                                a.departamento && e('span', null, '🏢 ' + a.departamento),
+                                a.puesto && e('span', null, '💼 ' + a.puesto)
+                            )
+                        ),
+                        // Meta info derecha
+                        e('div', { style:{ textAlign:'right', flexShrink:0 } },
+                            e('div', { style:{ fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'2px' } }, diasDesde(a.fechaAsignacion)),
+                            e('div', { style:{ fontSize:'11px', color:'var(--text-secondary)' } }, new Date(a.fechaAsignacion).toLocaleDateString('es-ES')),
+                            e('div', { style:{ marginTop:'4px', fontSize:'13px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color: col } }, a.cantidadProductos + ' artículo' + (a.cantidadProductos !== 1 ? 's' : ''))
+                        )
                     ),
-                    e('div', { className: 'toolbar-right' },
-                        e('button', { className: 'button button-success', onClick: () => onOpenModal('nueva-asignacion', null) }, T ? T().newAssignment : '+ Nueva Asignación'),
-                        e('button', { className: 'button button-warning', onClick: () => onOpenModal('nuevo-prestamo', null) }, T ? T().loan : '⏱️ Préstamo'),
-                        e('button', { className: 'button button-danger', onClick: () => onOpenModal('baja-empleado', null), style: { background: 'rgba(239,68,68,.15)', border: '1px solid var(--accent-red)', color: 'var(--accent-red)' } }, '👋 Baja de Empleado'),
-                        e('button', { className: 'button button-secondary', onClick: () => exportToCSV(filtered, 'asignaciones') }, 'Exportar')
+
+                    // ── Chips de material ──
+                    materialChips(a),
+
+                    // ── Expansión ──
+                    isExpanded && e('div', { style:{ marginTop:'14px', paddingTop:'14px', borderTop:'1px solid var(--border)' } },
+                        a.tecnicoResponsable && e('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginBottom:'8px' } }, '🔧 Técnico: ', e('span', { style:{ fontWeight:'600', color:'var(--text-primary)' } }, a.tecnicoResponsable)),
+                        a.observaciones && e('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginBottom:'8px', background:'var(--bg-primary)', padding:'8px 12px', borderRadius:'8px', lineHeight:'1.5' } }, '💬 ' + a.observaciones),
+                        a.firmaEmpleado && e('div', { style:{ marginBottom:'8px' } },
+                            e('div', { style:{ fontSize:'11px', color:'var(--text-secondary)', marginBottom:'4px', textTransform:'uppercase', fontWeight:'700' } }, 'Firma empleado'),
+                            e('img', { src: a.firmaEmpleado, style:{ maxWidth:'160px', maxHeight:'60px', border:'1px solid var(--border)', borderRadius:'6px', background:'white' }, alt:'Firma' })
+                        )
+                    ),
+
+                    // ── Acciones ──
+                    e('div', { style:{ display:'flex', gap:'8px', marginTop:'14px', flexWrap:'wrap' } },
+                        e('button', { className:'button button-secondary', style:{ padding:'8px 14px', fontSize:'13px', flex:1, minWidth:'80px' },
+                            onClick: () => setExpandedId(isExpanded ? null : a.id) }, isExpanded ? '▲ Menos' : '▼ Más'),
+                        e('button', { className:'button button-secondary', style:{ padding:'8px 14px', fontSize:'13px' },
+                            onClick: () => onOpenModal('ver-asignacion', a), title:'Ver detalle' }, '📄'),
+                        e('button', { className:'button button-secondary', style:{ padding:'8px 14px', fontSize:'13px' },
+                            onClick: () => exportAssignmentToPDF(a), title:'Descargar PDF' }, '📥'),
+                        a.estado === 'Activo' && e('button', { className:'button button-warning', style:{ padding:'8px 14px', fontSize:'13px', flex:1 },
+                            onClick: () => onOpenModal('devolver-material', a) }, '↩️ Devolver'),
+                        state.isAdmin && e('button', { className:'button button-danger', style:{ padding:'8px 14px', fontSize:'13px', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', color:'#ef4444' },
+                            onClick: () => onOpenModal('eliminar-asignacion', a), title:'Eliminar' }, '🗑️')
+                    )
+                );
+            };
+
+            return e('div', { style:{ display:'flex', flexDirection:'column', gap:'16px' } },
+
+                // ── Toolbar ──────────────────────────────────────────────────
+                e('div', { style:{ background:'var(--bg-secondary)', border:'1px solid var(--border)', borderRadius:'16px', padding:'16px 20px', display:'flex', flexDirection:'column', gap:'12px' } },
+                    // Fila 1: búsqueda + botones acción
+                    e('div', { style:{ display:'flex', gap:'12px', flexWrap:'wrap', alignItems:'center' } },
+                        e('div', { style:{ flex:1, position:'relative', minWidth:'200px' } },
+                            e('span', { style:{ position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', fontSize:'16px', pointerEvents:'none' } }, '🔍'),
+                            e('input', { type:'text', value:search, onChange: ev => setSearch(ev.target.value),
+                                placeholder:'Buscar por nombre, email, departamento...',
+                                style:{ width:'100%', padding:'11px 12px 11px 38px', background:'var(--bg-primary)', border:'2px solid var(--border)', borderRadius:'10px', color:'var(--text-primary)', fontSize:'14px', outline:'none', transition:'border-color .2s' },
+                                onFocus: ev => ev.target.style.borderColor='var(--accent-blue)',
+                                onBlur:  ev => ev.target.style.borderColor='var(--border)'
+                            })
+                        ),
+                        e('button', { className:'button button-success', style:{ padding:'11px 20px', fontSize:'14px', fontWeight:'700', gap:'6px' }, onClick: () => onOpenModal('nueva-asignacion', null) }, '+ Nueva Asignación'),
+                        e('button', { className:'button button-warning', style:{ padding:'11px 16px', fontSize:'14px' }, onClick: () => onOpenModal('nuevo-prestamo', null) }, '⏱️ Préstamo'),
+                        e('button', { style:{ padding:'11px 16px', fontSize:'14px', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', color:'#ef4444', borderRadius:'10px', cursor:'pointer', fontWeight:'700' }, onClick: () => onOpenModal('baja-empleado', null) }, '👋 Baja')
+                    ),
+                    // Fila 2: filtros + contador + toggle vista
+                    e('div', { style:{ display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center' } },
+                        e('select', { className:'filter-select', value:filterTipo, onChange: ev => setFilterTipo(ev.target.value) },
+                            e('option', { value:'all' }, 'Todos los tipos'),
+                            e('option', { value:'asignacion' }, '📋 Asignaciones'),
+                            e('option', { value:'prestamo' }, '⏱ Préstamos')
+                        ),
+                        e('select', { className:'filter-select', value:filterEstado, onChange: ev => setFilterEstado(ev.target.value) },
+                            e('option', { value:'all' }, 'Todos los estados'),
+                            e('option', { value:'Activo' }, '✅ Activo'),
+                            e('option', { value:'Devuelto' }, '✓ Devuelto'),
+                            e('option', { value:'Parcial' }, '◑ Parcial'),
+                            e('option', { value:'vencido' }, '⚠️ Vencidos')
+                        ),
+                        departamentos.length > 0 && e('select', { className:'filter-select', value:filterDept, onChange: ev => setFilterDept(ev.target.value) },
+                            e('option', { value:'all' }, 'Todos los dptos.'),
+                            departamentos.map(d => e('option', { key:d, value:d }, d))
+                        ),
+                        e('span', { style:{ fontSize:'13px', color:'var(--text-secondary)', fontWeight:'600', marginLeft:'4px' } }, filtered.length + ' resultado(s)'),
+                        e('div', { style:{ marginLeft:'auto', display:'flex', gap:'4px', background:'var(--bg-primary)', borderRadius:'8px', padding:'3px' } },
+                            [['cards','🃏'],['table','☰']].map(function(m) {
+                                return e('button', { key:m[0], onClick: () => setViewMode(m[0]), style:{ padding:'5px 10px', borderRadius:'6px', border:'none', cursor:'pointer', fontSize:'14px', background: viewMode===m[0] ? 'var(--accent-blue)' : 'transparent', color: viewMode===m[0] ? 'white' : 'var(--text-secondary)', transition:'all .15s' } }, m[1]);
+                            })
+                        )
                     )
                 ),
-                filtered.length > 0 ?
-                    e('div', null,
-                        // Resumen préstamos activos
-                        (function() {
-                            const prestamosActivos = (state.assignments || []).filter(a => a.esPrestamo && a.estado === 'Activo');
-                            const hoyTs = new Date(); hoyTs.setHours(0,0,0,0);
-                            const vencidos = prestamosActivos.filter(a => { const f = new Date(a.fechaAsignacion); f.setHours(0,0,0,0); return f < hoyTs; });
-                            if (prestamosActivos.length === 0) return null;
-                            return e('div', { style: { display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' } },
-                                e('div', { style: { padding: '10px 16px', background: 'rgba(249,115,22,.1)', border: '1px solid var(--accent-orange)', borderRadius: '8px', fontSize: '13px' } },
-                                    e('strong', { style: { color: 'var(--accent-orange)' } }, prestamosActivos.length), ' préstamo(s) activo(s)'
-                                ),
-                                vencidos.length > 0 && e('div', { style: { padding: '10px 16px', background: 'rgba(239,68,68,.1)', border: '1px solid var(--accent-red)', borderRadius: '8px', fontSize: '13px' } },
-                                    e('strong', { style: { color: 'var(--accent-red)' } }, '⚠ ' + vencidos.length), ' vencido(s)'
-                                )
-                            );
-                        })(),
-                        e('table', { className: 'history-table' },
+
+                // ── Banners alertas ───────────────────────────────────────────
+                vencidos.length > 0 && e('div', { style:{ padding:'14px 18px', background:'rgba(239,68,68,.1)', border:'2px solid rgba(239,68,68,.3)', borderRadius:'12px', display:'flex', alignItems:'center', gap:'12px', cursor:'pointer', animation:'pulse 2s infinite' }, onClick: () => { setFilterTipo('prestamo'); setFilterEstado('vencido'); } },
+                    e('span', { style:{ fontSize:'24px' } }, '⚠️'),
+                    e('div', { style:{ flex:1 } },
+                        e('div', { style:{ fontWeight:'700', color:'#ef4444', fontSize:'14px' } }, vencidos.length + ' préstamo(s) vencido(s) — Material sin devolver'),
+                        e('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'2px' } }, 'Haz clic para filtrar')
+                    ),
+                    e('span', { style:{ color:'#ef4444', fontWeight:'700', fontSize:'16px' } }, '→')
+                ),
+
+                // ── KPIs rápidos ──────────────────────────────────────────────
+                e('div', { style:{ display:'flex', gap:'12px', flexWrap:'wrap' } },
+                    [
+                        { label:'Total', value:(state.assignments||[]).length, color:'#58a6ff', icon:'📋' },
+                        { label:'Activos', value:(state.assignments||[]).filter(a=>a.estado==='Activo'&&!a.esPrestamo).length, color:'#3fb950', icon:'✅' },
+                        { label:'Préstamos', value:prestamosActivos.length, color:'#fbbf24', icon:'⏱️' },
+                        { label:'Vencidos', value:vencidos.length, color:'#ef4444', icon:'⚠️' },
+                    ].map(function(s, i) {
+                        return e('div', { key:i, style:{ flex:1, minWidth:'100px', background:'var(--bg-secondary)', border:'1px solid '+s.color+'33', borderRadius:'12px', padding:'14px 16px', display:'flex', alignItems:'center', gap:'12px', cursor: s.value > 0 ? 'pointer' : 'default' } },
+                            e('div', { style:{ fontSize:'22px' } }, s.icon),
+                            e('div', null,
+                                e('div', { style:{ fontSize:'22px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color:s.color, lineHeight:1 } }, s.value),
+                                e('div', { style:{ fontSize:'11px', color:'var(--text-secondary)', fontWeight:'700', textTransform:'uppercase', marginTop:'2px' } }, s.label)
+                            )
+                        );
+                    })
+                ),
+
+                // ── Contenido ─────────────────────────────────────────────────
+                filtered.length === 0 ?
+                    e('div', { className:'empty-state' },
+                        e('div', { className:'empty-state-icon' }, '📋'),
+                        e('div', { className:'empty-state-title' }, 'No hay asignaciones'),
+                        e('div', { className:'empty-state-text' }, search ? 'Prueba otros términos de búsqueda' : 'Crea la primera asignación de material')
+                    ) :
+
+                viewMode === 'cards' ?
+                    e('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(380px, 1fr))', gap:'14px' } },
+                        filtered.map(assignCard)
+                    ) :
+
+                    // Vista tabla compacta
+                    e('div', { style:{ background:'var(--bg-secondary)', border:'1px solid var(--border)', borderRadius:'12px', overflow:'hidden' } },
+                        e('table', { className:'history-table', style:{ margin:0 } },
                             e('thead', null, e('tr', null,
-                                e('th', { style: { width: '90px' } }, 'Tipo'),
-                                thSort('Fecha', 'fechaAsignacion', { width: '100px' }),
-                                thSort('Empleado', 'nombreEmpleado'),
-                                thSort('Departamento', 'departamento'),
-                                thSort('Prods', 'cantidadProductos', { width: '70px', textAlign: 'center' }),
-                                thSort('Estado', 'estado', { width: '90px' }),
-                                e('th', { style: { width: '120px' } }, 'Acciones')
+                                e('th', { style:{ width:'90px' } }, 'Tipo'),
+                                e('th', { style:{ width:'100px' } }, 'Fecha'),
+                                e('th', null, 'Empleado'),
+                                e('th', null, 'Departamento'),
+                                e('th', { style:{ width:'60px', textAlign:'center' } }, 'Items'),
+                                e('th', { style:{ width:'90px' } }, 'Estado'),
+                                e('th', { style:{ width:'120px' } }, 'Acciones')
                             )),
-                            e('tbody', null, filtered.map(a => {
+                            e('tbody', null, filtered.map(function(a) {
                                 const fa = new Date(a.fechaAsignacion); fa.setHours(0,0,0,0);
                                 const vencido = a.esPrestamo && a.estado === 'Activo' && fa < hoy;
-                                const prestEmpleado = (state.assignments || []).filter(x => x.emailEmpleado === a.emailEmpleado && x.esPrestamo && x.estado === 'Activo').length;
-                                return e('tr', { key: a.id, style: vencido ? { background: 'rgba(239,68,68,.1)', borderLeft: '4px solid var(--accent-red)' } : {} },
-                                    e('td', { style: { textAlign: 'center' } }, a.esPrestamo ? e('span', { style: { background: vencido ? 'var(--accent-red)' : 'var(--accent-orange)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' } }, vencido ? '⚠ VENCIDO' : 'Prestamo') : e('span', { style: { background: 'var(--accent-blue)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' } }, 'Asignacion')),
-                                    e('td', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px' } }, new Date(a.fechaAsignacion).toLocaleDateString('es-ES')),
-                                    e('td', null,
-                                        e('div', { style: { fontWeight: '600' } }, a.nombreEmpleado),
-                                        e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, a.emailEmpleado),
-                                        prestEmpleado > 0 ? e('div', { style: { fontSize: '11px', color: 'var(--accent-orange)', fontWeight: '600', marginTop: '2px' } }, '⏱ ' + prestEmpleado + ' préstamo(s) activo(s)') : null
+                                const col = avatarColor(a.nombreEmpleado);
+                                const estadoColor = { 'Activo':'#3fb950', 'Devuelto':'#6b7280', 'Parcial':'#fbbf24' }[a.estado] || '#6b7280';
+                                return e('tr', { key:a.id, style:{ borderLeft: vencido ? '4px solid #ef4444' : '4px solid '+col, background: vencido ? 'rgba(239,68,68,.05)' : 'transparent' } },
+                                    e('td', { style:{ textAlign:'center' } },
+                                        e('span', { style:{ padding:'3px 8px', borderRadius:'20px', fontSize:'11px', fontWeight:'700',
+                                            background: vencido ? 'rgba(239,68,68,.15)' : a.esPrestamo ? 'rgba(251,191,36,.15)' : 'rgba(88,166,255,.15)',
+                                            color: vencido ? '#ef4444' : a.esPrestamo ? '#fbbf24' : '#58a6ff'
+                                        } }, vencido ? '⚠️ VENCIDO' : a.esPrestamo ? '⏱' : '📋')
                                     ),
-                                    e('td', null, a.departamento),
-                                    e('td', { style: { textAlign: 'center', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '700' } }, a.cantidadProductos),
-                                    e('td', null, e('span', { className: 'movement-badge ' + (a.estado === 'Activo' ? 'Entrada' : a.estado === 'Devuelto' ? 'Devolucion' : 'Salida') }, a.estado)),
-                                    e('td', null, e('div', { style: { display: 'flex', gap: '6px', justifyContent: 'center' } },
-                                        e('div', { className: 'action-icon', onClick: () => onOpenModal('ver-asignacion', a), title: 'Ver' }, '📄'),
-                                        e('div', { className: 'action-icon', onClick: () => exportAssignmentToPDF(a), title: 'PDF' }, '📥'),
-                                        a.estado === 'Activo' && e('div', { className: 'action-icon', onClick: () => onOpenModal('devolver-material', a), title: 'Devolver' }, '↩️'),
-                                        state.isAdmin && e('div', { className: 'action-icon danger', onClick: () => onOpenModal('eliminar-asignacion', a), title: 'Eliminar' }, '🗑️')
+                                    e('td', { style:{ fontSize:'12px', fontFamily:'IBM Plex Mono,monospace', color:'var(--text-secondary)' } }, new Date(a.fechaAsignacion).toLocaleDateString('es-ES')),
+                                    e('td', null,
+                                        e('div', { style:{ display:'flex', alignItems:'center', gap:'8px' } },
+                                            e('div', { style:{ width:'28px', height:'28px', borderRadius:'8px', background:col+'22', border:'1px solid '+col+'44', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', fontWeight:'800', color:col, flexShrink:0 } }, initials(a.nombreEmpleado)),
+                                            e('div', null,
+                                                e('div', { style:{ fontWeight:'600', fontSize:'13px' } }, a.nombreEmpleado),
+                                                e('div', { style:{ fontSize:'11px', color:'var(--text-secondary)' } }, a.emailEmpleado)
+                                            )
+                                        )
+                                    ),
+                                    e('td', { style:{ fontSize:'13px', color:'var(--text-secondary)' } }, a.departamento || '—'),
+                                    e('td', { style:{ textAlign:'center', fontFamily:'IBM Plex Mono,monospace', fontWeight:'700', color:col } }, a.cantidadProductos),
+                                    e('td', null, e('span', { style:{ padding:'3px 8px', borderRadius:'20px', fontSize:'11px', fontWeight:'700', background:estadoColor+'22', color:estadoColor } }, a.estado)),
+                                    e('td', null, e('div', { style:{ display:'flex', gap:'4px', justifyContent:'center' } },
+                                        e('div', { className:'action-icon', onClick: () => onOpenModal('ver-asignacion', a), title:'Ver' }, '📄'),
+                                        e('div', { className:'action-icon', onClick: () => exportAssignmentToPDF(a), title:'PDF' }, '📥'),
+                                        a.estado === 'Activo' && e('div', { className:'action-icon', onClick: () => onOpenModal('devolver-material', a), title:'Devolver' }, '↩️'),
+                                        state.isAdmin && e('div', { className:'action-icon danger', onClick: () => onOpenModal('eliminar-asignacion', a), title:'Eliminar' }, '🗑️')
                                     ))
                                 );
                             }))
                         )
-                    ) :
-                    e('div', { className: 'empty-state' }, e('div', { className: 'empty-state-icon' }, '📋'), e('div', { className: 'empty-state-title' }, 'No hay asignaciones'), e('div', { className: 'empty-state-text' }, 'Crea la primera asignacion de material'))
+                    )
             );
         }
+
+
 
         // ==========================================
         // CONSTANTES GLOBALES
