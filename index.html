@@ -222,7 +222,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.5.4'
+        version: '2.5.5'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -784,21 +784,24 @@
         return true;
     }
 
+    let _dymoprinting = false;
     async function exportEtiquetaPDF(activos) {
-        // Intenta DYMO directo primero; si falla, fallback a PDF
-        if (activos.length === 1) {
-            try {
-                await printDymoLabel(activos[0]);
-                showToast('✓ Etiqueta enviada a DYMO LabelWriter 550', 'success');
-                return;
-            } catch(e) {
-                console.warn('DYMO directo falló, usando PDF:', e.message);
-                // Continúa con PDF
-            }
-        }
-        // PDF fallback (también para lotes de >1)
-        if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF no disponible', 'error'); return; }
+        if (_dymoprinting) return;
+        _dymoprinting = true;
         try {
+            // Intenta DYMO directo primero; si falla, fallback a PDF
+            if (activos.length === 1) {
+                try {
+                    await printDymoLabel(activos[0]);
+                    showToast('✓ Etiqueta enviada a DYMO LabelWriter 550', 'success');
+                    return;
+                } catch(e) {
+                    console.warn('DYMO directo falló, usando PDF:', e.message);
+                    showToast('⚠️ DYMO no disponible. Generando PDF...', 'warning');
+                }
+            }
+            // PDF fallback (también para lotes de >1)
+            if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF no disponible', 'error'); return; }
             const W = 89, H = 41;
             const baseUrl = window.location.href.split('?')[0].split('#')[0];
             const doc = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: [H, W] });
@@ -831,6 +834,7 @@
             window.open(pdfUrl, '_blank');
             showToast(activos.length + ' etiqueta(s) lista(s) — Ctrl+P para imprimir', 'success');
         } catch(e) { console.error(e); showToast('Error generando etiquetas', 'error'); }
+        finally { _dymoprinting = false; }
     }
     function exportAssignmentToPDF(assignment) {
         if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF no disponible', 'error'); return; }
@@ -928,123 +932,6 @@
         const modal = document.getElementById('barcode-scanner-modal');
         if (modal) modal.remove();
         scannerCallback = null;
-    }
-
-    // ==========================================
-    // REACT COMPONENTS
-    // ==========================================
-    // ==========================================
-    // DYMO CONNECT SDK - LabelWriter 550
-    // ==========================================
-    async function printDymoLabel(activo) {
-        const DYMO_URL = 'https://localhost:41951/DYMO/DLS/Printing/';
-        // XML de etiqueta formato 30336 (25x54mm)
-        const label = `<?xml version="1.0" encoding="utf-8"?>
-<DieCutLabel Version="8.0" Units="twips">
-  <PaperOrientation>Landscape</PaperOrientation>
-  <Id>Address</Id>
-  <PaperName>30336 Return Address</PaperName>
-  <DrawCommands>
-    <RoundRectangle X="0" Y="0" Width="3060" Height="1134" Rx="180" Ry="180"/>
-  </DrawCommands>
-  <ObjectInfo>
-    <BarcodeObject>
-      <Name>BARCODE</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>True</IsVariable>
-      <Text>${activo.idEtiqueta}</Text>
-      <Type>Code128Auto</Type>
-      <Size>Small</Size>
-      <TextPosition>None</TextPosition>
-      <TextFont>
-        <Size>8</Size><Bold>False</Bold><Italic>False</Italic><Underline>False</Underline><Strikeout>False</Strikeout>
-      </TextFont>
-      <CheckSumFont>
-        <Size>8</Size><Bold>False</Bold><Italic>False</Italic><Underline>False</Underline><Strikeout>False</Strikeout>
-      </CheckSumFont>
-      <BarcodeFormat>0</BarcodeFormat>
-      <AspectRatio>0</AspectRatio>
-    </BarcodeObject>
-    <Bounds X="50" Y="50" Width="900" Height="500"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>ID</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>True</IsVariable>
-      <Text>${activo.idEtiqueta}</Text>
-      <Font Family="Arial" Size="9" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-      <VerticalAlignment>Middle</VerticalAlignment>
-      <HorizontalAlignment>Left</HorizontalAlignment>
-    </TextObject>
-    <Bounds X="980" Y="50" Width="2000" Height="200"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>TIPO</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>True</IsVariable>
-      <Text>${activo.tipo} · ${activo.modelo}</Text>
-      <Font Family="Arial" Size="7" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-      <VerticalAlignment>Middle</VerticalAlignment>
-      <HorizontalAlignment>Left</HorizontalAlignment>
-    </TextObject>
-    <Bounds X="980" Y="260" Width="2000" Height="180"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>NS</Name>
-      <ForeColor Alpha="255" Red="80" Green="80" Blue="80"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>True</IsVariable>
-      <Text>${activo.numSerie ? 'N/S: ' + activo.numSerie : ''}</Text>
-      <Font Family="Arial" Size="6" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-      <VerticalAlignment>Middle</VerticalAlignment>
-      <HorizontalAlignment>Left</HorizontalAlignment>
-    </TextObject>
-    <Bounds X="980" Y="440" Width="2000" Height="160"/>
-  </ObjectInfo>
-</DieCutLabel>`;
-
-        try {
-            // Obtener impresoras disponibles
-            const printersResp = await fetch(DYMO_URL + 'GetPrinters', { method: 'GET' });
-            if (!printersResp.ok) throw new Error('Dymo Connect no responde');
-            const printersXml = await printersResp.text();
-            // Extraer primera impresora LabelWriter
-            const match = printersXml.match(/<Name>([^<]*LabelWriter[^<]*)<\/Name>/i);
-            const printerName = match ? match[1] : '';
-            if (!printerName) throw new Error('No se encontró ninguna LabelWriter conectada');
-
-            // Imprimir
-            const formData = new FormData();
-            formData.append('printerName', printerName);
-            formData.append('labelXml', label);
-            formData.append('labelSetXml', '');
-            const printResp = await fetch(DYMO_URL + 'PrintLabel', { method: 'POST', body: formData });
-            if (!printResp.ok) throw new Error('Error al enviar a la impresora');
-            showToast('🖨️ Etiqueta enviada a Dymo: ' + activo.idEtiqueta, 'success');
-        } catch(err) {
-            console.error('Dymo error:', err);
-            // Fallback a PDF si Dymo no está disponible
-            showToast('⚠️ Dymo no disponible. Generando PDF...', 'warning');
-            setTimeout(function() { exportEtiquetaPDF([activo]); }, 500);
-        }
     }
 
     window.addEventListener('load', function() {
