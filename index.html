@@ -222,7 +222,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.5.2'
+        version: '2.5.4'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -667,7 +667,136 @@
         printWindow.document.close();
         setTimeout(() => printWindow.print(), 250);
     }
+    // DYMO Direct Print — intenta imprimir directo en LabelWriter 550
+    // Si falla (mixed content, DYMO no disponible) hace fallback a PDF
+    const DYMO_URL = 'https://127.0.0.1:41951';
+    const DYMO_PRINTER = 'DYMO LabelWriter 550';
+
+    async function buildDymoLabelXml(activo) {
+        // Formato DYMO Connect (.dymo) para etiqueta 89x41mm (30256 o similar)
+        // Unidades en twips (1mm = 56.7 twips). 89mm=5045, 41mm=2325
+        const qrUrl = window.location.href.split('?')[0].split('#')[0] + '?equipo=' + activo.idEtiqueta;
+        // Generamos QR como base64 para incrustarlo
+        let qrBase64 = '';
+        try {
+            qrBase64 = await QRCode.toDataURL(qrUrl, { margin: 1, width: 200, color: { dark: '#000000', light: '#FFFFFF' } });
+            qrBase64 = qrBase64.replace('data:image/png;base64,', '');
+        } catch(e) {}
+
+        const idText = safePdfText(activo.idEtiqueta);
+        const tipoText = safePdfText(activo.tipo + (activo.modelo ? ' - ' + activo.modelo : ''));
+        const nsText = activo.numSerie ? 'N/S: ' + safePdfText(activo.numSerie) : '';
+
+        return `<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>LargeAddress</Id>
+  <PaperName>30256 Shipping</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="2325" Height="5045" Rx="270" Ry="270"/>
+  </DrawCommands>
+  <ObjectInfo>
+    <ImageObject>
+      <Name>QR</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>${qrBase64}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Center</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="50" Y="50" Width="2200" Height="2200"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ID</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText><Element><String>${idText}</String><Attributes><Font Family="Helvetica" Size="10" Bold="True" Italic="False" Underline="False" Strikeout="False"/><ForeColor Alpha="255" Red="0" Green="0" Blue="0"/></Attributes></Element></StyledText>
+    </TextObject>
+    <Bounds X="2350" Y="50" Width="2600" Height="400"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>TIPO</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText><Element><String>${tipoText}</String><Attributes><Font Family="Helvetica" Size="9" Bold="False" Italic="False" Underline="False" Strikeout="False"/><ForeColor Alpha="255" Red="0" Green="0" Blue="0"/></Attributes></Element></StyledText>
+    </TextObject>
+    <Bounds X="2350" Y="500" Width="2600" Height="400"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>NS</Name>
+      <ForeColor Alpha="255" Red="100" Green="100" Blue="100"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText><Element><String>${nsText}</String><Attributes><Font Family="Helvetica" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False"/><ForeColor Alpha="255" Red="100" Green="100" Blue="100"/></Attributes></Element></StyledText>
+    </TextObject>
+    <Bounds X="2350" Y="1000" Width="2600" Height="300"/>
+  </ObjectInfo>
+</DieCutLabel>`;
+    }
+
+    async function printDymoLabel(activo) {
+        const labelXml = await buildDymoLabelXml(activo);
+        const body = JSON.stringify({ printerName: DYMO_PRINTER, labelXml: labelXml, copies: 1 });
+        const resp = await fetch(DYMO_URL + '/dcd/api/print-label', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: body
+        });
+        if (!resp.ok) throw new Error('DYMO error: ' + resp.status);
+        const data = await resp.json();
+        if (!data.status) throw new Error('DYMO rechazó la impresión: ' + (data.error || ''));
+        return true;
+    }
+
     async function exportEtiquetaPDF(activos) {
+        // Intenta DYMO directo primero; si falla, fallback a PDF
+        if (activos.length === 1) {
+            try {
+                await printDymoLabel(activos[0]);
+                showToast('✓ Etiqueta enviada a DYMO LabelWriter 550', 'success');
+                return;
+            } catch(e) {
+                console.warn('DYMO directo falló, usando PDF:', e.message);
+                // Continúa con PDF
+            }
+        }
+        // PDF fallback (también para lotes de >1)
         if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF no disponible', 'error'); return; }
         try {
             const W = 89, H = 41;
@@ -678,53 +807,29 @@
                 if (idx > 0) doc.addPage([H, W], 'landscape');
                 doc.setFillColor(255, 255, 255);
                 doc.rect(0, 0, W, H, 'F');
-
-                // QR izquierda — contiene URL completa con parámetro equipo
                 const qrUrl = baseUrl + '?equipo=' + activo.idEtiqueta;
                 try {
                     const qrDataUrl = await QRCode.toDataURL(qrUrl, { margin: 1, width: 200, color: { dark: '#000000', light: '#FFFFFF' } });
                     doc.addImage(qrDataUrl, 'PNG', 1, 1, 38, 38);
                 } catch(e) {}
-
-                // Separador vertical
                 doc.setDrawColor(220, 220, 220);
                 doc.line(41, 3, 41, H - 3);
-
-                // Contenido derecha
                 const xT = 44;
-
-                // Cabecera empresa
                 doc.setFontSize(6); doc.setFont(undefined, 'bold'); doc.setTextColor(120, 120, 120);
                 doc.text('SANLUCAR FRUIT  ·  IT DEPT', xT, 7);
-
-                // ID etiqueta
                 doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
                 doc.text(safePdfText(activo.idEtiqueta), xT, 15);
-
-                // Tipo
                 doc.setFontSize(7.5); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 30, 30);
                 doc.text(safePdfText(activo.tipo), xT, 22);
-
-                // Modelo
-                if (activo.modelo) {
-                    doc.setFontSize(6.5); doc.setFont(undefined, 'normal'); doc.setTextColor(70, 70, 70);
-                    doc.text(safePdfText(activo.modelo), xT, 27.5);
-                }
-
-                // N/S
-                if (activo.numSerie) {
-                    doc.setFontSize(5.5); doc.setFont(undefined, 'normal'); doc.setTextColor(110, 110, 110);
-                    doc.text('N/S: ' + safePdfText(activo.numSerie), xT, 33);
-                }
-
-                // Sociedad
-                if (activo.sociedad) {
-                    doc.setFontSize(5); doc.setTextColor(160, 160, 160);
-                    doc.text(safePdfText(activo.sociedad), xT, 38.5);
-                }
+                if (activo.modelo) { doc.setFontSize(6.5); doc.setFont(undefined, 'normal'); doc.setTextColor(70, 70, 70); doc.text(safePdfText(activo.modelo), xT, 27.5); }
+                if (activo.numSerie) { doc.setFontSize(5.5); doc.setFont(undefined, 'normal'); doc.setTextColor(110, 110, 110); doc.text('N/S: ' + safePdfText(activo.numSerie), xT, 33); }
+                if (activo.sociedad) { doc.setFontSize(5); doc.setTextColor(160, 160, 160); doc.text(safePdfText(activo.sociedad), xT, 38.5); }
             }
-            doc.save('Etiquetas_' + new Date().toISOString().split('T')[0] + '.pdf');
-            showToast(activos.length + ' etiqueta(s) generada(s)', 'success');
+            doc.autoPrint();
+            const pdfBlob = doc.output('blob');
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            window.open(pdfUrl, '_blank');
+            showToast(activos.length + ' etiqueta(s) lista(s) — Ctrl+P para imprimir', 'success');
         } catch(e) { console.error(e); showToast('Error generando etiquetas', 'error'); }
     }
     function exportAssignmentToPDF(assignment) {
