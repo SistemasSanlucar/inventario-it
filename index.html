@@ -222,7 +222,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.6.0'
+        version: '2.6.1'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -667,25 +667,64 @@
         printWindow.document.close();
         setTimeout(() => printWindow.print(), 250);
     }
-    // DYMO Direct Print — intenta imprimir directo en LabelWriter 550
-    // Si falla (mixed content, DYMO no disponible) hace fallback a PDF
+    // ── DYMO Direct Print ───────────────────────────────────────────────────────
     const DYMO_URL = 'https://127.0.0.1:41951';
     const DYMO_PRINTER = 'DYMO LabelWriter 550';
 
-    // Carga el framework JS de DYMO desde localhost (una sola vez)
-    let _dymoFrameworkLoaded = false;
-    async function loadDymoFramework() {
-        if (_dymoFrameworkLoaded) return;
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = DYMO_URL + '/DYMO/DLS/Printing/Label.framework.js';
-            script.onload = () => { _dymoFrameworkLoaded = true; resolve(); };
-            script.onerror = () => reject(new Error('No se pudo cargar el framework DYMO'));
-            document.head.appendChild(script);
-        });
+    // Mapeo SKU → PaperName conocidos para DYMO LabelWriter 550
+    const DYMO_SKU_MAP = {
+        'S0722560': '11356 Name Badge',   // 89x41mm — el nuestro
+        'S0722400': '99012 Address',      // 89x36mm
+        'S0722370': '99010 Address',      // 89x28mm
+        'S0720030': '30256 Shipping',     // 59x102mm
+        'S0722520': '11352 Return Address',
+        'S0722550': '11355 Multi-Purpose',
+        'S0722530': '11353 Multi-Purpose',
+        'S0722390': '99015 Lever Arch',
+    };
+
+    // PaperNames a probar en orden si no podemos detectarlo por SKU
+    const DYMO_PAPER_FALLBACKS = [
+        '11356 Name Badge',
+        'S0722560',
+        '11356',
+        'Small Name Badge',
+        'Name Badge 89 x 41',
+    ];
+
+    // Detecta el PaperName correcto consultando la impresora
+    async function detectDymoPaperName() {
+        try {
+            const resp = await fetch(DYMO_URL + '/dcd/api/get-printers');
+            if (resp.ok) {
+                const data = await resp.json();
+                const printers = Array.isArray(data.responseValue) ? data.responseValue : [data.responseValue];
+                for (const p of printers) {
+                    if (!p) continue;
+                    const sku = (p.rollStatusResponse || {}).sku;
+                    if (sku && DYMO_SKU_MAP[sku]) {
+                        console.log('[DYMO] SKU detectado:', sku, '→ PaperName:', DYMO_SKU_MAP[sku]);
+                        return DYMO_SKU_MAP[sku];
+                    }
+                }
+            }
+        } catch(e) { console.warn('[DYMO] get-printers falló:', e.message); }
+        // Intenta extraer PaperName del sample HTML de DYMO Connect
+        try {
+            const resp = await fetch(DYMO_URL + '/Samples/sample.html');
+            if (resp.ok) {
+                const html = await resp.text();
+                const match = html.match(/<PaperName>([^<]+)<\/PaperName>/);
+                if (match) { console.log('[DYMO] PaperName desde sample.html:', match[1]); return match[1]; }
+            }
+        } catch(e) {}
+        console.warn('[DYMO] No se pudo detectar PaperName, usando fallback');
+        return null; // null = probar la lista de fallbacks
     }
 
-    function buildDymoLabelXmlStatic(activo) {
+    // Construye el XML de la etiqueta con el PaperName indicado
+    function buildDymoLabelXmlStatic(activo, paperName) {
+        paperName = paperName || localStorage.getItem('dymo_paper_name') || '11356 Name Badge';
         // DYMO 11356 Name Badge 89x41mm landscape
         // Twips: 89mm=5045 (ancho/largo), 41mm=2325 (alto/corto)
         const W = 5045, H = 2325;
@@ -716,7 +755,7 @@
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Landscape</PaperOrientation>
   <Id>NameBadge</Id>
-  <PaperName>11356 Name Badge</PaperName>
+  <PaperName>${paperName}</PaperName>
   <DrawCommands><RoundRectangle X="0" Y="0" Width="${W}" Height="${H}" Rx="180" Ry="180"/></DrawCommands>
   <ObjectInfo>
     <BarcodeObject>
@@ -740,26 +779,46 @@
 </DieCutLabel>`;
     }
 
-    async function printDymoLabel(activo) {
-        const labelXml = buildDymoLabelXmlStatic(activo);
-        // Intentar framework JS de DYMO primero
-        try {
-            await loadDymoFramework();
-            if (window.dymo && window.dymo.label && window.dymo.label.framework) {
-                const label = window.dymo.label.framework.openLabelXml(labelXml);
-                label.print(DYMO_PRINTER);
-                return true;
-            }
-        } catch(e) { console.warn('DYMO framework no disponible, usando API REST:', e.message); }
-        // Fallback: API REST
-        const body = JSON.stringify({ printerName: DYMO_PRINTER, labelXml: labelXml, copies: 1 });
+    // Envía un XML concreto a la API REST de DYMO y devuelve true o lanza error
+    async function sendDymoPrint(labelXml) {
+        const body = JSON.stringify({ printerName: DYMO_PRINTER, labelXml, copies: 1 });
         const resp = await fetch(DYMO_URL + '/dcd/api/print-label', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: body
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body
         });
         const text = await resp.text();
         let data; try { data = JSON.parse(text); } catch(e) { data = { status: resp.ok }; }
-        if (!resp.ok || data.status === false) throw new Error('DYMO error ' + resp.status + ': ' + (data.error || text.slice(0,200)));
+        if (!resp.ok || data.status === false) {
+            const err = data.error || text.slice(0, 300);
+            throw new Error(err);
+        }
         return true;
+    }
+
+    async function printDymoLabel(activo) {
+        // 1 — Detectar PaperName real de la impresora
+        const detectedName = await detectDymoPaperName();
+        const namesToTry = detectedName
+            ? [detectedName, ...DYMO_PAPER_FALLBACKS.filter(n => n !== detectedName)]
+            : DYMO_PAPER_FALLBACKS;
+
+        let lastError = null;
+        for (const paperName of namesToTry) {
+            try {
+                console.log('[DYMO] Intentando PaperName:', paperName);
+                const labelXml = buildDymoLabelXmlStatic(activo, paperName);
+                await sendDymoPrint(labelXml);
+                console.log('[DYMO] ✅ Impresión OK con PaperName:', paperName);
+                // Guardar el nombre que funcionó para no volver a probar
+                try { localStorage.setItem('dymo_paper_name', paperName); } catch(e) {}
+                return true;
+            } catch(e) {
+                console.warn('[DYMO] ❌ Falló con "' + paperName + '":', e.message.slice(0, 120));
+                lastError = e;
+                // Solo seguir intentando si el error es de PaperName, no de otro tipo
+                if (!e.message.includes('not declared') && !e.message.includes('DieCutLabel') && !e.message.includes('Invalid label')) break;
+            }
+        }
+        throw new Error('No se pudo imprimir. Último error: ' + (lastError ? lastError.message.slice(0, 200) : 'desconocido'));
     }
     let _dymoprinting = false;
     async function exportEtiquetaPDF(activos) {
