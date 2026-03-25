@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.0.3'
+        version: '3.0.4'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -239,7 +239,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             appTitle: 'Sistema de Inventario IT',
             login: 'Iniciar Sesión con Microsoft', loginIng: 'Iniciando...',
             loginDesc: 'Inicia sesión con tu cuenta corporativa de Microsoft 365 para acceder al sistema de gestión de inventario.',
-            loginNote: T().loginNote,
+            loginNote: 'Usa tu cuenta @sanlucar.com',
             dashboard: '📊 Dashboard', inventory: '📦 Inventario', equipment: '💻 Equipos',
             assignments: '📋 Asignaciones', history: '📜 Historial', admin: '🛠️ Admin',
             sync: '🔄 Sync', syncing: '⏳ Sync...', logout: 'Salir',
@@ -260,50 +260,43 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             packStandard: 'Usuario Estándar', packPremium: 'Usuario Premium',
             saving: 'Guardando...', loading: 'Cargando...',
             welcome: 'Bienvenido', noAccess: 'Sin acceso',
-            // Inventario
-            zones: T().zones, list: T().list, newItem: T().newItem, criticalStock: 'Stock Crítico',
+            zones: '🗄️ Armarios', list: '☰ Lista', newItem: '+ Nuevo', criticalStock: 'Stock Crítico',
             noResults: 'Sin resultados', tryOtherFilters: 'Prueba otros filtros',
             allCategories: 'Todas las categorías', sortName: 'Ordenar: Nombre',
             sortStock: 'Ordenar: Stock', allStatuses: 'Todos',
             stockLow: '⚠️ Stock bajo', outOfStock: '🔴 Sin stock',
-            // Equipos
-            backToList: T().backToList, exitScanner: T().exitScanner,
-            mapView: T().mapView, scannerMode: T().scannerMode, receiveBatch: T().receiveBatch,
+            backToList: '← Volver a lista', exitScanner: '← Salir del escáner',
+            mapView: '🗺️ Mapa', scannerMode: '⚡ Escáner', receiveBatch: '+ Recepción',
             pendingNSCount: '⚠️ Pendientes N/S',
-            // Asignaciones
-            assignMaterial: T().assignMaterial, returnMaterial: '↩️ Devolver',
+            assignMaterial: '+ Asignar', returnMaterial: '↩️ Devolver',
             allTypes: 'Todos los tipos', allStates: 'Todos los estados',
             allDepts: 'Todos los dptos.', results: 'resultado(s)',
             clearFilters: '✕ Limpiar', activeAssignment: 'Asignación', activeLoan: 'Préstamo',
             assigned: 'Asignado', returned: 'Devuelto', partial: 'Parcial', expired: '⚠️ Vencidos',
             noAssignments: 'No hay asignaciones', createFirst: 'Empieza asignando material a un empleado',
-            // Historial
             allTechnicians: 'Todos los técnicos', allMovements: 'Todos los movimientos',
             dateFrom: 'Desde', dateTo: 'Hasta',
-            // Dashboard
-            missionControl: T().missionControl, lastSync: 'Última sincronización',
-            generalStatus: T().generalStatus, optimal: T().optimal, attention: T().attention, critical: 'Crítico',
+            missionControl: '🎛️ Mission Control', lastSync: 'Última sincronización',
+            generalStatus: 'Estado General', optimal: 'Óptimo', attention: 'Atención', critical: 'Crítico',
             equipments: 'Equipos', inStorage: 'En Almacén', today: 'Hoy',
             noAlerts: 'sin alertas', alerts: 'alerta(s)',
             allOk: 'Todo en orden', noActiveAlerts: 'No hay alertas activas',
             nearWarranties: 'Garantías Próximas', noExpiring: 'Sin vencimientos próximos',
             next90: 'Próximos 90 días OK', topTechnicians: '🏆 Top Técnicos — Este Mes',
-            noActivityMonth: T().noActivityMonth, recentActivity: T().recentActivity,
-            viewAll: 'Ver todo →', criticalStockTitle: T().criticalStockTitle,
-            stockOptimal: T().stockOptimal, noMovements: 'Sin movimientos',
+            noActivityMonth: 'Sin actividad este mes', recentActivity: '📜 Actividad Reciente',
+            viewAll: 'Ver todo →', criticalStockTitle: '📦 Stock Crítico',
+            stockOptimal: 'Stock en niveles óptimos', noMovements: 'Sin movimientos',
             incidents: '🔧 Equipos con Incidencia',
-            // Admin
-            adminPanel: T().adminPanel,
-            infraGroup: T().infraGroup, catalogGroup: T().catalogGroup,
-            usersGroup: T().usersGroup, systemGroup: T().systemGroup,
+            adminPanel: '🛠️ Panel de Administración',
+            infraGroup: '📍 Infraestructura', catalogGroup: '📦 Catálogo y Stock',
+            usersGroup: '👥 Usuarios', systemGroup: '⚙️ Sistema',
             locations: 'Ubicaciones', societies: 'Sociedades', suppliers: 'Proveedores',
             catalog: 'Catálogo', packs: 'Packs', technicians: 'Técnicos',
             administrators: 'Administradores', settings: 'Ajustes', exportAudit: 'Exportar', actionLog: 'Log de Acciones',
-            // Ficha equipo
-            equipmentFile: T().equipmentFile, timeline: T().timeline,
-            noMovementsYet: T().noMovementsYet,
-            accessories: T().accessories, saveChanges: T().saveChanges,
-            changeStatus: T().changeStatus, printLabel: T().printLabel,
+            equipmentFile: '📄 Ficha de Equipo', timeline: '📋 Timeline del Equipo',
+            noMovementsYet: 'Sin movimientos registrados aún',
+            accessories: '🔌 Accesorios incluidos', saveChanges: 'Guardar cambios',
+            changeStatus: '🔄 Cambiar estado', printLabel: '🖨️ Imprimir etiqueta',
         },
         en: {
             appTitle: 'IT Inventory System',
@@ -351,7 +344,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             allTechnicians: 'All technicians', allMovements: 'All movements',
             dateFrom: 'From', dateTo: 'To',
             // Dashboard
-            missionControl: T().missionControl, lastSync: 'Last sync',
+            missionControl: '🎛️ Mission Control', lastSync: 'Last sync',
             generalStatus: 'General Status', optimal: 'Optimal', attention: 'Attention', critical: 'Critical',
             equipments: 'Equipment', inStorage: 'In Storage', today: 'Today',
             noAlerts: 'no alerts', alerts: 'alert(s)',
