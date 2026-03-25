@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.9.1'
+        version: '3.0.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -584,6 +584,8 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const fullyReturned = returnedProducts.length === allProducts.length;
             const newState = fullyReturned ? 'Devuelto' : 'Parcial';
             await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, assignmentId, { Estado: newState, Observaciones: observaciones });
+            // Agrupar productos fungibles por barcode para sumar cantidades correctamente
+            const fungibleMap = {};
             for (const prod of returnedProducts) {
                 if (prod.esEquipo) {
                     // Equipo etiquetado — vuelve a Almacén
@@ -591,11 +593,18 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     if (activo) await this.cambiarEstadoActivo(activo.id, 'Almacen', {});
                     await this.addToHistory({ tipo: 'Devolucion', producto: prod.nombre, cantidad: 1, usuario: '', tecnico, idEtiqueta: prod.idEtiqueta || '' });
                 } else {
-                    // Material fungible — devuelve al stock
-                    const inventoryItem = (inventoryData || []).find(i => i.barcode === prod.barcode);
-                    if (inventoryItem) await this.graph.updateListItem(CONFIG.sharepoint.lists.inventario, inventoryItem.id, { Stock: (inventoryItem.stock || 0) + 1 });
-                    await this.addToHistory({ tipo: 'Devolucion', producto: prod.nombre, cantidad: 1, usuario: '', tecnico });
+                    // Agrupar fungibles — puede devolver varias unidades del mismo producto
+                    const key = prod.barcode || prod.nombre;
+                    if (!fungibleMap[key]) fungibleMap[key] = { prod, cantidad: 0 };
+                    fungibleMap[key].cantidad += (parseInt(prod.cantidad) || 1);
                 }
+            }
+            // Actualizar stock de fungibles con cantidad real
+            for (const key of Object.keys(fungibleMap)) {
+                const { prod, cantidad } = fungibleMap[key];
+                const inventoryItem = (inventoryData || []).find(i => i.barcode === prod.barcode);
+                if (inventoryItem) await this.graph.updateListItem(CONFIG.sharepoint.lists.inventario, inventoryItem.id, { Stock: (inventoryItem.stock || 0) + cantidad });
+                await this.addToHistory({ tipo: 'Devolucion', producto: prod.nombre, cantidad, usuario: '', tecnico });
             }
             return newState;
         }
@@ -1050,6 +1059,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const pageWidth = doc.internal.pageSize.getWidth();
             const margin = 20;
             let y = 20;
+            // Header
             doc.setFontSize(18); doc.setFont(undefined, 'bold');
             doc.text('SANLUCAR FRUIT', pageWidth / 2, y, { align: 'center' }); y += 8;
             doc.setFontSize(12);
@@ -1064,8 +1074,11 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             y += 6;
             doc.setFont(undefined, 'bold'); doc.setFontSize(11); doc.text('MATERIAL ' + (assignment.esPrestamo ? 'EN PRESTAMO' : 'ASIGNADO'), margin, y); y += 8;
             doc.setFont(undefined, 'normal'); doc.setFontSize(10);
-            (assignment.productosAsignados || []).forEach((prod, idx) => {
-                doc.text((idx + 1) + '. ' + safePdfText(prod.nombre) + ' (Cod: ' + prod.barcode + ')', margin, y); y += 6;
+            var prods = assignment.productosAsignados || [];
+            try { if (typeof prods === 'string') prods = JSON.parse(prods); } catch(e) {}
+            prods.forEach((prod, idx) => {
+                const line = (idx + 1) + '. ' + safePdfText(prod.nombre) + (prod.idEtiqueta ? ' [' + prod.idEtiqueta + ']' : prod.barcode ? ' (Cod: ' + prod.barcode + ')' : '');
+                doc.text(line, margin, y); y += 6;
                 if (y > 270) { doc.addPage(); y = 20; }
             });
             y += 10;
@@ -1074,16 +1087,38 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const conditions = ['El empleado declara haber recibido el material en perfecto estado.', 'Se compromete a hacer un uso adecuado del mismo.', 'Mantendra el material en buen estado de conservacion.', 'Lo devolvera cuando finalice su relacion laboral o cuando se solicite.'];
             conditions.forEach(cond => { doc.text('- ' + cond, margin, y); y += 5; });
             if (assignment.observaciones) { y += 5; doc.setFont(undefined, 'bold'); doc.text('OBSERVACIONES:', margin, y); y += 6; doc.setFont(undefined, 'normal'); doc.text(safePdfText(assignment.observaciones), margin, y); y += 10; }
-            y += 15;
-            doc.setFontSize(10);
+            // Firma si existe
+            if (assignment.firmaEmpleado) {
+                y += 10;
+                doc.setFont(undefined, 'bold'); doc.setFontSize(10); doc.text('FIRMA DEL EMPLEADO:', margin, y); y += 6;
+                try { doc.addImage(assignment.firmaEmpleado, 'PNG', margin, y, 70, 25); y += 30; } catch(e) {}
+            }
+            y += 10;
+            if (y > 240) { doc.addPage(); y = 20; }
+            doc.setFontSize(10); doc.setFont(undefined, 'normal');
             doc.text('Empleado: ' + safePdfText(assignment.nombreEmpleado), margin, y);
-            doc.text('Tecnico IT: ' + safePdfText(assignment.tecnicoResponsable), pageWidth / 2 + 10, y);
-            y += 15;
-            doc.setFontSize(8);
-            doc.text('Fecha: ' + new Date(assignment.fechaAsignacion).toLocaleString('es-ES') + ' | Sanlucar Fruit', pageWidth / 2, y, { align: 'center' });
-            doc.save('Asignacion_' + safePdfText(assignment.nombreEmpleado).replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf');
-            showToast('PDF generado correctamente', 'success');
-        } catch(e) { console.error('Error generando PDF:', e); showToast('Error generando PDF', 'error'); }
+            doc.text('Tecnico IT: ' + safePdfText(assignment.tecnicoResponsable || ''), pageWidth / 2 + 10, y);
+            y += 20;
+            // QR con enlace a la app
+            const qrUrl = window.location.href.split('?')[0] + '?asignacion=' + (assignment.id || '');
+            generateQRDataUrl(qrUrl).then(function(qrDataUrl) {
+                if (qrDataUrl) {
+                    doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 28, y - 38, 28, 28);
+                    doc.setFontSize(7); doc.setTextColor(150,150,150);
+                    doc.text('Escanear para ver', pageWidth - margin - 28, y - 8, { maxWidth: 28 });
+                    doc.setTextColor(0,0,0);
+                }
+                doc.setFontSize(8);
+                doc.text('Fecha: ' + new Date(assignment.fechaAsignacion).toLocaleString('es-ES') + ' | Sanlucar Fruit IT', pageWidth / 2, y, { align: 'center' });
+                doc.save('Asignacion_' + safePdfText(assignment.nombreEmpleado).replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf');
+                showToast('PDF generado correctamente', 'success');
+            }).catch(function() {
+                doc.setFontSize(8);
+                doc.text('Fecha: ' + new Date(assignment.fechaAsignacion).toLocaleString('es-ES') + ' | Sanlucar Fruit IT', pageWidth / 2, y, { align: 'center' });
+                doc.save('Asignacion_' + safePdfText(assignment.nombreEmpleado).replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf');
+                showToast('PDF generado correctamente', 'success');
+            });
+        } catch(e) { console.error('Error generando PDF:', e); showToast('Error generando PDF: ' + (e.message || 'desconocido'), 'error'); }
     }
 
     // ==========================================
@@ -3838,20 +3873,44 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                                 }),
                                 e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' } }, 'Un accesorio por línea. Se guarda al cerrar con "Guardar cambios".')
                             ),
-                            // Historial
-                            e('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '12px', letterSpacing: '.5px' } }, '📋 Historial del equipo'),
+                            // ── Timeline del equipo ──────────────────────────────────────
+                            e('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '16px', letterSpacing: '.5px' } }, '📋 Timeline del Equipo'),
                             (function() {
-                                const hEq = state.history.filter(function(h) { return h.idEtiqueta === fichaEquipo.idEtiqueta; });
-                                if (hEq.length === 0) return e('div', { style: { color: 'var(--text-secondary)', fontSize: '14px', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, 'Sin movimientos registrados aún');
-                                return e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-                                    hEq.map(function(h) {
-                                        return e('div', { key: h.id, style: { display: 'flex', gap: '10px', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: '8px', alignItems: 'center', flexWrap: 'wrap' } },
-                                            e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'IBM Plex Mono,monospace', minWidth: '110px' } }, new Date(h.fecha).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })),
-                                            e('span', { className: 'movement-badge ' + h.tipo, style: { minWidth: '90px', textAlign: 'center' } }, h.tipo),
-                                            e('span', { style: { flex: 1, fontSize: '13px' } }, h.motivo || h.usuario || '-'),
-                                            e('span', { style: { fontSize: '12px', color: 'var(--accent-green)' } }, h.tecnico)
-                                        );
-                                    })
+                                const hEq = state.history.filter(function(h) { return h.idEtiqueta === fichaEquipo.idEtiqueta; }).sort(function(a,b) { return new Date(b.fecha) - new Date(a.fecha); });
+                                if (hEq.length === 0) return e('div', { style: { color: 'var(--text-secondary)', fontSize: '14px', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '10px', textAlign: 'center' } }, '📭 Sin movimientos registrados aún');
+                                const tipoConfig = {
+                                    'CambioEstado': { icon: '🔄', color: '#a855f7', label: 'Cambio de estado' },
+                                    'Asignacion':   { icon: '→',  color: '#58a6ff', label: 'Asignado' },
+                                    'Devolucion':   { icon: '←',  color: '#3fb950', label: 'Devuelto' },
+                                    'Entrada':      { icon: '↑',  color: '#3fb950', label: 'Entrada' },
+                                    'Salida':       { icon: '↓',  color: '#ef4444', label: 'Salida' },
+                                    'Prestamo':     { icon: '⏱',  color: '#fbbf24', label: 'Préstamo' },
+                                };
+                                return e('div', { style: { position: 'relative' } },
+                                    // Línea vertical
+                                    e('div', { style: { position: 'absolute', left: '19px', top: '24px', bottom: '24px', width: '2px', background: 'var(--border)', zIndex: 0 } }),
+                                    e('div', { style: { display: 'flex', flexDirection: 'column', gap: '0' } },
+                                        hEq.map(function(h, i) {
+                                            const cfg = tipoConfig[h.tipo] || { icon: '•', color: '#6b7280', label: h.tipo };
+                                            const fecha = new Date(h.fecha);
+                                            const esHoy = fecha.toDateString() === new Date().toDateString();
+                                            return e('div', { key: h.id || i, style: { display: 'flex', gap: '14px', alignItems: 'flex-start', paddingBottom: '16px', position: 'relative', zIndex: 1 } },
+                                                // Dot
+                                                e('div', { style: { width: '40px', height: '40px', borderRadius: '50%', background: cfg.color + '20', border: '2px solid ' + cfg.color + '66', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0, background: 'var(--bg-secondary)' } }, cfg.icon),
+                                                // Contenido
+                                                e('div', { style: { flex: 1, background: 'var(--bg-tertiary)', borderRadius: '10px', padding: '10px 14px', border: '1px solid ' + cfg.color + '33' } },
+                                                    e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap', gap: '6px' } },
+                                                        e('span', { style: { fontSize: '13px', fontWeight: '700', color: cfg.color } }, cfg.label),
+                                                        e('span', { style: { fontSize: '11px', color: esHoy ? cfg.color : 'var(--text-secondary)', fontFamily: 'IBM Plex Mono,monospace', fontWeight: esHoy ? '700' : '400' } },
+                                                            esHoy ? 'Hoy ' : '', fecha.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+                                                        )
+                                                    ),
+                                                    (h.motivo || h.usuario) && e('div', { style: { fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' } }, h.motivo || h.usuario),
+                                                    h.tecnico && e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)' } }, '🔧 ' + h.tecnico)
+                                                )
+                                            );
+                                        })
+                                    )
                                 );
                             })()
                         ),
@@ -4552,8 +4611,81 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const [scanResult, setScanResult] = useState(null); // 'ok'|'notfound'
             const [mobileSearch, setMobileSearch] = useState('');
             const [scanning, setScanning] = useState(false);
+            const [sigFullscreen, setSigFullscreen] = useState(false);
+            const [sigData, setSigData] = useState(null);
+            const sigCanvasRef = React.useRef(null);
+            const sigDrawing = React.useRef(false);
+            const sigLast = React.useRef(null);
+
+            // Firma fullscreen — lanza modo apaisado
+            const openSignature = function() {
+                setSigData(null);
+                setSigFullscreen(true);
+                try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(function() {}); } catch(e) {}
+                // Limpiar canvas al abrir
+                setTimeout(function() {
+                    const c = sigCanvasRef.current;
+                    if (c) { c.width = c.offsetWidth; c.height = c.offsetHeight; c.getContext('2d').clearRect(0,0,c.width,c.height); }
+                }, 100);
+            };
+            const closeSignature = function(save) {
+                if (save && sigCanvasRef.current) setSigData(sigCanvasRef.current.toDataURL());
+                setSigFullscreen(false);
+                try { screen.orientation && screen.orientation.unlock && screen.orientation.unlock(); } catch(e) {}
+            };
+            const sigPos = function(ev, canvas) {
+                const rect = canvas.getBoundingClientRect();
+                const t = ev.touches ? ev.touches[0] : ev;
+                return { x: (t.clientX - rect.left) * (canvas.width / rect.width), y: (t.clientY - rect.top) * (canvas.height / rect.height) };
+            };
 
             const hoy = new Date().toLocaleDateString('es-ES');
+
+            // ── Overlay firma fullscreen ──────────────────────────────────────
+            const renderSigFullscreen = function() {
+                return e('div', { style: { position: 'fixed', inset: 0, background: '#fff', zIndex: 99999, display: 'flex', flexDirection: 'column' } },
+                    // Header
+                    e('div', { style: { background: '#1a1f2e', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 } },
+                        e('div', { style: { color: 'white', fontWeight: '700', fontSize: '14px' } }, '✍️ Firma del empleado'),
+                        e('div', { style: { display: 'flex', gap: '8px' } },
+                            e('button', { onClick: function() {
+                                const c = sigCanvasRef.current;
+                                if (c) c.getContext('2d').clearRect(0,0,c.width,c.height);
+                            }, style: { padding: '8px 14px', background: 'rgba(255,255,255,.15)', border: 'none', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' } }, '🗑️ Limpiar'),
+                            e('button', { onClick: function() { closeSignature(false); }, style: { padding: '8px 14px', background: 'rgba(239,68,68,.3)', border: 'none', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px' } }, 'Cancelar'),
+                            e('button', { onClick: function() { closeSignature(true); showToast('✅ Firma guardada', 'success'); }, style: { padding: '8px 14px', background: '#3fb950', border: 'none', borderRadius: '8px', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '700' } }, '✅ Confirmar')
+                        )
+                    ),
+                    // Línea guía
+                    e('div', { style: { background: '#f0f0f0', padding: '6px 16px', fontSize: '12px', color: '#666', flexShrink: 0, textAlign: 'center' } }, 'Firma en el espacio de abajo con el dedo'),
+                    // Canvas
+                    e('canvas', {
+                        ref: sigCanvasRef,
+                        style: { flex: 1, width: '100%', cursor: 'crosshair', touchAction: 'none', background: 'white' },
+                        onMouseDown: function(ev) { sigDrawing.current = true; sigLast.current = sigPos(ev.nativeEvent || ev, ev.target); },
+                        onMouseMove: function(ev) {
+                            if (!sigDrawing.current || !sigLast.current) return;
+                            const c = ev.target; const ctx = c.getContext('2d');
+                            const p = sigPos(ev.nativeEvent || ev, c);
+                            ctx.beginPath(); ctx.moveTo(sigLast.current.x, sigLast.current.y); ctx.lineTo(p.x, p.y);
+                            ctx.strokeStyle = '#1a1f2e'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+                            sigLast.current = p;
+                        },
+                        onMouseUp: function() { sigDrawing.current = false; sigLast.current = null; },
+                        onTouchStart: function(ev) { ev.preventDefault(); sigDrawing.current = true; sigLast.current = sigPos(ev.nativeEvent || ev, ev.target); },
+                        onTouchMove: function(ev) {
+                            ev.preventDefault();
+                            if (!sigDrawing.current || !sigLast.current) return;
+                            const c = ev.target; const ctx = c.getContext('2d');
+                            const p = sigPos(ev.nativeEvent || ev, c);
+                            ctx.beginPath(); ctx.moveTo(sigLast.current.x, sigLast.current.y); ctx.lineTo(p.x, p.y);
+                            ctx.strokeStyle = '#1a1f2e'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+                            sigLast.current = p;
+                        },
+                        onTouchEnd: function(ev) { ev.preventDefault(); sigDrawing.current = false; sigLast.current = null; }
+                    })
+                );
+            };
             const movHoy = (state.history || []).filter(h => new Date(h.fecha).toDateString() === new Date().toDateString()).length;
             const misAsig = (state.assignments || []).filter(a => a.estado === 'Activo').length;
             const pendientes = (state.activos || []).filter(a => a.estado === 'Pendiente').length;
@@ -4607,6 +4739,9 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     sub && e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, sub)
                 );
             };
+
+            // Firma fullscreen — siempre tiene prioridad sobre cualquier pantalla
+            if (sigFullscreen) return renderSigFullscreen();
 
             // ── Pantalla principal ────────────────────────────────────────────
             if (screen === 'home') return e('div', { style: { display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-primary)' } },
@@ -4715,6 +4850,11 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             e('button', { onClick: () => exportEtiquetaPDF([a]), style: { padding: '16px', background: 'var(--bg-secondary)', border: '2px solid var(--border)', borderRadius: '14px', color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' } }, '🖨️ Imprimir etiqueta'),
                             a.estado === 'Almacen' && e('button', { onClick: () => onOpenModal('nueva-asignacion', null), style: { padding: '16px', background: '#3fb950', border: 'none', borderRadius: '14px', color: 'white', fontSize: '15px', fontWeight: '700', cursor: 'pointer' } }, '✅ Asignar equipo'),
                             a.estado === 'Asignado' && e('button', { onClick: () => onOpenModal('devolver-material', null), style: { padding: '16px', background: '#f97316', border: 'none', borderRadius: '14px', color: 'white', fontSize: '15px', fontWeight: '700', cursor: 'pointer' } }, '↩️ Registrar devolución'),
+                            // Firma fullscreen
+                            e('button', { onClick: openSignature, style: { padding: '16px', background: sigData ? 'rgba(63,185,80,.15)' : 'rgba(88,166,255,.1)', border: '2px solid ' + (sigData ? '#3fb95044' : '#58a6ff44'), borderRadius: '14px', color: sigData ? '#3fb950' : '#58a6ff', fontSize: '15px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' } },
+                                sigData ? '✅ Firma capturada — repetir' : '✍️ Firmar aquí'
+                            ),
+                            sigData && e('img', { src: sigData, style: { width: '100%', height: '80px', objectFit: 'contain', background: 'white', borderRadius: '10px', border: '1px solid var(--border)' }, alt: 'Firma' })
                         ),
                         // Nuevo escaneo
                         e('button', { onClick: launchScanner, style: { marginTop: '12px', padding: '16px', background: 'rgba(88,166,255,.1)', border: '2px solid #58a6ff44', borderRadius: '14px', color: '#58a6ff', fontSize: '15px', fontWeight: '700', cursor: 'pointer', width: '100%' } }, '📷 Escanear otro equipo')
@@ -4895,6 +5035,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 if (!dataManager || state.syncing) return;
                 setState(s => ({ ...s, syncing: true }));
                 try {
+                    cache.clear(); // Forzar recarga fresca desde SharePoint
                     const data = await dataManager.loadAllData();
                     setDataState(data, { syncing: false });
                     if (showMsg) showToast('Sincronizado correctamente', 'success');
