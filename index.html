@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.0.8'
+        version: '3.0.9'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -912,6 +912,12 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
     // Detecta el PaperName correcto consultando la impresora
     // Detecta el LabelName correcto consultando la impresora (formato DCD v1.6)
     async function detectDymoLabelName() {
+        // Rollo confirmado: WhiteNameBadgeS0722560 (SKU S0722560)
+        const cached = localStorage.getItem('dymo_label_name');
+        if (cached) return cached;
+        return 'WhiteNameBadgeS0722560';
+    }
+    async function detectDymoLabelName_unused() {
         const cached = localStorage.getItem('dymo_label_name');
         if (cached) { console.log('[DYMO] Usando LabelName guardado:', cached); return cached; }
         try {
@@ -926,47 +932,121 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         return null;
     }
 
-    // Construye XML en formato DesktopLabel (DYMO Connect 1.6.x) — unidades en pulgadas
-    function buildDymoLabelXml(activo, labelName) {
-        labelName = labelName || localStorage.getItem('dymo_label_name') || 'NameBadge11356';
-        // 89mm x 41mm en pulgadas landscape: W=3.504", H=1.614"
-        const W = 3.504, H = 1.614;
-        const qrUrl = window.location.href.split('?')[0].split('#')[0] + '?equipo=' + activo.idEtiqueta;
-        const id     = safePdfText(activo.idEtiqueta);
-        const tipo   = safePdfText(activo.tipo);
-        const modelo = activo.modelo   ? safePdfText(activo.modelo)   : '';
-        const ns     = activo.numSerie ? 'N/S: ' + safePdfText(activo.numSerie) : '';
-        const soc    = activo.sociedad ? safePdfText(activo.sociedad) : '';
+    // Construye XML DesktopLabel para DYMO Connect 1.6 — formato validado
+    // LabelName: WhiteNameBadgeS0722560 (SKU S0722560, 89x41mm Name Badge)
+    function buildDymoLabelXml(activo) {
+        var labelName = localStorage.getItem('dymo_label_name') || 'WhiteNameBadgeS0722560';
+        var qrUrl = window.location.href.split('?')[0].split('#')[0] + '?equipo=' + activo.idEtiqueta;
+        var id     = safePdfText(activo.idEtiqueta);
+        var tipo   = safePdfText(activo.tipo);
+        var modelo = activo.modelo   ? safePdfText(activo.modelo)   : '';
+        var ns     = activo.numSerie ? 'N/S: ' + safePdfText(activo.numSerie) : '';
+        var soc    = activo.sociedad ? safePdfText(activo.sociedad) : '';
 
-        const txt = function(name, text, x, y, w, h, fontSize, isBold, r, g, b) {
+        // Helper: TextObject en pulgadas — estructura validada contra schema DYMO 1.6
+        var txt = function(name, text, x, y, w, h, fontSize, isBold, r, g, b) {
             if (!text) return '';
-            return '<TextObject><Name>' + name + '</Name><Brushes><BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush><BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush><StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush><FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush></Brushes><Rotation>Rotation0</Rotation><OutlineThickness>1</OutlineThickness><IsOutlined>False</IsOutlined><BorderStyle>SolidLine</BorderStyle><Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin><HorizontalAlignment>Left</HorizontalAlignment><VerticalAlignment>Middle</VerticalAlignment><FitMode>AlwaysFit</FitMode><IsVertical>False</IsVertical><FormattedText><FitMode>AlwaysFit</FitMode><HorizontalAlignment>Left</HorizontalAlignment><VerticalAlignment>Middle</VerticalAlignment><IsVertical>False</IsVertical><LineTextSpan><TextSpan><Text>' + text + '</Text><FontInfo><FontName>Segoe UI</FontName><FontSize>' + fontSize + '</FontSize><IsBold>' + isBold + '</IsBold><IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush><SolidColorBrush><Color A="1" R="' + r + '" G="' + g + '" B="' + b + '"/></SolidColorBrush></FontBrush></FontInfo></TextSpan></LineTextSpan></FormattedText><ObjectLayout><DYMOPoint><X>' + x + '</X><Y>' + y + '</Y></DYMOPoint><Size><Width>' + w + '</Width><Height>' + h + '</Height></Size></ObjectLayout></TextObject>';
+            return '<TextObject>' +
+                '<n>' + name + '</n>' +
+                '<Brushes>' +
+                    '<BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush>' +
+                    '<BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush>' +
+                    '<StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush>' +
+                    '<FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush>' +
+                '</Brushes>' +
+                '<Rotation>Rotation0</Rotation>' +
+                '<OutlineThickness>1</OutlineThickness>' +
+                '<IsOutlined>False</IsOutlined>' +
+                '<BorderStyle>SolidLine</BorderStyle>' +
+                '<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin>' +
+                '<HorizontalAlignment>Left</HorizontalAlignment>' +
+                '<VerticalAlignment>Middle</VerticalAlignment>' +
+                '<FitMode>AlwaysFit</FitMode>' +
+                '<IsVertical>False</IsVertical>' +
+                '<FormattedText>' +
+                    '<FitMode>AlwaysFit</FitMode>' +
+                    '<HorizontalAlignment>Left</HorizontalAlignment>' +
+                    '<VerticalAlignment>Middle</VerticalAlignment>' +
+                    '<IsVertical>False</IsVertical>' +
+                    '<LineTextSpan>' +
+                        '<TextSpan>' +
+                            '<Text>' + text + '</Text>' +
+                            '<FontInfo>' +
+                                '<FontName>Segoe UI</FontName>' +
+                                '<FontSize>' + fontSize + '</FontSize>' +
+                                '<IsBold>' + isBold + '</IsBold>' +
+                                '<IsItalic>False</IsItalic>' +
+                                '<IsUnderline>False</IsUnderline>' +
+                                '<FontBrush><SolidColorBrush><Color A="1" R="' + r + '" G="' + g + '" B="' + b + '"/></SolidColorBrush></FontBrush>' +
+                            '</FontInfo>' +
+                        '</TextSpan>' +
+                    '</LineTextSpan>' +
+                '</FormattedText>' +
+                '<ObjectLayout>' +
+                    '<DYMOPoint><X>' + x + '</X><Y>' + y + '</Y></DYMOPoint>' +
+                    '<Size><Width>' + w + '</Width><Height>' + h + '</Height></Size>' +
+                '</ObjectLayout>' +
+            '</TextObject>';
         };
 
-        const tX = 1.62, tW = 1.82;
+        // QR: ocupa 1.44" a la izquierda. Texto: a la derecha desde X=1.62"
+        var tX = 1.62, tW = 1.82;
+
+        var labelObjects =
+            '<BarcodeObject>' +
+                '<n>QR1</n>' +
+                '<Brushes>' +
+                    '<BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush>' +
+                    '<BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush>' +
+                    '<StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush>' +
+                    '<FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush>' +
+                '</Brushes>' +
+                '<Rotation>Rotation0</Rotation>' +
+                '<OutlineThickness>1</OutlineThickness>' +
+                '<IsOutlined>False</IsOutlined>' +
+                '<BorderStyle>SolidLine</BorderStyle>' +
+                '<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin>' +
+                '<BarcodeFormat>QRCode</BarcodeFormat>' +
+                '<Data><DataString>' + qrUrl + '</DataString></Data>' +
+                '<HorizontalAlignment>Center</HorizontalAlignment>' +
+                '<VerticalAlignment>Middle</VerticalAlignment>' +
+                '<Size>Large</Size>' +
+                '<TextPosition>None</TextPosition>' +
+                '<ObjectLayout>' +
+                    '<DYMOPoint><X>0.06</X><Y>0.06</Y></DYMOPoint>' +
+                    '<Size><Width>1.44</Width><Height>1.44</Height></Size>' +
+                '</ObjectLayout>' +
+            '</BarcodeObject>' +
+            txt('EMPRESA', 'SANLUCAR FRUIT · IT', tX, 0.06, tW, 0.18, 7,   'False', '0.51', '0.51', '0.51') +
+            txt('ID',      id,                        tX, 0.27, tW, 0.32, 11,  'True',  '0',    '0',    '0'   ) +
+            txt('TIPO',    tipo,                       tX, 0.63, tW, 0.26, 9,   'True',  '0.12', '0.12', '0.12') +
+            txt('MODELO',  modelo,                     tX, 0.93, tW, 0.22, 7.5, 'False', '0.27', '0.27', '0.27') +
+            txt('NS',      ns,                         tX, 1.18, tW, 0.20, 6.5, 'False', '0.39', '0.39', '0.39') +
+            txt('SOC',     soc,                        tX, 1.41, tW, 0.16, 6,   'False', '0.59', '0.59', '0.59');
+
         return '<?xml version="1.0" encoding="utf-8"?>' +
-'<DesktopLabel Version="1">' +
-'<DYMOLabel Version="3">' +
-'<Description>Etiqueta IT Sanlucar</Description>' +
-'<Orientation>Landscape</Orientation>' +
-'<LabelName>' + labelName + '</LabelName>' +
-'<InitialLength>0</InitialLength>' +
-'<BorderStyle>SolidLine</BorderStyle>' +
-'<DYMORect><DYMOPoint><X>0.06</X><Y>0.06</Y></DYMOPoint><Size><Width>' + (W-0.12).toFixed(3) + '</Width><Height>' + (H-0.12).toFixed(3) + '</Height></Size></DYMORect>' +
-'<BorderColor><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderColor>' +
-'<BorderThickness>1</BorderThickness><Show_Border>False</Show_Border>' +
-'<DynamicLayoutManager><RotationBehavior>ClearObjects</RotationBehavior><LabelObjects>' +
-'<BarcodeObject>' +'<Name>QR1</Name>' +'<Brushes>' +'<BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush>' +'<BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush>' +'<StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush>' +'<FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush>' +'</Brushes>' +'<Rotation>Rotation0</Rotation>' +'<OutlineThickness>1</OutlineThickness>' +'<IsOutlined>False</IsOutlined>' +'<BorderStyle>SolidLine</BorderStyle>' +'<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin>' +'<BarcodeFormat>QRCode</BarcodeFormat>' +'<Data><DataString>' + qrUrl + '</DataString></Data>' +'<HorizontalAlignment>Center</HorizontalAlignment>' +'<VerticalAlignment>Middle</VerticalAlignment>' +'<Size>Large</Size>' +'<TextPosition>None</TextPosition>' +'<ObjectLayout>' +'<DYMOPoint><X>0.06</X><Y>0.06</Y></DYMOPoint>' +'<Size><Width>1.44</Width><Height>1.44</Height></Size>' +'</ObjectLayout>' +'</BarcodeObject>' +
-txt('TXT_EMPRESA', 'SANLUCAR FRUIT · IT', tX, 0.06, tW, 0.18, 7,    'False', '0.51', '0.51', '0.51') +
-txt('TXT_ID',      id,                       tX, 0.27, tW, 0.32, 11,   'True',  '0',    '0',    '0'   ) +
-txt('TXT_TIPO',    tipo,                      tX, 0.63, tW, 0.26, 9,    'True',  '0.12', '0.12', '0.12') +
-txt('TXT_MODELO',  modelo,                    tX, 0.93, tW, 0.22, 7.5,  'False', '0.27', '0.27', '0.27') +
-txt('TXT_NS',      ns,                        tX, 1.18, tW, 0.20, 6.5,  'False', '0.39', '0.39', '0.39') +
-txt('TXT_SOC',     soc,                       tX, 1.41, tW, 0.16, 6,    'False', '0.59', '0.59', '0.59') +
-'</LabelObjects></DynamicLayoutManager></DYMOLabel>' +
-'<LabelApplication>Blank</LabelApplication>' +
-'<DataTable><Columns/><Rows/></DataTable>' +
-'</DesktopLabel>';
+            '<DesktopLabel Version="1">' +
+                '<DYMOLabel Version="3">' +
+                    '<Description>Etiqueta IT Sanlucar</Description>' +
+                    '<Orientation>Landscape</Orientation>' +
+                    '<LabelName>' + labelName + '</LabelName>' +
+                    '<InitialLength>0</InitialLength>' +
+                    '<BorderStyle>SolidLine</BorderStyle>' +
+                    '<DYMORect>' +
+                        '<DYMOPoint><X>0.06</X><Y>0.06</Y></DYMOPoint>' +
+                        '<Size><Width>3.38</Width><Height>1.49</Height></Size>' +
+                    '</DYMORect>' +
+                    '<BorderColor><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderColor>' +
+                    '<BorderThickness>1</BorderThickness>' +
+                    '<Show_Border>False</Show_Border>' +
+                    '<DynamicLayoutManager>' +
+                        '<RotationBehavior>ClearObjects</RotationBehavior>' +
+                        '<LabelObjects>' + labelObjects + '</LabelObjects>' +
+                    '</DynamicLayoutManager>' +
+                '</DYMOLabel>' +
+                '<LabelApplication>Blank</LabelApplication>' +
+                '<DataTable><Columns/><Rows/></DataTable>' +
+            '</DesktopLabel>';
     }
 
     // Envía XML a la API REST de DYMO Connect 1.6
@@ -984,7 +1064,7 @@ txt('TXT_SOC',     soc,                       tX, 1.41, tW, 0.16, 6,    'False',
     }
 
     // LabelNames a probar en orden
-    const DYMO_LABEL_FALLBACKS = ['Address30251'];
+    const DYMO_LABEL_FALLBACKS = ['WhiteNameBadgeS0722560'];
 
     async function printDymoLabel(activo) {
         const detectedName = await detectDymoLabelName();
