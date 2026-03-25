@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.0.1'
+        version: '3.0.3'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -239,7 +239,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             appTitle: 'Sistema de Inventario IT',
             login: 'Iniciar Sesión con Microsoft', loginIng: 'Iniciando...',
             loginDesc: 'Inicia sesión con tu cuenta corporativa de Microsoft 365 para acceder al sistema de gestión de inventario.',
-            loginNote: 'Usa tu cuenta @sanlucar.com',
+            loginNote: T().loginNote,
             dashboard: '📊 Dashboard', inventory: '📦 Inventario', equipment: '💻 Equipos',
             assignments: '📋 Asignaciones', history: '📜 Historial', admin: '🛠️ Admin',
             sync: '🔄 Sync', syncing: '⏳ Sync...', logout: 'Salir',
@@ -259,8 +259,51 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             packLoad: 'Cargar pack',
             packStandard: 'Usuario Estándar', packPremium: 'Usuario Premium',
             saving: 'Guardando...', loading: 'Cargando...',
-            welcome: 'Bienvenido',
-            noAccess: 'Sin acceso',
+            welcome: 'Bienvenido', noAccess: 'Sin acceso',
+            // Inventario
+            zones: T().zones, list: T().list, newItem: T().newItem, criticalStock: 'Stock Crítico',
+            noResults: 'Sin resultados', tryOtherFilters: 'Prueba otros filtros',
+            allCategories: 'Todas las categorías', sortName: 'Ordenar: Nombre',
+            sortStock: 'Ordenar: Stock', allStatuses: 'Todos',
+            stockLow: '⚠️ Stock bajo', outOfStock: '🔴 Sin stock',
+            // Equipos
+            backToList: T().backToList, exitScanner: T().exitScanner,
+            mapView: T().mapView, scannerMode: T().scannerMode, receiveBatch: T().receiveBatch,
+            pendingNSCount: '⚠️ Pendientes N/S',
+            // Asignaciones
+            assignMaterial: T().assignMaterial, returnMaterial: '↩️ Devolver',
+            allTypes: 'Todos los tipos', allStates: 'Todos los estados',
+            allDepts: 'Todos los dptos.', results: 'resultado(s)',
+            clearFilters: '✕ Limpiar', activeAssignment: 'Asignación', activeLoan: 'Préstamo',
+            assigned: 'Asignado', returned: 'Devuelto', partial: 'Parcial', expired: '⚠️ Vencidos',
+            noAssignments: 'No hay asignaciones', createFirst: 'Empieza asignando material a un empleado',
+            // Historial
+            allTechnicians: 'Todos los técnicos', allMovements: 'Todos los movimientos',
+            dateFrom: 'Desde', dateTo: 'Hasta',
+            // Dashboard
+            missionControl: T().missionControl, lastSync: 'Última sincronización',
+            generalStatus: T().generalStatus, optimal: T().optimal, attention: T().attention, critical: 'Crítico',
+            equipments: 'Equipos', inStorage: 'En Almacén', today: 'Hoy',
+            noAlerts: 'sin alertas', alerts: 'alerta(s)',
+            allOk: 'Todo en orden', noActiveAlerts: 'No hay alertas activas',
+            nearWarranties: 'Garantías Próximas', noExpiring: 'Sin vencimientos próximos',
+            next90: 'Próximos 90 días OK', topTechnicians: '🏆 Top Técnicos — Este Mes',
+            noActivityMonth: T().noActivityMonth, recentActivity: T().recentActivity,
+            viewAll: 'Ver todo →', criticalStockTitle: T().criticalStockTitle,
+            stockOptimal: T().stockOptimal, noMovements: 'Sin movimientos',
+            incidents: '🔧 Equipos con Incidencia',
+            // Admin
+            adminPanel: T().adminPanel,
+            infraGroup: T().infraGroup, catalogGroup: T().catalogGroup,
+            usersGroup: T().usersGroup, systemGroup: T().systemGroup,
+            locations: 'Ubicaciones', societies: 'Sociedades', suppliers: 'Proveedores',
+            catalog: 'Catálogo', packs: 'Packs', technicians: 'Técnicos',
+            administrators: 'Administradores', settings: 'Ajustes', exportAudit: 'Exportar', actionLog: 'Log de Acciones',
+            // Ficha equipo
+            equipmentFile: T().equipmentFile, timeline: T().timeline,
+            noMovementsYet: T().noMovementsYet,
+            accessories: T().accessories, saveChanges: T().saveChanges,
+            changeStatus: T().changeStatus, printLabel: T().printLabel,
         },
         en: {
             appTitle: 'IT Inventory System',
@@ -286,8 +329,51 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             packLoad: 'Load pack',
             packStandard: 'Standard User', packPremium: 'Premium User',
             saving: 'Saving...', loading: 'Loading...',
-            welcome: 'Welcome',
-            noAccess: 'No access',
+            welcome: 'Welcome', noAccess: 'No access',
+            // Inventory
+            zones: '🗄️ Cabinets', list: '☰ List', newItem: '+ New', criticalStock: 'Critical Stock',
+            noResults: 'No results', tryOtherFilters: 'Try other filters',
+            allCategories: 'All categories', sortName: 'Sort: Name',
+            sortStock: 'Sort: Stock', allStatuses: 'All',
+            stockLow: '⚠️ Low stock', outOfStock: '🔴 Out of stock',
+            // Equipment
+            backToList: '← Back to list', exitScanner: '← Exit scanner',
+            mapView: '🗺️ Map', scannerMode: '⚡ Scanner', receiveBatch: '+ Receive',
+            pendingNSCount: '⚠️ Pending S/N',
+            // Assignments
+            assignMaterial: '+ Assign', returnMaterial: '↩️ Return',
+            allTypes: 'All types', allStates: 'All states',
+            allDepts: 'All depts.', results: 'result(s)',
+            clearFilters: '✕ Clear', activeAssignment: 'Assignment', activeLoan: 'Loan',
+            assigned: 'Assigned', returned: 'Returned', partial: 'Partial', expired: '⚠️ Expired',
+            noAssignments: 'No assignments', createFirst: 'Start by assigning material to an employee',
+            // History
+            allTechnicians: 'All technicians', allMovements: 'All movements',
+            dateFrom: 'From', dateTo: 'To',
+            // Dashboard
+            missionControl: T().missionControl, lastSync: 'Last sync',
+            generalStatus: 'General Status', optimal: 'Optimal', attention: 'Attention', critical: 'Critical',
+            equipments: 'Equipment', inStorage: 'In Storage', today: 'Today',
+            noAlerts: 'no alerts', alerts: 'alert(s)',
+            allOk: 'All clear', noActiveAlerts: 'No active alerts',
+            nearWarranties: 'Upcoming Warranties', noExpiring: 'No upcoming expirations',
+            next90: 'Next 90 days OK', topTechnicians: '🏆 Top Technicians — This Month',
+            noActivityMonth: 'No activity this month', recentActivity: '📜 Recent Activity',
+            viewAll: 'View all →', criticalStockTitle: '📦 Critical Stock',
+            stockOptimal: 'Stock at optimal levels', noMovements: 'No movements',
+            incidents: '🔧 Equipment with Incidents',
+            // Admin
+            adminPanel: '🛠️ Admin Panel',
+            infraGroup: '📍 Infrastructure', catalogGroup: '📦 Catalogue & Stock',
+            usersGroup: '👥 Users', systemGroup: '⚙️ System',
+            locations: 'Locations', societies: 'Companies', suppliers: 'Suppliers',
+            catalog: 'Catalogue', packs: 'Packs', technicians: 'Technicians',
+            administrators: 'Administrators', settings: 'Settings', exportAudit: 'Export', actionLog: 'Action Log',
+            // Equipment file
+            equipmentFile: '📄 Equipment File', timeline: '📋 Equipment Timeline',
+            noMovementsYet: 'No movements registered yet',
+            accessories: '🔌 Included accessories', saveChanges: 'Save changes',
+            changeStatus: '🔄 Change status', printLabel: '🖨️ Print label',
         }
     };
     let currentLang = localStorage.getItem('inv_lang') || 'es';
@@ -831,104 +917,75 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
     ];
 
     // Detecta el PaperName correcto consultando la impresora
-    async function detectDymoPaperName() {
-        // 0 — Si el usuario ha guardado manualmente un PaperName que funcionó, usarlo
-        const cached = localStorage.getItem('dymo_paper_name');
-        if (cached) { console.log('[DYMO] Usando PaperName guardado:', cached); return cached; }
-
-        // 1 — Consumables endpoint → da el nombre exacto del papel cargado
+    // Detecta el LabelName correcto consultando la impresora (formato DCD v1.6)
+    async function detectDymoLabelName() {
+        const cached = localStorage.getItem('dymo_label_name');
+        if (cached) { console.log('[DYMO] Usando LabelName guardado:', cached); return cached; }
         try {
-            const resp = await fetch(DYMO_URL + '/dcd/api/get-consumables-printer/' + encodeURIComponent(DYMO_PRINTER));
+            const resp = await fetch(DYMO_URL + '/dcd/api/get-default-label/LabelWriter');
             if (resp.ok) {
                 const data = await resp.json();
                 const rv = data.responseValue || data;
-                console.log('[DYMO] get-consumables response:', JSON.stringify(rv).slice(0, 300));
-                // Buscar el nombre del papel en la respuesta
-                const pn = rv.paperName || rv.name || rv.labelName || rv.mediaName;
-                if (pn && pn !== 'null') { console.log('[DYMO] PaperName desde consumables:', pn); return pn; }
-                // Intentar extraer del SKU
-                const sku = rv.sku || (rv.rollStatusResponse && rv.rollStatusResponse.sku);
-                if (sku && DYMO_SKU_MAP[sku]) { console.log('[DYMO] PaperName desde SKU:', sku, '→', DYMO_SKU_MAP[sku]); return DYMO_SKU_MAP[sku]; }
+                const ln = rv && rv.label && rv.label.name;
+                if (ln) { console.log('[DYMO] LabelName desde get-default-label:', ln); return ln; }
             }
-        } catch(e) { console.warn('[DYMO] get-consumables falló:', e.message); }
-
-        // 2 — Printers endpoint → SKU del rollo cargado
-        try {
-            const resp = await fetch(DYMO_URL + '/dcd/api/get-printers');
-            if (resp.ok) {
-                const data = await resp.json();
-                const printers = Array.isArray(data.responseValue) ? data.responseValue : [data.responseValue];
-                for (const p of printers) {
-                    if (!p) continue;
-                    const sku = (p.rollStatusResponse || {}).sku;
-                    console.log('[DYMO] get-printers SKU:', sku);
-                    if (sku && DYMO_SKU_MAP[sku]) { console.log('[DYMO] PaperName desde SKU:', DYMO_SKU_MAP[sku]); return DYMO_SKU_MAP[sku]; }
-                }
-            }
-        } catch(e) { console.warn('[DYMO] get-printers falló:', e.message); }
-
-        console.warn('[DYMO] No se pudo detectar PaperName, probando fallbacks');
+        } catch(e) { console.warn('[DYMO] get-default-label falló:', e.message); }
         return null;
     }
 
-    // Construye el XML de la etiqueta con el PaperName indicado
-    function buildDymoLabelXmlStatic(activo, paperName) {
-        paperName = paperName || localStorage.getItem('dymo_paper_name') || '11356 Name Badge';
-        // DYMO 11356 Name Badge 89x41mm landscape
-        // Twips: 89mm=5045 (ancho/largo), 41mm=2325 (alto/corto)
-        const W = 5045, H = 2325;
+    // Construye XML en formato DesktopLabel (DYMO Connect 1.6.x) — unidades en pulgadas
+    function buildDymoLabelXml(activo, labelName) {
+        labelName = labelName || localStorage.getItem('dymo_label_name') || 'NameBadge11356';
+        // 89mm x 41mm en pulgadas landscape: W=3.504", H=1.614"
+        const W = 3.504, H = 1.614;
         const qrUrl = window.location.href.split('?')[0].split('#')[0] + '?equipo=' + activo.idEtiqueta;
         const id     = safePdfText(activo.idEtiqueta);
         const tipo   = safePdfText(activo.tipo);
         const modelo = activo.modelo   ? safePdfText(activo.modelo)   : '';
         const ns     = activo.numSerie ? 'N/S: ' + safePdfText(activo.numSerie) : '';
         const soc    = activo.sociedad ? safePdfText(activo.sociedad) : '';
-        const TX = 2250, TW = 2700;
-        const t = (name, str, y, h, size, bold, r, g, b) => !str ? '' : `
-  <ObjectInfo>
-    <TextObject>
-      <n>${name}</n><ForeColor Alpha="255" Red="${r}" Green="${g}" Blue="${b}"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName><Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored><IsVariable>False</IsVariable>
-      <HorizontalAlignment>Left</HorizontalAlignment><VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode><UseFullFontHeight>True</UseFullFontHeight><Verticalized>False</Verticalized>
-      <StyledText><Element><String>${str}</String><Attributes>
-        <Font Family="Arial" Size="${size}" Bold="${bold}" Italic="False" Underline="False" Strikeout="False"/>
-        <ForeColor Alpha="255" Red="${r}" Green="${g}" Blue="${b}"/>
-      </Attributes></Element></StyledText>
-    </TextObject>
-    <Bounds X="${TX}" Y="${y}" Width="${TW}" Height="${h}"/>
-  </ObjectInfo>`;
-        return `<?xml version="1.0" encoding="utf-8"?>
-<DieCutLabel Version="8.0" Units="twips">
-  <PaperOrientation>Landscape</PaperOrientation>
-  <Id>NameBadge</Id>
-  <PaperName>${paperName}</PaperName>
-  <DrawCommands><RoundRectangle X="0" Y="0" Width="${W}" Height="${H}" Rx="180" Ry="180"/></DrawCommands>
-  <ObjectInfo>
-    <BarcodeObject>
-      <n>QR</n><ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName><Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored><IsVariable>False</IsVariable>
-      <Text>${qrUrl}</Text><Type>QRCode</Type><Size>Large</Size><TextPosition>None</TextPosition>
-      <TextFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-      <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-      <BarcodeFormat>0</BarcodeFormat><AspectRatio>0</AspectRatio>
-    </BarcodeObject>
-    <Bounds X="60" Y="60" Width="2100" Height="2200"/>
-  </ObjectInfo>
-  ${t('EMPRESA','SANLUCAR FRUIT · IT',80, 200,7,  'False',130,130,130)}
-  ${t('ID',     id,                        310,360,9,  'True', 0,  0,  0  )}
-  ${t('TIPO',   tipo,                      710,300,8,  'True', 30, 30, 30 )}
-  ${t('MODELO', modelo,                    1050,270,7, 'False',70, 70, 70 )}
-  ${t('NS',     ns,                        1360,250,6.5,'False',100,100,100)}
-  ${t('SOC',    soc,                       1650,230,6, 'False',150,150,150)}
-</DieCutLabel>`;
+
+        const txt = function(name, text, x, y, w, h, fontSize, isBold, r, g, b) {
+            if (!text) return '';
+            return '<TextObject><n>' + name + '</n><Brushes><BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush><BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush><StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush><FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush></Brushes><Rotation>Rotation0</Rotation><OutlineThickness>1</OutlineThickness><IsOutlined>False</IsOutlined><BorderStyle>SolidLine</BorderStyle><Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin><HorizontalAlignment>Left</HorizontalAlignment><VerticalAlignment>Middle</VerticalAlignment><FitMode>AlwaysFit</FitMode><IsVertical>False</IsVertical><FormattedText><FitMode>AlwaysFit</FitMode><HorizontalAlignment>Left</HorizontalAlignment><VerticalAlignment>Middle</VerticalAlignment><IsVertical>False</IsVertical><LineTextSpan><TextSpan><Text>' + text + '</Text><FontInfo><FontName>Segoe UI</FontName><FontSize>' + fontSize + '</FontSize><IsBold>' + isBold + '</IsBold><IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush><SolidColorBrush><Color A="1" R="' + r + '" G="' + g + '" B="' + b + '"/></SolidColorBrush></FontBrush></FontInfo></TextSpan></LineTextSpan></FormattedText><ObjectLayout><DYMOPoint><X>' + x + '</X><Y>' + y + '</Y></DYMOPoint><Size><Width>' + w + '</Width><Height>' + h + '</Height></Size></ObjectLayout></TextObject>';
+        };
+
+        const tX = 1.62, tW = 1.82;
+        return '<?xml version="1.0" encoding="utf-8"?>' +
+'<DesktopLabel Version="1">' +
+'<DYMOLabel Version="3">' +
+'<Description>Etiqueta IT Sanlucar</Description>' +
+'<Orientation>Landscape</Orientation>' +
+'<LabelName>' + labelName + '</LabelName>' +
+'<InitialLength>0</InitialLength>' +
+'<BorderStyle>SolidLine</BorderStyle>' +
+'<DYMORect><DYMOPoint><X>0.06</X><Y>0.06</Y></DYMOPoint><Size><Width>' + (W-0.12).toFixed(3) + '</Width><Height>' + (H-0.12).toFixed(3) + '</Height></Size></DYMORect>' +
+'<BorderColor><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderColor>' +
+'<BorderThickness>1</BorderThickness><Show_Border>False</Show_Border>' +
+'<DynamicLayoutManager><RotationBehavior>ClearObjects</RotationBehavior><LabelObjects>' +
+'<BarcodeObject><n>QR1</n>' +
+'<Brushes><BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush><BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush><StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush><FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush></Brushes>' +
+'<Rotation>Rotation0</Rotation><OutlineThickness>1</OutlineThickness><IsOutlined>False</IsOutlined><BorderStyle>SolidLine</BorderStyle><Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin>' +
+'<BarcodeFormat>QRCode</BarcodeFormat><Data><DataString>' + qrUrl + '</DataString></Data>' +
+'<HorizontalAlignment>Center</HorizontalAlignment><VerticalAlignment>Middle</VerticalAlignment>' +
+'<Size>Large</Size><EccType>LevelM</EccType>' +
+'<ForeColor><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></ForeColor>' +
+'<BackColor><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackColor>' +
+'<ObjectLayout><DYMOPoint><X>0.06</X><Y>0.06</Y></DYMOPoint><Size><Width>1.44</Width><Height>1.44</Height></Size></ObjectLayout>' +
+'</BarcodeObject>' +
+txt('TXT_EMPRESA', 'SANLUCAR FRUIT · IT', tX, 0.06, tW, 0.18, 7,    'False', '0.51', '0.51', '0.51') +
+txt('TXT_ID',      id,                       tX, 0.27, tW, 0.32, 11,   'True',  '0',    '0',    '0'   ) +
+txt('TXT_TIPO',    tipo,                      tX, 0.63, tW, 0.26, 9,    'True',  '0.12', '0.12', '0.12') +
+txt('TXT_MODELO',  modelo,                    tX, 0.93, tW, 0.22, 7.5,  'False', '0.27', '0.27', '0.27') +
+txt('TXT_NS',      ns,                        tX, 1.18, tW, 0.20, 6.5,  'False', '0.39', '0.39', '0.39') +
+txt('TXT_SOC',     soc,                       tX, 1.41, tW, 0.16, 6,    'False', '0.59', '0.59', '0.59') +
+'</LabelObjects></DynamicLayoutManager></DYMOLabel>' +
+'<LabelApplication>Blank</LabelApplication>' +
+'<DataTable><Columns/><Rows/></DataTable>' +
+'</DesktopLabel>';
     }
 
-    // Envía un XML concreto a la API REST de DYMO y devuelve true o lanza error
+    // Envía XML a la API REST de DYMO Connect 1.6
     async function sendDymoPrint(labelXml) {
         const body = JSON.stringify({ printerName: DYMO_PRINTER, labelXml, copies: 1 });
         const resp = await fetch(DYMO_URL + '/dcd/api/print-label', {
@@ -937,38 +994,41 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         const text = await resp.text();
         let data; try { data = JSON.parse(text); } catch(e) { data = { status: resp.ok }; }
         if (!resp.ok || data.status === false) {
-            const err = data.error || text.slice(0, 300);
-            throw new Error(err);
+            throw new Error(data.error || text.slice(0, 300));
         }
         return true;
     }
 
-    async function printDymoLabel(activo) {
-        // 1 — Detectar PaperName real de la impresora
-        const detectedName = await detectDymoPaperName();
-        const namesToTry = detectedName
-            ? [detectedName, ...DYMO_PAPER_FALLBACKS.filter(n => n !== detectedName)]
-            : DYMO_PAPER_FALLBACKS;
+    // LabelNames a probar en orden
+    const DYMO_LABEL_FALLBACKS = ['NameBadge11356', '11356 Name Badge', 'NameBadge', 'Address30251'];
 
-        let lastError = null;
-        for (const paperName of namesToTry) {
+    async function printDymoLabel(activo) {
+        const detectedName = await detectDymoLabelName();
+        const namesToTry = detectedName
+            ? [detectedName, ...DYMO_LABEL_FALLBACKS.filter(function(n) { return n !== detectedName; })]
+            : DYMO_LABEL_FALLBACKS;
+        var lastError = null;
+        for (var i = 0; i < namesToTry.length; i++) {
+            var labelName = namesToTry[i];
             try {
-                console.log('[DYMO] Intentando PaperName:', paperName);
-                const labelXml = buildDymoLabelXmlStatic(activo, paperName);
+                console.log('[DYMO] Intentando LabelName:', labelName);
+                var labelXml = buildDymoLabelXml(activo, labelName);
                 await sendDymoPrint(labelXml);
-                console.log('[DYMO] ✅ Impresión OK con PaperName:', paperName);
-                // Guardar el nombre que funcionó para no volver a probar
-                try { localStorage.setItem('dymo_paper_name', paperName); } catch(e) {}
+                console.log('[DYMO] ✅ OK con LabelName:', labelName);
+                try { localStorage.setItem('dymo_label_name', labelName); } catch(e) {}
                 return true;
             } catch(e) {
-                console.warn('[DYMO] ❌ Falló con "' + paperName + '":', e.message.slice(0, 120));
+                console.warn('[DYMO] ❌ Falló "' + labelName + '":', e.message.slice(0, 150));
                 lastError = e;
-                // Solo seguir intentando si el error es de PaperName, no de otro tipo
-                if (!e.message.includes('not declared') && !e.message.includes('DieCutLabel') && !e.message.includes('Invalid label')) break;
+                var msg = e.message || '';
+                if (!msg.includes('not declared') && !msg.includes('Invalid label') &&
+                    !msg.includes('LabelName') && !msg.includes('not found') &&
+                    !msg.includes('DesktopLabel') && !msg.includes('DYMOLabel')) break;
             }
         }
         throw new Error('No se pudo imprimir. Último error: ' + (lastError ? lastError.message.slice(0, 200) : 'desconocido'));
     }
+
     // Genera QR como data URL — usa librería embebida, sin CDN
     function generateQRDataUrl(text) {
         return new Promise(function(resolve) {
@@ -1191,13 +1251,17 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const handleLogin = async () => { setLoading(true); try { await onLogin(); } catch(err) { showToast('Error al iniciar sesion', 'error'); } finally { setLoading(false); } };
             return e('div', { className: 'login-screen' },
                 e('div', { className: 'login-box' },
-                    e('span', { className: 'login-icon' }, '📦'),
-                    e('h1', null, 'Sistema de Inventario IT'),
-                    e('p', { style: { fontSize: '14px', color: 'var(--accent-purple)', fontWeight: '600', marginBottom: '12px' } }, 'Sanlucar Fruit'),
-                    e('p', null, 'Inicia sesion con tu cuenta corporativa de Microsoft 365 para acceder al sistema de gestion de inventario.'),
+                    e('div', { style: { marginBottom: '24px', display: 'flex', justifyContent: 'center' } },
+                        e('img', { src: 'https://sanlucar.com/wp-content/uploads/2023/03/SanLucar_LOGO_final.svg', alt: 'Sanlúcar Fruit', style: { height: '64px', width: 'auto', objectFit: 'contain' },
+                            onError: function(ev) { ev.target.style.display = 'none'; }
+                        })
+                    ),
+                    e('h1', null, T().appTitle),
+                    e('p', { style: { fontSize: '14px', color: 'var(--accent-purple)', fontWeight: '600', marginBottom: '12px' } }, 'Sanlucar Fruit · IT'),
+                    e('p', null, T().loginDesc),
                     e('button', { className: 'button button-primary', onClick: handleLogin, disabled: loading, style: { width: '100%', marginTop: '16px' } },
-                        loading ? e('span', { className: 'loading-spinner' }) : null, loading ? ' Iniciando...' : ' Iniciar Sesion con Microsoft'),
-                    e('p', { style: { fontSize: '12px', marginTop: '24px' } }, 'Usa tu cuenta @sanlucar.com')
+                        loading ? e('span', { className: 'loading-spinner' }) : null, loading ? ' ' + T().loginIng : ' ' + T().login),
+                    e('p', { style: { fontSize: '12px', marginTop: '24px' } }, T().loginNote)
                 )
             );
         }
@@ -1251,7 +1315,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             health -= prestamosVencidos.length * 5;
             health = Math.max(0, Math.min(100, health));
             const healthColor = health >= 80 ? '#3fb950' : health >= 55 ? '#fbbf24' : '#ef4444';
-            const healthLabel = health >= 80 ? 'Óptimo' : health >= 55 ? 'Atención' : 'Crítico';
+            const healthLabel = health >= 80 ? T().optimal : health >= 55 ? T().attention : 'Crítico';
 
             // ── Animated counters ──────────────────────────────────────────────
             React.useEffect(function() {
@@ -1398,12 +1462,12 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 // ── Header ────────────────────────────────────────────────────
                 e('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'16px' } },
                     e('div', null,
-                        e('h2', { style:{ fontSize:'26px', fontWeight:'800', marginBottom:'4px', background:'linear-gradient(135deg, var(--text-primary), var(--text-secondary))', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' } }, '🎛️ Mission Control'),
+                        e('h2', { style:{ fontSize:'26px', fontWeight:'800', marginBottom:'4px', background:'linear-gradient(135deg, var(--text-primary), var(--text-secondary))', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' } }, T().missionControl),
                         e('div', { style:{ fontSize:'13px', color:'var(--text-secondary)' } }, 'Última sincronización: ' + (state.lastSync ? state.lastSync.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : '—'))
                     ),
                     e('div', { style:{ display:'flex', alignItems:'center', gap:'16px', background:'var(--bg-secondary)', border:'2px solid '+healthColor+'44', borderRadius:'16px', padding:'14px 20px' } },
                         e('div', { style:{ textAlign:'center' } },
-                            e('div', { style:{ fontSize:'10px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'3px' } }, 'Estado General'),
+                            e('div', { style:{ fontSize:'10px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'3px' } }, T().generalStatus),
                             e('div', { style:{ fontSize:'30px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color:healthColor, lineHeight:1 } }, health + '%'),
                             e('div', { style:{ fontSize:'11px', fontWeight:'700', color:healthColor, marginTop:'2px' } }, healthLabel)
                         ),
@@ -1608,9 +1672,9 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
 
                     // Top técnicos
                     card(e('div', null,
-                        cardTitle('🏆 Top Técnicos — Este Mes'),
+                        cardTitle(T().topTechnicians),
                         techAct.length === 0 ?
-                            e('div', { style:{ textAlign:'center', padding:'20px', color:'var(--text-secondary)', fontSize:'13px' } }, 'Sin actividad este mes') :
+                            e('div', { style:{ textAlign:'center', padding:'20px', color:'var(--text-secondary)', fontSize:'13px' } }, T().noActivityMonth) :
                             e('div', { style:{ display:'flex', flexDirection:'column', gap:'12px' } },
                                 techAct.map(function(t, i) {
                                     var medals = ['🥇','🥈','🥉'];
@@ -1633,7 +1697,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     // Actividad reciente
                     card(e('div', null,
                         e('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' } },
-                            e('div', { style:{ fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px' } }, '📜 Actividad Reciente'),
+                            e('div', { style:{ fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px' } }, T().recentActivity),
                             e('button', { onClick: () => onNavigate('historial', {}), style:{ background:'none', border:'none', color:'#58a6ff', fontSize:'12px', fontWeight:'700', cursor:'pointer' } }, 'Ver todo →')
                         ),
                         recentH.length === 0 ?
@@ -1660,13 +1724,13 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     // Stock crítico
                     card(e('div', null,
                         e('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' } },
-                            e('div', { style:{ fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px' } }, '📦 Stock Crítico'),
+                            e('div', { style:{ fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px' } }, T().criticalStockTitle),
                             e('button', { onClick: () => onNavigate('inventario', { tipo:'stockBajo' }), style:{ background:'none', border:'none', color:'#58a6ff', fontSize:'12px', fontWeight:'700', cursor:'pointer' } }, 'Ver todo →')
                         ),
                         inv.stockBajo === 0 && inv.sinStock === 0 ?
                             e('div', { style:{ textAlign:'center', padding:'28px 0' } },
                                 e('div', { style:{ fontSize:'40px', marginBottom:'8px' } }, '✅'),
-                                e('div', { style:{ color:'#3fb950', fontWeight:'700', fontSize:'14px' } }, 'Stock en niveles óptimos')
+                                e('div', { style:{ color:'#3fb950', fontWeight:'700', fontSize:'14px' } }, T().stockOptimal)
                             ) :
                             e('div', { style:{ display:'flex', flexDirection:'column', gap:'9px' } },
                                 state.inventory
@@ -1688,6 +1752,57 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                                         );
                                     })
                             )
+                    )),
+
+                    // Equipos con incidencia
+                    card(e('div', null,
+                        cardTitle(T().incidents, { fn: () => onNavigate('equipos', {}), label: T().viewAll }),
+                        (function() {
+                            var incidencias = [
+                                { estado: 'Reparacion', label: 'En Reparación', color: '#a855f7', icon: '🔧' },
+                                { estado: 'Extraviado', label: 'Extraviados',   color: '#f97316', icon: '🔍' },
+                                { estado: 'Robado',     label: 'Robados',       color: '#ef4444', icon: '🚨' },
+                            ];
+                            var equiposInc = incidencias.map(function(inc) {
+                                return Object.assign({}, inc, { items: equiposAll.filter(function(a) { return a.estado === inc.estado; }) });
+                            }).filter(function(inc) { return inc.items.length > 0; });
+
+                            if (equiposInc.length === 0) return e('div', { style:{ textAlign:'center', padding:'28px 0' } },
+                                e('div', { style:{ fontSize:'40px', marginBottom:'8px' } }, '✅'),
+                                e('div', { style:{ color:'#3fb950', fontWeight:'700', fontSize:'14px' } }, T().allOk),
+                                e('div', { style:{ color:'var(--text-secondary)', fontSize:'12px', marginTop:'4px' } }, 'Sin equipos con incidencia')
+                            );
+
+                            return e('div', { style:{ display:'flex', flexDirection:'column', gap:'10px' } },
+                                // Contadores por tipo
+                                e('div', { style:{ display:'flex', gap:'8px', marginBottom:'4px' } },
+                                    incidencias.map(function(inc) {
+                                        var cnt = equiposAll.filter(function(a) { return a.estado === inc.estado; }).length;
+                                        return e('div', { key: inc.estado, style:{ flex:1, textAlign:'center', background: cnt > 0 ? inc.color+'15' : 'var(--bg-tertiary)', border:'1px solid '+(cnt > 0 ? inc.color+'44' : 'var(--border)'), borderRadius:'8px', padding:'8px 4px' } },
+                                            e('div', { style:{ fontSize:'18px' } }, inc.icon),
+                                            e('div', { style:{ fontSize:'20px', fontWeight:'800', fontFamily:'IBM Plex Mono,monospace', color: cnt > 0 ? inc.color : 'var(--text-secondary)', lineHeight:1 } }, cnt),
+                                            e('div', { style:{ fontSize:'9px', color:'var(--text-secondary)', fontWeight:'700', textTransform:'uppercase', marginTop:'2px' } }, inc.label)
+                                        );
+                                    })
+                                ),
+                                // Lista de equipos afectados
+                                equiposInc.flatMap(function(inc) {
+                                    return inc.items.slice(0, 3).map(function(a, i) {
+                                        return e('div', { key: inc.estado + i, onClick: () => onNavigate('equipos', { estado: inc.estado }), style:{ display:'flex', alignItems:'center', gap:'10px', padding:'9px 12px', background:inc.color+'0d', border:'1px solid '+inc.color+'22', borderRadius:'8px', cursor:'pointer', transition:'all .15s' },
+                                            onMouseEnter: ev => { ev.currentTarget.style.borderColor = inc.color + '66'; },
+                                            onMouseLeave: ev => { ev.currentTarget.style.borderColor = inc.color + '22'; }
+                                        },
+                                            e('span', { style:{ fontSize:'16px', flexShrink:0 } }, inc.icon),
+                                            e('div', { style:{ flex:1, minWidth:0 } },
+                                                e('div', { style:{ fontSize:'12px', fontWeight:'700', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, a.tipo + (a.modelo ? ' · ' + a.modelo : '')),
+                                                e('div', { style:{ fontSize:'10px', fontFamily:'IBM Plex Mono,monospace', color:'var(--text-secondary)' } }, a.idEtiqueta)
+                                            ),
+                                            a.motivoIncidencia && e('div', { style:{ fontSize:'10px', color:inc.color, maxWidth:'80px', textAlign:'right', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, a.motivoIncidencia)
+                                        );
+                                    });
+                                })
+                            );
+                        })()
                     ))
                 )
             );
@@ -1840,7 +1955,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             e('button', { onClick:()=>setViewMode('lista'),
                                 style:{ padding:'6px 14px', borderRadius:'6px', border:'none', cursor:'pointer', fontSize:'13px', fontWeight:'700',
                                     background: viewMode==='lista' ? 'var(--accent-blue)' : 'transparent',
-                                    color: viewMode==='lista' ? 'white' : 'var(--text-secondary)' } }, '☰ Lista')
+                                    color: viewMode==='lista' ? 'white' : 'var(--text-secondary)' } }, T().list)
                         )
                     ),
                     viewMode === 'zonas' && sedes.length > 1 && e('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap' } },
@@ -2244,11 +2359,11 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     ),
                     // Botones de acción grandes para iPad
                     e('button', { className:'button button-success', style:{ padding:'0 24px', fontSize:'15px', fontWeight:'800', borderRadius:'14px', minHeight:'52px', whiteSpace:'nowrap' },
-                        onClick: () => onOpenModal('nueva-asignacion', null) }, '+ Asignar'),
+                        onClick: () => onOpenModal('nueva-asignacion', null) }, T().assignMaterial),
                     e('button', { className:'button button-warning', style:{ padding:'0 20px', fontSize:'15px', fontWeight:'700', borderRadius:'14px', minHeight:'52px', whiteSpace:'nowrap' },
                         onClick: () => onOpenModal('nuevo-prestamo', null) }, '⏱️ Préstamo'),
                     e('button', { style:{ padding:'0 20px', fontSize:'15px', fontWeight:'700', borderRadius:'14px', minHeight:'52px', background:'rgba(239,68,68,.1)', border:'2px solid rgba(239,68,68,.3)', color:'#ef4444', cursor:'pointer', whiteSpace:'nowrap' },
-                        onClick: () => onOpenModal('baja-empleado', null) }, '👋 Baja')
+                        onClick: () => onOpenModal('baja-empleado', null) }, T().employeeLeave)
                 ),
 
                 // ── KPIs ──────────────────────────────────────────────────────
@@ -3751,13 +3866,13 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             className: 'button button-warning',
                             onClick: function() { setView('pendientes'); }
                         }, '⚠️ Pendientes N/S (' + pendientes.length + ')'),
-                        view === 'pendientes' && e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, '← Volver a lista'),
-                        view === 'recepcion' && e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, '← Volver a lista'),
-                        view === 'scanner' && e('button', { className: 'button button-secondary', onClick: function() { stopBarcodeScanner(); setView('lista'); } }, '← Salir del escáner'),
-                        view === 'mapa' && e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, '← Volver a lista'),
-                        view === 'lista' && e('button', { className: 'button button-secondary', style: { background: 'rgba(88,166,255,.1)', border: '1px solid #58a6ff44', color: '#58a6ff' }, onClick: function() { setView('mapa'); } }, '🗺️ Mapa'),
-                        view === 'lista' && e('button', { className: 'button button-purple', onClick: function() { setScanLog([]); setScanCount(0); setScanLastId(''); setView('scanner'); } }, '⚡ Escáner'),
-                        view === 'lista' && e('button', { className: 'button button-primary', onClick: function() { setView('recepcion'); } }, '+ Recepción')
+                        view === 'pendientes' && e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, T().backToList),
+                        view === 'recepcion' && e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, T().backToList),
+                        view === 'scanner' && e('button', { className: 'button button-secondary', onClick: function() { stopBarcodeScanner(); setView('lista'); } }, T().exitScanner),
+                        view === 'mapa' && e('button', { className: 'button button-secondary', onClick: function() { setView('lista'); } }, T().backToList),
+                        view === 'lista' && e('button', { className: 'button button-secondary', style: { background: 'rgba(88,166,255,.1)', border: '1px solid #58a6ff44', color: '#58a6ff' }, onClick: function() { setView('mapa'); } }, T().mapView),
+                        view === 'lista' && e('button', { className: 'button button-purple', onClick: function() { setScanLog([]); setScanCount(0); setScanLastId(''); setView('scanner'); } }, T().scannerMode),
+                        view === 'lista' && e('button', { className: 'button button-primary', onClick: function() { setView('recepcion'); } }, T().receiveBatch)
                     )
                 ),
                 // Contenido según vista
@@ -3814,7 +3929,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 fichaEquipo && e('div', { className: 'modal-overlay', onClick: function(ev) { if (ev.target === ev.currentTarget) setFichaEquipo(null); } },
                     e('div', { className: 'modal', style: { maxWidth: '750px' }, onClick: function(ev) { ev.stopPropagation(); } },
                         e('div', { className: 'modal-header' },
-                            e('h2', { className: 'modal-title' }, '📄 Ficha de Equipo'),
+                            e('h2', { className: 'modal-title' }, T().equipmentFile),
                             e('button', { className: 'modal-close', onClick: function() { setFichaEquipo(null); } }, '×')
                         ),
                         e('div', { className: 'modal-body' },
@@ -3847,7 +3962,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             ),
                             // Accesorios
                             e('div', { style: { marginBottom: '20px' } },
-                                e('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px', letterSpacing: '.5px' } }, '🔌 Accesorios incluidos'),
+                                e('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px', letterSpacing: '.5px' } }, T().accessories),
                                 e('textarea', {
                                     className: 'form-textarea',
                                     placeholder: 'Ej: Cargador USB-C 65W\nFunda protectora\nCable HDMI',
@@ -3858,7 +3973,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                                 e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' } }, 'Un accesorio por línea. Se guarda al cerrar con "Guardar cambios".')
                             ),
                             // ── Timeline del equipo ──────────────────────────────────────
-                            e('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '16px', letterSpacing: '.5px' } }, '📋 Timeline del Equipo'),
+                            e('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '16px', letterSpacing: '.5px' } }, T().timeline),
                             (function() {
                                 const hEq = state.history.filter(function(h) { return h.idEtiqueta === fichaEquipo.idEtiqueta; }).sort(function(a,b) { return new Date(b.fecha) - new Date(a.fecha); });
                                 if (hEq.length === 0) return e('div', { style: { color: 'var(--text-secondary)', fontSize: '14px', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '10px', textAlign: 'center' } }, '📭 Sin movimientos registrados aún');
@@ -3899,8 +4014,8 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             })()
                         ),
                         e('div', { className: 'modal-footer' },
-                            fichaEquipo.numSerie && e('button', { className: 'button button-success', onClick: function() { exportEtiquetaPDF([fichaEquipo]); } }, '🖨️ Imprimir etiqueta'),
-                            !['Robado','Baja','Pendiente'].includes(fichaEquipo.estado) && e('button', { className: 'button button-secondary', onClick: function() { setCambioEstado({ equipo: fichaEquipo, nuevoEstado: '' }); setCambioMotivo(''); setCambioDestino(''); setFichaEquipo(null); } }, '🔄 Cambiar estado'),
+                            fichaEquipo.numSerie && e('button', { className: 'button button-success', onClick: function() { exportEtiquetaPDF([fichaEquipo]); } }, T().printLabel),
+                            !['Robado','Baja','Pendiente'].includes(fichaEquipo.estado) && e('button', { className: 'button button-secondary', onClick: function() { setCambioEstado({ equipo: fichaEquipo, nuevoEstado: '' }); setCambioMotivo(''); setCambioDestino(''); setFichaEquipo(null); } }, T().changeStatus),
                             e('button', { className: 'button button-primary', onClick: async function() {
                                 // Guardar accesorios si han cambiado
                                 const original = (state.activos || []).find(function(a) { return a.id === fichaEquipo.id; });
@@ -3908,7 +4023,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                                     try { await dataManager.updateActivoAccesorios(fichaEquipo.id, fichaEquipo.accesorios || ''); await onRefresh(); showToast('Accesorios guardados', 'success'); } catch(err) { showToast('Error guardando accesorios', 'error'); }
                                 }
                                 setFichaEquipo(null);
-                            } }, 'Guardar cambios'),
+                            } }, T().saveChanges),
                             e('button', { className: 'button button-secondary', onClick: function() { setFichaEquipo(null); } }, 'Cerrar')
                         )
                     )
@@ -3963,7 +4078,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
 
         // ADMIN PANEL - v2.3.0
         // ==========================================
-        function AdminPanel({ state, onRefresh, onSetStockMinimo }) {
+        function AdminPanel({ state, onRefresh, onSetStockMinimo, isAdmin }) {
             const [activeSection, setActiveSection] = useState('ubicaciones');
             const [loading, setLoading] = useState(false);
             const [openGroups, setOpenGroups] = useState({ infraestructura: true, catalogo: false, usuarios: false, sistema: false });
@@ -4307,35 +4422,38 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         )
                     ),
                     e('div', { className: 'form-group', style: { marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border)' } },
-                        e('label', { className: 'form-label' }, '🖨️ DYMO — PaperName'),
+                        e('label', { className: 'form-label' }, '🖨️ DYMO Connect 1.6 — LabelName'),
                         e('div', { style: { fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' } },
-                            'Si la impresión falla con "DieCutLabel not declared", introduce aquí el nombre exacto del papel según el driver Windows. ',
-                            e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', color: 'var(--accent-blue)', fontSize: '12px' } }, localStorage.getItem('dymo_paper_name') ? '✅ Guardado: ' + localStorage.getItem('dymo_paper_name') : '⚠️ No configurado — se detecta automáticamente')
+                            'El LabelName identifica el tipo de etiqueta en DYMO Connect 1.6. Usa el botón 🔍 Detectar para obtenerlo automáticamente. ',
+                            e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', color: 'var(--accent-blue)', fontSize: '12px' } }, localStorage.getItem('dymo_label_name') ? '✅ Guardado: ' + localStorage.getItem('dymo_label_name') : '⚠️ No configurado — usa NameBadge11356 por defecto')
                         ),
                         e('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
                             e('input', { type: 'text', className: 'form-input', id: 'dymo-paper-input',
                                 placeholder: 'ej: 11356 Name Badge',
-                                defaultValue: localStorage.getItem('dymo_paper_name') || '',
+                                defaultValue: localStorage.getItem('dymo_label_name') || '',
                                 style: { flex: 1, fontFamily: 'IBM Plex Mono,monospace' }
                             }),
                             e('button', { className: 'button button-success', style: { padding: '12px 16px' }, onClick: function() {
                                 const val = document.getElementById('dymo-paper-input').value.trim();
-                                if (val) { localStorage.setItem('dymo_paper_name', val); showToast('PaperName guardado: ' + val, 'success'); }
-                                else { localStorage.removeItem('dymo_paper_name'); showToast('PaperName eliminado — se detectará automáticamente', 'success'); }
+                                if (val) { localStorage.setItem('dymo_label_name', val); showToast('LabelName guardado: ' + val, 'success'); }
+                                else { localStorage.removeItem('dymo_label_name'); showToast('LabelName eliminado — se usará NameBadge11356', 'success'); }
                             } }, '✓ Guardar'),
                             e('button', { className: 'button button-secondary', style: { padding: '12px 16px' }, onClick: async function() {
                                 showToast('Detectando PaperName...', 'success');
                                 try {
-                                    const resp = await fetch('https://127.0.0.1:41951/dcd/api/get-consumables-printer/' + encodeURIComponent('DYMO LabelWriter 550'));
+                                    const resp = await fetch('https://127.0.0.1:41951/dcd/api/get-default-label/LabelWriter');
                                     const data = await resp.json();
-                                    showToast('Respuesta: ' + JSON.stringify(data.responseValue || data).slice(0, 150), 'success');
+                                    const rv = data.responseValue || data;
+                                    const ln = rv && rv.label && rv.label.name;
+                                    if (ln) { document.getElementById('dymo-paper-input').value = ln; showToast('LabelName detectado: ' + ln, 'success'); }
+                                    else showToast('Respuesta: ' + JSON.stringify(rv).slice(0, 150), 'success');
                                 } catch(e) {
                                     showToast('Error: ' + e.message, 'error');
                                 }
                             } }, '🔍 Detectar')
                         ),
                         e('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' } },
-                            ['11356 Name Badge','S0722560','11356','30252 Address','99012 Address'].map(function(pn) {
+                            ['NameBadge11356','11356 Name Badge','NameBadge','Address30251','Address30252'].map(function(pn) {
                                 return e('button', { key: pn, onClick: function() {
                                     document.getElementById('dymo-paper-input').value = pn;
                                 }, style: { background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'IBM Plex Mono,monospace' } }, pn);
@@ -4478,7 +4596,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
 
             return e('div', null,
                 e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } },
-                    e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, '🛠️ Panel de Administración')
+                    e('h2', { style: { fontSize: '24px', fontWeight: '700' } }, T().adminPanel)
                 ),
                 e('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } },
                     e('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '190px' } },
@@ -4486,10 +4604,10 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         e('button', { onClick: () => toggleGroup('infraestructura'), style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', width: '100%', borderRadius: '6px' },
                             onMouseEnter: ev => ev.currentTarget.style.background = 'var(--bg-primary)',
                             onMouseLeave: ev => ev.currentTarget.style.background = 'none'
-                        }, e('span', null, '📍 Infraestructura'), e('span', null, openGroups.infraestructura ? '▾' : '▸')),
+                        }, e('span', null, T().infraGroup), e('span', null, openGroups.infraestructura ? '▾' : '▸')),
                         openGroups.infraestructura && e('div', { style: { display: 'flex', flexDirection: 'column', gap: '3px', paddingLeft: '10px', marginBottom: '4px', borderLeft: '2px solid rgba(168,85,247,.3)' } },
-                            sectionBtn('ubicaciones', 'Ubicaciones', '📍'),
-                            sectionBtn('sociedades', 'Sociedades', '🏢')
+                            sectionBtn('ubicaciones', T().locations, '📍'),
+                            sectionBtn('sociedades', T().societies, '🏢')
                         ),
                         // Grupo: Catálogo
                         e('button', { onClick: () => toggleGroup('catalogo'), style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', width: '100%', borderRadius: '6px' },
@@ -4497,28 +4615,28 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             onMouseLeave: ev => ev.currentTarget.style.background = 'none'
                         }, e('span', null, '📦 Catálogo'), e('span', null, openGroups.catalogo ? '▾' : '▸')),
                         openGroups.catalogo && e('div', { style: { display: 'flex', flexDirection: 'column', gap: '3px', paddingLeft: '10px', marginBottom: '4px', borderLeft: '2px solid rgba(168,85,247,.3)' } },
-                            sectionBtn('proveedores', 'Proveedores', '🚚'),
-                            sectionBtn('catalogo', 'Catálogo', '📦'),
-                            sectionBtn('packs', 'Packs', '🎒')
+                            isAdmin && sectionBtn('proveedores', T().suppliers, '🚚'),
+                            sectionBtn('catalogo', T().catalog, '📦'),
+                            isAdmin && sectionBtn('packs', T().packs, '🎒')
                         ),
-                        // Grupo: Usuarios
-                        e('button', { onClick: () => toggleGroup('usuarios'), style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', width: '100%', borderRadius: '6px' },
+                        // Grupo: Usuarios — solo admins
+                        isAdmin && e('button', { onClick: () => toggleGroup('usuarios'), style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', width: '100%', borderRadius: '6px' },
                             onMouseEnter: ev => ev.currentTarget.style.background = 'var(--bg-primary)',
                             onMouseLeave: ev => ev.currentTarget.style.background = 'none'
-                        }, e('span', null, '👥 Usuarios'), e('span', null, openGroups.usuarios ? '▾' : '▸')),
-                        openGroups.usuarios && e('div', { style: { display: 'flex', flexDirection: 'column', gap: '3px', paddingLeft: '10px', marginBottom: '4px', borderLeft: '2px solid rgba(168,85,247,.3)' } },
-                            sectionBtn('tecnicos', 'Técnicos', '👤'),
-                            sectionBtn('admins', 'Administradores', '🛡️')
+                        }, e('span', null, T().usersGroup), e('span', null, openGroups.usuarios ? '▾' : '▸')),
+                        isAdmin && openGroups.usuarios && e('div', { style: { display: 'flex', flexDirection: 'column', gap: '3px', paddingLeft: '10px', marginBottom: '4px', borderLeft: '2px solid rgba(168,85,247,.3)' } },
+                            sectionBtn('tecnicos', T().technicians, '👤'),
+                            sectionBtn('admins', T().administrators, '🛡️')
                         ),
-                        // Grupo: Sistema
-                        e('button', { onClick: () => toggleGroup('sistema'), style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', width: '100%', borderRadius: '6px' },
+                        // Grupo: Sistema — solo admins
+                        isAdmin && e('button', { onClick: () => toggleGroup('sistema'), style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', width: '100%', borderRadius: '6px' },
                             onMouseEnter: ev => ev.currentTarget.style.background = 'var(--bg-primary)',
                             onMouseLeave: ev => ev.currentTarget.style.background = 'none'
-                        }, e('span', null, '⚙️ Sistema'), e('span', null, openGroups.sistema ? '▾' : '▸')),
-                        openGroups.sistema && e('div', { style: { display: 'flex', flexDirection: 'column', gap: '3px', paddingLeft: '10px', borderLeft: '2px solid rgba(168,85,247,.3)' } },
-                            sectionBtn('ajustes', 'Ajustes', '⚙️'),
-                            sectionBtn('exportar', 'Exportar', '📊'),
-                            sectionBtn('log', 'Log de Acciones', '📋')
+                        }, e('span', null, T().systemGroup), e('span', null, openGroups.sistema ? '▾' : '▸')),
+                        isAdmin && openGroups.sistema && e('div', { style: { display: 'flex', flexDirection: 'column', gap: '3px', paddingLeft: '10px', borderLeft: '2px solid rgba(168,85,247,.3)' } },
+                            sectionBtn('ajustes', T().settings, '⚙️'),
+                            sectionBtn('exportar', T().exportAudit, '📊'),
+                            sectionBtn('log', T().actionLog, '📋')
                         )
                     ),
                     e('div', { style: { flex: 1, minWidth: '300px' } },
@@ -4732,7 +4850,10 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 // Header
                 e('div', { style: { background: 'var(--bg-secondary)', padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
                     e('div', null,
-                        e('div', { style: { fontSize: '18px', fontWeight: '800' } }, '📦 IT Inventario'),
+                        e('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' } },
+                            e('img', { src: 'https://sanlucar.com/wp-content/uploads/2023/03/SanLucar_LOGO_final.svg', alt: 'Sanlúcar', style: { height: '22px', width: 'auto', filter: 'brightness(0) invert(1)', objectFit: 'contain' }, onError: function(ev) { ev.target.style.display='none'; } }),
+                            e('span', { style: { fontSize: '14px', fontWeight: '800', color: 'var(--text-secondary)' } }, 'IT')
+                        ),
                         e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' } }, state.user?.name + ' · ' + hoy)
                     ),
                     e('button', { onClick: onRefresh, style: { background: 'none', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px 14px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '14px' } }, '🔄')
@@ -4831,7 +4952,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         ),
                         // Acciones según estado
                         e('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
-                            e('button', { onClick: () => exportEtiquetaPDF([a]), style: { padding: '16px', background: 'var(--bg-secondary)', border: '2px solid var(--border)', borderRadius: '14px', color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' } }, '🖨️ Imprimir etiqueta'),
+                            e('button', { onClick: () => exportEtiquetaPDF([a]), style: { padding: '16px', background: 'var(--bg-secondary)', border: '2px solid var(--border)', borderRadius: '14px', color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' } }, T().printLabel),
                             a.estado === 'Almacen' && e('button', { onClick: () => onOpenModal('nueva-asignacion', null), style: { padding: '16px', background: '#3fb950', border: 'none', borderRadius: '14px', color: 'white', fontSize: '15px', fontWeight: '700', cursor: 'pointer' } }, '✅ Asignar equipo'),
                             a.estado === 'Asignado' && e('button', { onClick: () => onOpenModal('devolver-material', null), style: { padding: '16px', background: '#f97316', border: 'none', borderRadius: '14px', color: 'white', fontSize: '15px', fontWeight: '700', cursor: 'pointer' } }, '↩️ Registrar devolución'),
                             // Firma fullscreen
@@ -5099,7 +5220,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 e('header', { className: 'header' },
                     e('div', { className: 'header-left' },
                         e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
-                            e('span', { className: 'header-icon' }, '📦'),
+                            e('img', { src: 'https://sanlucar.com/wp-content/uploads/2023/03/SanLucar_LOGO_final.svg', alt: 'Sanlúcar', style: { height: '32px', width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }, onError: function(ev) { ev.target.style.display='none'; } }),
                             e('h1', null, T().appTitle),
                             e('span', { style: { fontSize: '12px', padding: '4px 8px', background: 'rgba(88,166,255,.15)', color: 'var(--accent-blue)', borderRadius: '6px', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '600' } }, 'v' + CONFIG.version)
                         ),
@@ -5160,7 +5281,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             pendientesCount > 0 ? e('span', { style: { background: 'var(--accent-orange)', color: 'white', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700', marginLeft: '4px' } }, pendientesCount) : null
                         );
                     }),
-                    state.isAdmin && e('button', { className: 'tab-button ' + (state.activeTab === 'admin' ? 'active' : ''), onClick: () => handleTabChange('admin'), style: { background: state.activeTab === 'admin' ? 'var(--accent-purple)' : '', borderColor: state.isAdmin ? 'var(--accent-purple)' : '' } }, T().admin)
+                    e('button', { className: 'tab-button ' + (state.activeTab === 'admin' ? 'active' : ''), onClick: () => handleTabChange('admin'), style: { background: state.activeTab === 'admin' ? 'var(--accent-purple)' : '', borderColor: 'var(--accent-purple)', borderWidth: '1px', borderStyle: 'solid' } }, T().admin)
                 ),
                 e('div', { className: 'content-section' },
                     state.activeTab === 'dashboard' && e(Dashboard, { state, onNavigate: handleNavigate }),
@@ -5168,10 +5289,11 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     state.activeTab === 'equipos' && e(EquiposView, { state, onRefresh: refreshData, initialFilter: state.tabFilter, deepLinkEquipo: state.deepLinkEquipo, onClearDeepLink: function() { setState(s => ({ ...s, deepLinkEquipo: null })); } }),
                     state.activeTab === 'asignaciones' && e(AssignmentsView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal, initialFilter: state.tabFilter }),
                     state.activeTab === 'historial' && e(HistoryView, { state, onRefresh: refreshData, onOpenModal: handleOpenModal, initialFilter: state.tabFilter }),
-                    state.activeTab === 'admin' && state.isAdmin && e(AdminPanel, {
+                    state.activeTab === 'admin' && e(AdminPanel, {
                         state,
                         onRefresh: refreshData,
-                        onSetStockMinimo: val => setState(s => ({ ...s, stockMinimoDefault: val }))
+                        onSetStockMinimo: val => setState(s => ({ ...s, stockMinimoDefault: val })),
+                        isAdmin: state.isAdmin
                     })
                 ),
                 state.modalType && !state.showConfirm && formModalTypes.includes(state.modalType) &&
