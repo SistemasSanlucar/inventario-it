@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.0.9'
+        version: '3.1.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -912,11 +912,9 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
     // Detecta el PaperName correcto consultando la impresora
     // Detecta el LabelName correcto consultando la impresora (formato DCD v1.6)
     async function detectDymoLabelName() {
-        // Rollo confirmado: WhiteNameBadgeS0722560 (SKU S0722560)
-        const cached = localStorage.getItem('dymo_label_name');
-        if (cached) return cached;
-        return 'WhiteNameBadgeS0722560';
+        return localStorage.getItem('dymo_label_name') || 'WhiteNameBadgeS0722560';
     }
+
     async function detectDymoLabelName_unused() {
         const cached = localStorage.getItem('dymo_label_name');
         if (cached) { console.log('[DYMO] Usando LabelName guardado:', cached); return cached; }
@@ -932,8 +930,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         return null;
     }
 
-    // Construye XML DesktopLabel para DYMO Connect 1.6 — formato validado
-    // LabelName: WhiteNameBadgeS0722560 (SKU S0722560, 89x41mm Name Badge)
+    // Construye XML DesktopLabel — estructura VALIDADA manualmente contra DYMO Connect 1.6.0.36
     function buildDymoLabelXml(activo) {
         var labelName = localStorage.getItem('dymo_label_name') || 'WhiteNameBadgeS0722560';
         var qrUrl = window.location.href.split('?')[0].split('#')[0] + '?equipo=' + activo.idEtiqueta;
@@ -943,22 +940,41 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         var ns     = activo.numSerie ? 'N/S: ' + safePdfText(activo.numSerie) : '';
         var soc    = activo.sociedad ? safePdfText(activo.sociedad) : '';
 
-        // Helper: TextObject en pulgadas — estructura validada contra schema DYMO 1.6
-        var txt = function(name, text, x, y, w, h, fontSize, isBold, r, g, b) {
+        // Brushes reutilizable
+        var brushes =
+            '<Brushes>' +
+                '<BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush>' +
+                '<BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush>' +
+                '<StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush>' +
+                '<FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush>' +
+            '</Brushes>';
+
+        var commonProps =
+            '<Rotation>Rotation0</Rotation>' +
+            '<OutlineThickness>1</OutlineThickness>' +
+            '<IsOutlined>False</IsOutlined>' +
+            '<BorderStyle>SolidLine</BorderStyle>' +
+            '<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin>';
+
+        // FontInfo con FontBrush — requerido por DYMO 1.6
+        var fontInfo = function(size, bold, r, g, b) {
+            return '<FontInfo>' +
+                '<FontName>Segoe UI</FontName>' +
+                '<FontSize>' + size + '</FontSize>' +
+                '<IsBold>' + bold + '</IsBold>' +
+                '<IsItalic>False</IsItalic>' +
+                '<IsUnderline>False</IsUnderline>' +
+                '<FontBrush><SolidColorBrush><Color A="1" R="' + r + '" G="' + g + '" B="' + b + '"/></SolidColorBrush></FontBrush>' +
+            '</FontInfo>';
+        };
+
+        // TextObject — validado contra schema DYMO 1.6
+        var txt = function(name, text, x, y, w, h, size, bold, r, g, b) {
             if (!text) return '';
             return '<TextObject>' +
                 '<Name>' + name + '</Name>' +
-                '<Brushes>' +
-                    '<BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush>' +
-                    '<BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush>' +
-                    '<StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush>' +
-                    '<FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush>' +
-                '</Brushes>' +
-                '<Rotation>Rotation0</Rotation>' +
-                '<OutlineThickness>1</OutlineThickness>' +
-                '<IsOutlined>False</IsOutlined>' +
-                '<BorderStyle>SolidLine</BorderStyle>' +
-                '<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin>' +
+                brushes +
+                commonProps +
                 '<HorizontalAlignment>Left</HorizontalAlignment>' +
                 '<VerticalAlignment>Middle</VerticalAlignment>' +
                 '<FitMode>AlwaysFit</FitMode>' +
@@ -971,14 +987,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     '<LineTextSpan>' +
                         '<TextSpan>' +
                             '<Text>' + text + '</Text>' +
-                            '<FontInfo>' +
-                                '<FontName>Segoe UI</FontName>' +
-                                '<FontSize>' + fontSize + '</FontSize>' +
-                                '<IsBold>' + isBold + '</IsBold>' +
-                                '<IsItalic>False</IsItalic>' +
-                                '<IsUnderline>False</IsUnderline>' +
-                                '<FontBrush><SolidColorBrush><Color A="1" R="' + r + '" G="' + g + '" B="' + b + '"/></SolidColorBrush></FontBrush>' +
-                            '</FontInfo>' +
+                            fontInfo(size, bold, r, g, b) +
                         '</TextSpan>' +
                     '</LineTextSpan>' +
                 '</FormattedText>' +
@@ -989,40 +998,35 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             '</TextObject>';
         };
 
-        // QR: ocupa 1.44" a la izquierda. Texto: a la derecha desde X=1.62"
-        var tX = 1.62, tW = 1.82;
-
-        var labelObjects =
+        // BarcodeObject — estructura exacta validada con status:true
+        var barcodeObj =
             '<BarcodeObject>' +
                 '<Name>QR1</Name>' +
-                '<Brushes>' +
-                    '<BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush>' +
-                    '<BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush>' +
-                    '<StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush>' +
-                    '<FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush>' +
-                '</Brushes>' +
-                '<Rotation>Rotation0</Rotation>' +
-                '<OutlineThickness>1</OutlineThickness>' +
-                '<IsOutlined>False</IsOutlined>' +
-                '<BorderStyle>SolidLine</BorderStyle>' +
-                '<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin>' +
+                brushes +
+                commonProps +
                 '<BarcodeFormat>QRCode</BarcodeFormat>' +
                 '<Data><DataString>' + qrUrl + '</DataString></Data>' +
                 '<HorizontalAlignment>Center</HorizontalAlignment>' +
                 '<VerticalAlignment>Middle</VerticalAlignment>' +
                 '<Size>Large</Size>' +
                 '<TextPosition>None</TextPosition>' +
+                fontInfo('8', 'False', '0', '0', '0') +
                 '<ObjectLayout>' +
                     '<DYMOPoint><X>0.06</X><Y>0.06</Y></DYMOPoint>' +
                     '<Size><Width>1.44</Width><Height>1.44</Height></Size>' +
                 '</ObjectLayout>' +
-            '</BarcodeObject>' +
-            txt('EMPRESA', 'SANLUCAR FRUIT · IT', tX, 0.06, tW, 0.18, 7,   'False', '0.51', '0.51', '0.51') +
-            txt('ID',      id,                        tX, 0.27, tW, 0.32, 11,  'True',  '0',    '0',    '0'   ) +
-            txt('TIPO',    tipo,                       tX, 0.63, tW, 0.26, 9,   'True',  '0.12', '0.12', '0.12') +
-            txt('MODELO',  modelo,                     tX, 0.93, tW, 0.22, 7.5, 'False', '0.27', '0.27', '0.27') +
-            txt('NS',      ns,                         tX, 1.18, tW, 0.20, 6.5, 'False', '0.39', '0.39', '0.39') +
-            txt('SOC',     soc,                        tX, 1.41, tW, 0.16, 6,   'False', '0.59', '0.59', '0.59');
+            '</BarcodeObject>';
+
+        // Texto a la derecha del QR
+        var tX = '1.62', tW = '1.82';
+        var labelObjects =
+            barcodeObj +
+            txt('EMPRESA', 'SANLUCAR FRUIT \xB7 IT', tX, '0.06', tW, '0.18', '7',   'False', '0.51', '0.51', '0.51') +
+            txt('ID',      id,                        tX, '0.27', tW, '0.32', '11',  'True',  '0',    '0',    '0'   ) +
+            txt('TIPO',    tipo,                       tX, '0.63', tW, '0.26', '9',   'True',  '0.12', '0.12', '0.12') +
+            txt('MODELO',  modelo,                     tX, '0.93', tW, '0.22', '7.5', 'False', '0.27', '0.27', '0.27') +
+            txt('NS',      ns,                         tX, '1.18', tW, '0.20', '6.5', 'False', '0.39', '0.39', '0.39') +
+            txt('SOC',     soc,                        tX, '1.41', tW, '0.16', '6',   'False', '0.59', '0.59', '0.59');
 
         return '<?xml version="1.0" encoding="utf-8"?>' +
             '<DesktopLabel Version="1">' +
