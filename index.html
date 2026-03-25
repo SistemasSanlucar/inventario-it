@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.0.4'
+        version: '3.0.5'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -940,7 +940,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
 
         const txt = function(name, text, x, y, w, h, fontSize, isBold, r, g, b) {
             if (!text) return '';
-            return '<TextObject><n>' + name + '</n><Brushes><BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush><BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush><StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush><FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush></Brushes><Rotation>Rotation0</Rotation><OutlineThickness>1</OutlineThickness><IsOutlined>False</IsOutlined><BorderStyle>SolidLine</BorderStyle><Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin><HorizontalAlignment>Left</HorizontalAlignment><VerticalAlignment>Middle</VerticalAlignment><FitMode>AlwaysFit</FitMode><IsVertical>False</IsVertical><FormattedText><FitMode>AlwaysFit</FitMode><HorizontalAlignment>Left</HorizontalAlignment><VerticalAlignment>Middle</VerticalAlignment><IsVertical>False</IsVertical><LineTextSpan><TextSpan><Text>' + text + '</Text><FontInfo><FontName>Segoe UI</FontName><FontSize>' + fontSize + '</FontSize><IsBold>' + isBold + '</IsBold><IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush><SolidColorBrush><Color A="1" R="' + r + '" G="' + g + '" B="' + b + '"/></SolidColorBrush></FontBrush></FontInfo></TextSpan></LineTextSpan></FormattedText><ObjectLayout><DYMOPoint><X>' + x + '</X><Y>' + y + '</Y></DYMOPoint><Size><Width>' + w + '</Width><Height>' + h + '</Height></Size></ObjectLayout></TextObject>';
+            return '<TextObject><Name>' + name + '</Name><Brushes><BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush><BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush><StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush><FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush></Brushes><Rotation>Rotation0</Rotation><OutlineThickness>1</OutlineThickness><IsOutlined>False</IsOutlined><BorderStyle>SolidLine</BorderStyle><Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin><HorizontalAlignment>Left</HorizontalAlignment><VerticalAlignment>Middle</VerticalAlignment><FitMode>AlwaysFit</FitMode><IsVertical>False</IsVertical><FormattedText><FitMode>AlwaysFit</FitMode><HorizontalAlignment>Left</HorizontalAlignment><VerticalAlignment>Middle</VerticalAlignment><IsVertical>False</IsVertical><LineTextSpan><TextSpan><Text>' + text + '</Text><FontInfo><FontName>Segoe UI</FontName><FontSize>' + fontSize + '</FontSize><IsBold>' + isBold + '</IsBold><IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush><SolidColorBrush><Color A="1" R="' + r + '" G="' + g + '" B="' + b + '"/></SolidColorBrush></FontBrush></FontInfo></TextSpan></LineTextSpan></FormattedText><ObjectLayout><DYMOPoint><X>' + x + '</X><Y>' + y + '</Y></DYMOPoint><Size><Width>' + w + '</Width><Height>' + h + '</Height></Size></ObjectLayout></TextObject>';
         };
 
         const tX = 1.62, tW = 1.82;
@@ -956,7 +956,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
 '<BorderColor><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderColor>' +
 '<BorderThickness>1</BorderThickness><Show_Border>False</Show_Border>' +
 '<DynamicLayoutManager><RotationBehavior>ClearObjects</RotationBehavior><LabelObjects>' +
-'<BarcodeObject><n>QR1</n>' +
+'<BarcodeObject><Name>QR1</Name>' +
 '<Brushes><BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush><BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderBrush><StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></StrokeBrush><FillBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></FillBrush></Brushes>' +
 '<Rotation>Rotation0</Rotation><OutlineThickness>1</OutlineThickness><IsOutlined>False</IsOutlined><BorderStyle>SolidLine</BorderStyle><Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin>' +
 '<BarcodeFormat>QRCode</BarcodeFormat><Data><DataString>' + qrUrl + '</DataString></Data>' +
@@ -993,7 +993,7 @@ txt('TXT_SOC',     soc,                       tX, 1.41, tW, 0.16, 6,    'False',
     }
 
     // LabelNames a probar en orden
-    const DYMO_LABEL_FALLBACKS = ['NameBadge11356', '11356 Name Badge', 'NameBadge', 'Address30251'];
+    const DYMO_LABEL_FALLBACKS = ['Address30251', 'Address30252', 'Address', 'NameBadge11356'];
 
     async function printDymoLabel(activo) {
         const detectedName = await detectDymoLabelName();
