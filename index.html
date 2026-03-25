@@ -223,7 +223,7 @@
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '2.8.1'
+        version: '2.8.2'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -820,6 +820,27 @@
 
     // Detecta el PaperName correcto consultando la impresora
     async function detectDymoPaperName() {
+        // 0 — Si el usuario ha guardado manualmente un PaperName que funcionó, usarlo
+        const cached = localStorage.getItem('dymo_paper_name');
+        if (cached) { console.log('[DYMO] Usando PaperName guardado:', cached); return cached; }
+
+        // 1 — Consumables endpoint → da el nombre exacto del papel cargado
+        try {
+            const resp = await fetch(DYMO_URL + '/dcd/api/get-consumables-printer/' + encodeURIComponent(DYMO_PRINTER));
+            if (resp.ok) {
+                const data = await resp.json();
+                const rv = data.responseValue || data;
+                console.log('[DYMO] get-consumables response:', JSON.stringify(rv).slice(0, 300));
+                // Buscar el nombre del papel en la respuesta
+                const pn = rv.paperName || rv.name || rv.labelName || rv.mediaName;
+                if (pn && pn !== 'null') { console.log('[DYMO] PaperName desde consumables:', pn); return pn; }
+                // Intentar extraer del SKU
+                const sku = rv.sku || (rv.rollStatusResponse && rv.rollStatusResponse.sku);
+                if (sku && DYMO_SKU_MAP[sku]) { console.log('[DYMO] PaperName desde SKU:', sku, '→', DYMO_SKU_MAP[sku]); return DYMO_SKU_MAP[sku]; }
+            }
+        } catch(e) { console.warn('[DYMO] get-consumables falló:', e.message); }
+
+        // 2 — Printers endpoint → SKU del rollo cargado
         try {
             const resp = await fetch(DYMO_URL + '/dcd/api/get-printers');
             if (resp.ok) {
@@ -828,24 +849,14 @@
                 for (const p of printers) {
                     if (!p) continue;
                     const sku = (p.rollStatusResponse || {}).sku;
-                    if (sku && DYMO_SKU_MAP[sku]) {
-                        console.log('[DYMO] SKU detectado:', sku, '→ PaperName:', DYMO_SKU_MAP[sku]);
-                        return DYMO_SKU_MAP[sku];
-                    }
+                    console.log('[DYMO] get-printers SKU:', sku);
+                    if (sku && DYMO_SKU_MAP[sku]) { console.log('[DYMO] PaperName desde SKU:', DYMO_SKU_MAP[sku]); return DYMO_SKU_MAP[sku]; }
                 }
             }
         } catch(e) { console.warn('[DYMO] get-printers falló:', e.message); }
-        // Intenta extraer PaperName del sample HTML de DYMO Connect
-        try {
-            const resp = await fetch(DYMO_URL + '/Samples/sample.html');
-            if (resp.ok) {
-                const html = await resp.text();
-                const match = html.match(/<PaperName>([^<]+)<\/PaperName>/);
-                if (match) { console.log('[DYMO] PaperName desde sample.html:', match[1]); return match[1]; }
-            }
-        } catch(e) {}
-        console.warn('[DYMO] No se pudo detectar PaperName, usando fallback');
-        return null; // null = probar la lista de fallbacks
+
+        console.warn('[DYMO] No se pudo detectar PaperName, probando fallbacks');
+        return null;
     }
 
     // Construye el XML de la etiqueta con el PaperName indicado
@@ -946,6 +957,36 @@
         }
         throw new Error('No se pudo imprimir. Último error: ' + (lastError ? lastError.message.slice(0, 200) : 'desconocido'));
     }
+    // Genera QR como data URL — intenta librería externa, si no genera con canvas
+    async function generateQRDataUrl(text) {
+        // Método 1: librería qrcode de jsdelivr
+        try {
+            const QRLib = (typeof QRCode !== 'undefined' && QRCode && QRCode.toDataURL) ? QRCode : null;
+            if (QRLib) {
+                return await QRLib.toDataURL(text, { margin: 1, width: 256, color: { dark: '#000000', light: '#FFFFFF' } });
+            }
+        } catch(e) {}
+        // Método 2: generar con canvas usando qrcode-generator (cargado inline)
+        try {
+            const qr = window._qrgen ? window._qrgen(0, 'M') : null;
+            if (qr) {
+                qr.addData(text); qr.make();
+                const size = qr.getModuleCount();
+                const scale = Math.floor(256 / size);
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = size * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#000000';
+                for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) {
+                    if (qr.isDark(r, c)) ctx.fillRect(c * scale, r * scale, scale, scale);
+                }
+                return canvas.toDataURL('image/png');
+            }
+        } catch(e) {}
+        return null;
+    }
+
     let _dymoprinting = false;
     async function exportEtiquetaPDF(activos) {
         if (_dymoprinting) return;
@@ -974,17 +1015,18 @@
                 doc.rect(0, 0, W, H, 'F');
                 const qrUrl = baseUrl + '?equipo=' + activo.idEtiqueta;
                 try {
-                    // QRCode lib (may be blocked by browser tracking prevention)
-                    const QRLib = (typeof QRCode !== 'undefined' && QRCode.toDataURL) ? QRCode : 
-                                  (typeof window.QRCode !== 'undefined' && window.QRCode.toDataURL) ? window.QRCode : null;
-                    if (QRLib) {
-                        const qrDataUrl = await QRLib.toDataURL(qrUrl, { margin: 1, width: 256, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#FFFFFF' } });
+                    // Generar QR en canvas — sin dependencia de librería externa
+                    const qrDataUrl = await generateQRDataUrl(qrUrl);
+                    if (qrDataUrl) {
                         doc.addImage(qrDataUrl, 'PNG', 1, 1, 38, 38);
                     } else {
-                        // Fallback: dibuja cuadrado placeholder con texto
-                        doc.setFillColor(230,230,230); doc.rect(1, 1, 38, 38, 'F');
-                        doc.setFontSize(5); doc.setTextColor(80,80,80);
-                        doc.text('QR: ' + activo.idEtiqueta, 2, 20, { maxWidth: 36 });
+                        // Placeholder visual si no hay QR
+                        doc.setFillColor(245,245,245); doc.rect(1, 1, 38, 38, 'F');
+                        doc.setDrawColor(180,180,180); doc.rect(1, 1, 38, 38, 'S');
+                        doc.setFontSize(4.5); doc.setTextColor(100,100,100);
+                        doc.text('ESCANEAR EN APP', 20, 16, { align:'center' });
+                        doc.setFontSize(5.5); doc.setTextColor(50,50,50);
+                        doc.text(activo.idEtiqueta, 20, 24, { align:'center' });
                     }
                 } catch(e) { console.error('QR error:', e); }
                 doc.setDrawColor(220, 220, 220);
@@ -3965,6 +4007,42 @@
                             e('input', { type: 'number', min: '0', className: 'form-input', value: stockMinimoInput, onChange: ev => setStockMinimoInput(ev.target.value), style: { maxWidth: '120px' } }),
                             e('button', { className: 'button button-success', onClick: () => { const val = parseInt(stockMinimoInput) || 2; localStorage.setItem('stockMinimoDefault', val); onSetStockMinimo(val); showToast('Stock mínimo por defecto: ' + val, 'success'); }, style: { padding: '12px 20px' } }, '✓ Guardar'),
                             e('span', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, 'Se aplica al crear nuevos productos')
+                        )
+                    ),
+                    e('div', { className: 'form-group', style: { marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border)' } },
+                        e('label', { className: 'form-label' }, '🖨️ DYMO — PaperName'),
+                        e('div', { style: { fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' } },
+                            'Si la impresión falla con "DieCutLabel not declared", introduce aquí el nombre exacto del papel según el driver Windows. ',
+                            e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', color: 'var(--accent-blue)', fontSize: '12px' } }, localStorage.getItem('dymo_paper_name') ? '✅ Guardado: ' + localStorage.getItem('dymo_paper_name') : '⚠️ No configurado — se detecta automáticamente')
+                        ),
+                        e('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+                            e('input', { type: 'text', className: 'form-input', id: 'dymo-paper-input',
+                                placeholder: 'ej: 11356 Name Badge',
+                                defaultValue: localStorage.getItem('dymo_paper_name') || '',
+                                style: { flex: 1, fontFamily: 'IBM Plex Mono,monospace' }
+                            }),
+                            e('button', { className: 'button button-success', style: { padding: '12px 16px' }, onClick: function() {
+                                const val = document.getElementById('dymo-paper-input').value.trim();
+                                if (val) { localStorage.setItem('dymo_paper_name', val); showToast('PaperName guardado: ' + val, 'success'); }
+                                else { localStorage.removeItem('dymo_paper_name'); showToast('PaperName eliminado — se detectará automáticamente', 'success'); }
+                            } }, '✓ Guardar'),
+                            e('button', { className: 'button button-secondary', style: { padding: '12px 16px' }, onClick: async function() {
+                                showToast('Detectando PaperName...', 'success');
+                                try {
+                                    const resp = await fetch('https://127.0.0.1:41951/dcd/api/get-consumables-printer/' + encodeURIComponent('DYMO LabelWriter 550'));
+                                    const data = await resp.json();
+                                    showToast('Respuesta: ' + JSON.stringify(data.responseValue || data).slice(0, 150), 'success');
+                                } catch(e) {
+                                    showToast('Error: ' + e.message, 'error');
+                                }
+                            } }, '🔍 Detectar')
+                        ),
+                        e('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' } },
+                            ['11356 Name Badge','S0722560','11356','30252 Address','99012 Address'].map(function(pn) {
+                                return e('button', { key: pn, onClick: function() {
+                                    document.getElementById('dymo-paper-input').value = pn;
+                                }, style: { background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'IBM Plex Mono,monospace' } }, pn);
+                            })
                         )
                     )
                 )
