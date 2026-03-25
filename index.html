@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.0.0'
+        version: '3.0.1'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -3285,6 +3285,173 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         // ==========================================
         // EQUIPOS VIEW - v2.2.0
         // ==========================================
+        // ---- ScannerRapido ---- (componente propio para poder usar hooks)
+        function ScannerRapido({ state, scanLog, setScanLog, scanCount, setScanCount, scanLastId, setScanLastId, scanFlash, setScanFlash }) {
+            useEffect(function() {
+                var active = true;
+                function launch() {
+                    if (!active) return;
+                    startBarcodeScanner(function(code) {
+                        if (!active) return;
+                        var id = code.trim().toUpperCase();
+                        var urlMatch = id.match(/[?&]EQUIPO=([^&]+)/i);
+                        if (urlMatch) id = urlMatch[1];
+                        var activo = (state.activos || []).find(function(a) { return a.idEtiqueta === id; });
+                        var ts = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        if (activo) {
+                            setScanLog(function(prev) { return [{ id, tipo: activo.tipo, modelo: activo.modelo, estado: activo.estado, ts, ok: true }].concat(prev).slice(0, 50); });
+                            setScanCount(function(n) { return n + 1; });
+                            setScanLastId(id);
+                            setScanFlash(true);
+                            setTimeout(function() { setScanFlash(false); }, 600);
+                        } else {
+                            setScanLog(function(prev) { return [{ id, tipo: '—', modelo: 'No encontrado en inventario', estado: '', ts, ok: false }].concat(prev).slice(0, 50); });
+                        }
+                        setTimeout(function() { if (active) launch(); }, 800);
+                    });
+                }
+                launch();
+                return function() { active = false; stopBarcodeScanner(); };
+            }, []);
+
+            return e('div', null,
+                e('div', { style: { background: scanFlash ? 'rgba(63,185,80,.15)' : 'var(--bg-secondary)', border: '2px solid ' + (scanFlash ? 'var(--accent-green)' : 'var(--accent-purple)'), borderRadius: '16px', padding: '28px 32px', marginBottom: '20px', transition: 'all .3s ease', textAlign: 'center' } },
+                    e('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' } }, '⚡ Modo Escáner Rápido — Activo'),
+                    e('div', { style: { display: 'flex', justifyContent: 'center', gap: '48px', flexWrap: 'wrap' } },
+                        e('div', { style: { textAlign: 'center' } },
+                            e('div', { style: { fontSize: '56px', fontWeight: '800', fontFamily: 'IBM Plex Mono,monospace', color: 'var(--accent-green)', lineHeight: 1 } }, scanCount),
+                            e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', marginTop: '6px' } }, 'Escaneados')
+                        ),
+                        scanLastId && e('div', { style: { textAlign: 'center' } },
+                            e('div', { style: { fontSize: '22px', fontWeight: '800', fontFamily: 'IBM Plex Mono,monospace', color: 'var(--accent-blue)', lineHeight: 1 } }, scanLastId),
+                            e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', marginTop: '6px' } }, 'Último escaneado')
+                        )
+                    ),
+                    e('div', { style: { marginTop: '16px', fontSize: '13px', color: 'var(--text-secondary)' } }, '📷 Apunta la cámara al QR o código de barras — se registra automáticamente')
+                ),
+                scanLog.length > 0 && e('div', { style: { background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' } },
+                    e('div', { style: { padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                        e('span', { style: { fontWeight: '700', fontSize: '14px' } }, '📋 Registro de sesión'),
+                        e('button', { onClick: function() { setScanLog([]); setScanCount(0); setScanLastId(''); }, style: { background: 'none', border: 'none', color: 'var(--accent-red)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' } }, 'Limpiar')
+                    ),
+                    e('div', { style: { maxHeight: '420px', overflowY: 'auto' } },
+                        scanLog.map(function(entry, i) {
+                            return e('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 20px', borderBottom: '1px solid var(--border)', background: i === 0 ? (entry.ok ? 'rgba(63,185,80,.05)' : 'rgba(239,68,68,.05)') : 'transparent' } },
+                                e('div', { style: { width: '26px', height: '26px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', background: entry.ok ? 'rgba(63,185,80,.15)' : 'rgba(239,68,68,.15)', flexShrink: 0 } }, entry.ok ? '✅' : '❌'),
+                                e('div', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', fontWeight: '700', color: entry.ok ? 'var(--accent-green)' : 'var(--accent-red)', minWidth: '160px' } }, entry.id),
+                                e('div', { style: { flex: 1 } },
+                                    e('div', { style: { fontSize: '13px', fontWeight: '600' } }, entry.tipo + (entry.modelo ? ' · ' + entry.modelo : '')),
+                                    entry.estado && e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' } }, 'Estado: ' + entry.estado)
+                                ),
+                                e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'IBM Plex Mono,monospace', flexShrink: 0 } }, entry.ts)
+                            );
+                        })
+                    )
+                ),
+                scanLog.length > 0 && e('div', { style: { marginTop: '12px', display: 'flex', gap: '12px', justifyContent: 'flex-end' } },
+                    e('button', { className: 'button button-secondary', onClick: function() {
+                        exportToCSV(scanLog.map(function(en) { return { 'ID': en.id, 'Tipo': en.tipo, 'Modelo': en.modelo, 'Estado': en.estado, 'Hora': en.ts, 'Resultado': en.ok ? 'OK' : 'No encontrado' }; }), 'scan_session');
+                    } }, '⬇️ Exportar log CSV')
+                )
+            );
+        }
+
+        // ---- MapaUbicaciones ---- (componente propio para poder usar hooks)
+        function MapaUbicaciones({ state, setSearch, setView }) {
+            const sedes = {};
+            (state.activos || []).forEach(function(a) {
+                const ub = a.ubicacion || 'Sin ubicación';
+                const sede = ub.includes(' - ') ? ub.split(' - ')[0] : ub;
+                const zona = ub.includes(' - ') ? ub.split(' - ').slice(1).join(' - ') : 'General';
+                if (!sedes[sede]) sedes[sede] = {};
+                if (!sedes[sede][zona]) sedes[sede][zona] = [];
+                sedes[sede][zona].push(a);
+            });
+            const sedeKeys = Object.keys(sedes).sort();
+            const [activeSede, setActiveSede] = useState(sedeKeys[0] || '');
+            const [mapaHover, setMapaHover] = useState(null);
+
+            const estadoColor = { 'Almacen':'#3fb950','Asignado':'#58a6ff','Pendiente':'#f97316','Transito':'#fbbf24','Reparacion':'#a855f7','Extraviado':'#ef4444','Robado':'#dc2626','Baja':'#6b7280' };
+            const zonaStatus = function(items) {
+                if (items.some(a => a.estado === 'Extraviado' || a.estado === 'Robado')) return '#ef4444';
+                if (items.some(a => a.estado === 'Pendiente')) return '#f97316';
+                if (items.some(a => a.estado === 'Reparacion')) return '#a855f7';
+                return '#3fb950';
+            };
+
+            if (sedeKeys.length === 0) return e('div', { style: { textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' } },
+                e('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '🗺️'),
+                e('div', { style: { fontWeight: '700', fontSize: '16px' } }, 'Sin equipos con ubicación asignada'),
+                e('div', { style: { fontSize: '13px', marginTop: '8px' } }, 'Asigna ubicaciones a los equipos para verlos en el mapa')
+            );
+
+            const zonas = sedes[activeSede] || {};
+            const zonaKeys = Object.keys(zonas).sort();
+
+            return e('div', { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
+                sedeKeys.length > 1 && e('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+                    sedeKeys.map(function(sede) {
+                        const total = Object.values(sedes[sede]).flat().length;
+                        const isActive = activeSede === sede;
+                        return e('button', { key: sede, onClick: function() { setActiveSede(sede); },
+                            style: { padding: '10px 18px', borderRadius: '12px', border: '2px solid ' + (isActive ? '#58a6ff' : 'var(--border)'), background: isActive ? 'rgba(88,166,255,.12)' : 'var(--bg-secondary)', color: isActive ? '#58a6ff' : 'var(--text-primary)', fontWeight: '700', fontSize: '14px', cursor: 'pointer', transition: 'all .15s' } },
+                            '🏢 ', sede, e('span', { style: { marginLeft: '6px', fontSize: '11px', opacity: 0.7 } }, total + ' eq.')
+                        );
+                    })
+                ),
+                zonaKeys.length === 0 ? e('div', { style: { textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' } }, 'No hay zonas para esta sede') :
+                e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' } },
+                    zonaKeys.map(function(zona) {
+                        const items = zonas[zona];
+                        const color = zonaStatus(items);
+                        const byEstado = {};
+                        items.forEach(function(a) { byEstado[a.estado] = (byEstado[a.estado]||0) + 1; });
+                        const isHovered = mapaHover === zona;
+                        return e('div', { key: zona,
+                            onMouseEnter: function() { setMapaHover(zona); },
+                            onMouseLeave: function() { setMapaHover(null); },
+                            onClick: function() { setSearch(activeSede + ' - ' + zona); setView('lista'); },
+                            style: { background: 'var(--bg-secondary)', border: '2px solid ' + color + (isHovered ? '99' : '33'), borderRadius: '16px', padding: '18px', cursor: 'pointer', transition: 'all .2s ease', transform: isHovered ? 'translateY(-4px)' : '', boxShadow: isHovered ? '0 12px 32px ' + color + '22' : 'none', position: 'relative', overflow: 'hidden' }
+                        },
+                            e('div', { style: { position: 'absolute', top: '-15px', right: '-15px', width: '60px', height: '60px', borderRadius: '50%', background: color + '15', filter: 'blur(15px)' } }),
+                            e('div', { style: { fontSize: '32px', marginBottom: '8px' } }, '🗄️'),
+                            e('div', { style: { fontWeight: '800', fontSize: '13px', marginBottom: '4px', lineHeight: '1.3' } }, zona),
+                            e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' } }, items.length + ' equipo' + (items.length !== 1 ? 's' : '')),
+                            e('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' } },
+                                Object.entries(byEstado).map(function(entry) {
+                                    var est = entry[0], cnt = entry[1];
+                                    var col = estadoColor[est] || '#6b7280';
+                                    var pct = Math.round(cnt / items.length * 100);
+                                    return e('div', { key: est, style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+                                        e('div', { style: { width: '6px', height: '6px', borderRadius: '50%', background: col, flexShrink: 0 } }),
+                                        e('div', { style: { flex: 1, height: '4px', background: 'var(--bg-primary)', borderRadius: '2px', overflow: 'hidden' } },
+                                            e('div', { style: { height: '100%', width: pct + '%', background: col, borderRadius: '2px' } })
+                                        ),
+                                        e('span', { style: { fontSize: '10px', color: 'var(--text-secondary)', minWidth: '16px', textAlign: 'right' } }, cnt)
+                                    );
+                                })
+                            ),
+                            e('div', { style: { fontSize: '10px', color: color, fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' } },
+                                e('div', { style: { width: '6px', height: '6px', borderRadius: '50%', background: color } }),
+                                color === '#3fb950' ? 'Todo OK' : color === '#f97316' ? 'Pendientes' : color === '#ef4444' ? 'Incidencia' : 'Revisar'
+                            )
+                        );
+                    })
+                ),
+                e('div', { style: { display: 'flex', gap: '12px', flexWrap: 'wrap', paddingTop: '12px', borderTop: '1px solid var(--border)' } },
+                    Object.entries(estadoColor).map(function(entry) {
+                        var est = entry[0], col = entry[1];
+                        var cnt = (state.activos || []).filter(function(a) { return a.ubicacion && a.ubicacion.startsWith(activeSede) && a.estado === est; }).length;
+                        if (cnt === 0) return null;
+                        return e('div', { key: est, style: { display: 'flex', alignItems: 'center', gap: '5px' } },
+                            e('div', { style: { width: '8px', height: '8px', borderRadius: '50%', background: col } }),
+                            e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)' } }, est + ' (' + cnt + ')')
+                        );
+                    }).filter(Boolean)
+                )
+            );
+        }
+
         function EquiposView({ state, onRefresh, initialFilter, deepLinkEquipo, onClearDeepLink }) {
             const [view, setView] = useState('lista'); // 'lista' | 'pendientes' | 'recepcion' | 'scanner'
             const [search, setSearch] = useState('');
@@ -3420,195 +3587,12 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
 
             // ---- Render: Mapa de Ubicaciones ----
             const renderMapaUbicaciones = function() {
-                // Agrupar activos por sede (prefijo antes de " - ")
-                const sedes = {};
-                (state.activos || []).forEach(function(a) {
-                    const ub = a.ubicacion || 'Sin ubicación';
-                    const sede = ub.includes(' - ') ? ub.split(' - ')[0] : ub;
-                    const zona = ub.includes(' - ') ? ub.split(' - ').slice(1).join(' - ') : 'General';
-                    if (!sedes[sede]) sedes[sede] = {};
-                    if (!sedes[sede][zona]) sedes[sede][zona] = [];
-                    sedes[sede][zona].push(a);
-                });
-                const sedeKeys = Object.keys(sedes).sort();
-                const [activeSede, setActiveSede] = React.useState(sedeKeys[0] || '');
-                const [mapaHover, setMapaHover] = React.useState(null);
-
-                const estadoColor = { 'Almacen':'#3fb950', 'Asignado':'#58a6ff', 'Pendiente':'#f97316', 'Transito':'#fbbf24', 'Reparacion':'#a855f7', 'Extraviado':'#ef4444', 'Robado':'#dc2626', 'Baja':'#6b7280' };
-
-                const zonaStatus = function(items) {
-                    if (items.some(a => a.estado === 'Extraviado' || a.estado === 'Robado')) return '#ef4444';
-                    if (items.some(a => a.estado === 'Pendiente')) return '#f97316';
-                    if (items.some(a => a.estado === 'Reparacion')) return '#a855f7';
-                    return '#3fb950';
-                };
-
-                const zonas = sedes[activeSede] || {};
-                const zonaKeys = Object.keys(zonas).sort();
-
-                return e('div', { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
-                    // Selector de sede
-                    sedeKeys.length > 1 && e('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-                        sedeKeys.map(function(sede) {
-                            const total = Object.values(sedes[sede]).flat().length;
-                            const isActive = activeSede === sede;
-                            return e('button', { key: sede, onClick: function() { setActiveSede(sede); },
-                                style: { padding: '10px 18px', borderRadius: '12px', border: '2px solid ' + (isActive ? '#58a6ff' : 'var(--border)'), background: isActive ? 'rgba(88,166,255,.12)' : 'var(--bg-secondary)', color: isActive ? '#58a6ff' : 'var(--text-primary)', fontWeight: '700', fontSize: '14px', cursor: 'pointer', transition: 'all .15s' } },
-                                '🏢 ', sede, e('span', { style: { marginLeft: '6px', fontSize: '11px', opacity: 0.7 } }, total + ' eq.')
-                            );
-                        })
-                    ),
-
-                    // Grid de armarios/zonas
-                    e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' } },
-                        zonaKeys.map(function(zona) {
-                            const items = zonas[zona];
-                            const color = zonaStatus(items);
-                            const byEstado = {};
-                            items.forEach(function(a) { byEstado[a.estado] = (byEstado[a.estado]||0) + 1; });
-                            const isHovered = mapaHover === zona;
-                            return e('div', { key: zona,
-                                onMouseEnter: function() { setMapaHover(zona); },
-                                onMouseLeave: function() { setMapaHover(null); },
-                                onClick: function() { setSearch(activeSede + ' - ' + zona); setView('lista'); },
-                                style: { background: 'var(--bg-secondary)', border: '2px solid ' + color + (isHovered ? '99' : '33'), borderRadius: '16px', padding: '18px', cursor: 'pointer', transition: 'all .2s ease',
-                                    transform: isHovered ? 'translateY(-4px)' : '',
-                                    boxShadow: isHovered ? '0 12px 32px ' + color + '22' : 'none',
-                                    position: 'relative', overflow: 'hidden'
-                                }
-                            },
-                                e('div', { style: { position: 'absolute', top: '-15px', right: '-15px', width: '60px', height: '60px', borderRadius: '50%', background: color + '15', filter: 'blur(15px)' } }),
-                                // Icono armario SVG
-                                e('div', { style: { fontSize: '32px', marginBottom: '8px' } }, '🗄️'),
-                                e('div', { style: { fontWeight: '800', fontSize: '13px', marginBottom: '4px', lineHeight: '1.3' } }, zona),
-                                e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' } }, items.length + ' equipo' + (items.length !== 1 ? 's' : '')),
-                                // Barras por estado
-                                e('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' } },
-                                    Object.entries(byEstado).map(function(entry) {
-                                        var est = entry[0], cnt = entry[1];
-                                        var col = estadoColor[est] || '#6b7280';
-                                        var pct = Math.round(cnt / items.length * 100);
-                                        return e('div', { key: est, style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-                                            e('div', { style: { width: '6px', height: '6px', borderRadius: '50%', background: col, flexShrink: 0 } }),
-                                            e('div', { style: { flex: 1, height: '4px', background: 'var(--bg-primary)', borderRadius: '2px', overflow: 'hidden' } },
-                                                e('div', { style: { height: '100%', width: pct + '%', background: col, borderRadius: '2px' } })
-                                            ),
-                                            e('span', { style: { fontSize: '10px', color: 'var(--text-secondary)', minWidth: '16px', textAlign: 'right' } }, cnt)
-                                        );
-                                    })
-                                ),
-                                e('div', { style: { fontSize: '10px', color: color, fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' } },
-                                    e('div', { style: { width: '6px', height: '6px', borderRadius: '50%', background: color } }),
-                                    color === '#3fb950' ? 'Todo OK' : color === '#f97316' ? 'Pendientes' : color === '#ef4444' ? 'Incidencia' : 'Revisar'
-                                )
-                            );
-                        })
-                    ),
-
-                    // Leyenda estados
-                    e('div', { style: { display: 'flex', gap: '12px', flexWrap: 'wrap', paddingTop: '12px', borderTop: '1px solid var(--border)' } },
-                        Object.entries(estadoColor).map(function(entry) {
-                            var est = entry[0], col = entry[1];
-                            var cnt = (state.activos || []).filter(function(a) { return a.ubicacion && a.ubicacion.startsWith(activeSede) && a.estado === est; }).length;
-                            if (cnt === 0) return null;
-                            return e('div', { key: est, style: { display: 'flex', alignItems: 'center', gap: '5px' } },
-                                e('div', { style: { width: '8px', height: '8px', borderRadius: '50%', background: col } }),
-                                e('span', { style: { fontSize: '11px', color: 'var(--text-secondary)' } }, est + ' (' + cnt + ')')
-                            );
-                        }).filter(Boolean)
-                    )
-                );
+                return e(MapaUbicaciones, { state, setSearch, setView });
             };
 
             // ---- Render: Escáner Rápido ----
             const renderScannerRapido = function() {
-                // Al entrar en este modo, lanzar cámara en bucle
-                React.useEffect(function() {
-                    var active = true;
-                    function launchScanner() {
-                        if (!active) return;
-                        startBarcodeScanner(function(code) {
-                            if (!active) return;
-                            var id = code.trim().toUpperCase();
-                            // Extraer ID de etiqueta si viene como URL
-                            var urlMatch = id.match(/[?&]EQUIPO=([^&]+)/i);
-                            if (urlMatch) id = urlMatch[1];
-                            var activo = (state.activos || []).find(function(a) { return a.idEtiqueta === id; });
-                            var ts = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                            if (activo) {
-                                setScanLog(function(prev) { return [{ id, tipo: activo.tipo, modelo: activo.modelo, estado: activo.estado, ts, ok: true }].concat(prev).slice(0, 50); });
-                                setScanCount(function(n) { return n + 1; });
-                                setScanLastId(id);
-                                setScanFlash(true);
-                                setTimeout(function() { setScanFlash(false); }, 600);
-                            } else {
-                                setScanLog(function(prev) { return [{ id, tipo: '—', modelo: 'No encontrado en inventario', estado: '', ts, ok: false }].concat(prev).slice(0, 50); });
-                            }
-                            // Auto-relaunch after short delay
-                            setTimeout(function() { if (active) launchScanner(); }, 800);
-                        });
-                    }
-                    launchScanner();
-                    return function() { active = false; stopBarcodeScanner(); };
-                }, []);
-
-                return e('div', null,
-                    // Header con contador
-                    e('div', { style: {
-                        background: scanFlash ? 'rgba(63,185,80,.15)' : 'var(--bg-secondary)',
-                        border: '2px solid ' + (scanFlash ? 'var(--accent-green)' : 'var(--accent-purple)'),
-                        borderRadius: '16px', padding: '28px 32px', marginBottom: '20px',
-                        transition: 'all .3s ease', textAlign: 'center'
-                    } },
-                        e('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' } }, '⚡ Modo Escáner Rápido — Activo'),
-                        e('div', { style: { display: 'flex', justifyContent: 'center', gap: '48px', flexWrap: 'wrap' } },
-                            e('div', { style: { textAlign: 'center' } },
-                                e('div', { style: { fontSize: '56px', fontWeight: '800', fontFamily: 'IBM Plex Mono,monospace', color: 'var(--accent-green)', lineHeight: 1 } }, scanCount),
-                                e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', marginTop: '6px' } }, 'Escaneados')
-                            ),
-                            scanLastId && e('div', { style: { textAlign: 'center' } },
-                                e('div', { style: { fontSize: '22px', fontWeight: '800', fontFamily: 'IBM Plex Mono,monospace', color: 'var(--accent-blue)', lineHeight: 1 } }, scanLastId),
-                                e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', marginTop: '6px' } }, 'Último escaneado')
-                            )
-                        ),
-                        e('div', { style: { marginTop: '16px', fontSize: '13px', color: 'var(--text-secondary)' } }, '📷 Apunta la cámara al QR o código de barras — se registra automáticamente')
-                    ),
-
-                    // Log de escaneos
-                    scanLog.length > 0 && e('div', { style: { background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' } },
-                        e('div', { style: { padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-                            e('span', { style: { fontWeight: '700', fontSize: '14px' } }, '📋 Registro de sesión'),
-                            e('button', { onClick: function() { setScanLog([]); setScanCount(0); setScanLastId(''); },
-                                style: { background: 'none', border: 'none', color: 'var(--accent-red)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' } }, 'Limpiar')
-                        ),
-                        e('div', { style: { maxHeight: '420px', overflowY: 'auto' } },
-                            scanLog.map(function(entry, i) {
-                                return e('div', { key: i, style: {
-                                    display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 20px',
-                                    borderBottom: '1px solid var(--border)',
-                                    background: i === 0 ? (entry.ok ? 'rgba(63,185,80,.05)' : 'rgba(239,68,68,.05)') : 'transparent',
-                                    transition: 'background .3s'
-                                } },
-                                    e('div', { style: { width: '26px', height: '26px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px',
-                                        background: entry.ok ? 'rgba(63,185,80,.15)' : 'rgba(239,68,68,.15)', flexShrink: 0 } }, entry.ok ? '✅' : '❌'),
-                                    e('div', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '12px', fontWeight: '700', color: entry.ok ? 'var(--accent-green)' : 'var(--accent-red)', minWidth: '160px' } }, entry.id),
-                                    e('div', { style: { flex: 1 } },
-                                        e('div', { style: { fontSize: '13px', fontWeight: '600' } }, entry.tipo + (entry.modelo ? ' · ' + entry.modelo : '')),
-                                        entry.estado && e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' } }, 'Estado: ' + entry.estado)
-                                    ),
-                                    e('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'IBM Plex Mono,monospace', flexShrink: 0 } }, entry.ts)
-                                );
-                            })
-                        )
-                    ),
-
-                    // Botón exportar log si hay entradas
-                    scanLog.length > 0 && e('div', { style: { marginTop: '12px', display: 'flex', gap: '12px', justifyContent: 'flex-end' } },
-                        e('button', { className: 'button button-secondary', onClick: function() {
-                            exportToCSV(scanLog.map(function(e) { return { 'ID': e.id, 'Tipo': e.tipo, 'Modelo': e.modelo, 'Estado': e.estado, 'Hora': e.ts, 'Resultado': e.ok ? 'OK' : 'No encontrado' }; }), 'scan_session');
-                        } }, '⬇️ Exportar log CSV')
-                    )
-                );
+                return e(ScannerRapido, { state, scanLog, setScanLog, scanCount, setScanCount, scanLastId, setScanLastId, scanFlash, setScanFlash });
             };
 
             // ---- Render: Recepción en lote ----
