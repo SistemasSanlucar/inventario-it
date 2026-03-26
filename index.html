@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.1.1'
+        version: '3.1.2'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -975,9 +975,12 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             '</TextObject>';
         };
 
+        // Layout portrait: 1.614" ancho x 3.504" alto
+        // QR centrado arriba (1.4"x1.4"), texto debajo
+        var qrX = '0.107';
         var barcodeObj =
             '<BarcodeObject>' +
-                '<Name>QR1</Name>' +
+                '<n>QR1</n>' +
                 brushes + commonProps +
                 '<BarcodeFormat>QRCode</BarcodeFormat>' +
                 '<Data><DataString>' + qrUrl + '</DataString></Data>' +
@@ -987,20 +990,20 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 '<TextPosition>None</TextPosition>' +
                 fontInfo('8', 'False', '0', '0', '0') +
                 '<ObjectLayout>' +
-                    '<DYMOPoint><X>0.06</X><Y>0.06</Y></DYMOPoint>' +
-                    '<Size><Width>1.44</Width><Height>1.44</Height></Size>' +
+                    '<DYMOPoint><X>' + qrX + '</X><Y>0.06</Y></DYMOPoint>' +
+                    '<Size><Width>1.4</Width><Height>1.4</Height></Size>' +
                 '</ObjectLayout>' +
             '</BarcodeObject>';
 
-        var tX = '1.62', tW = '1.82';
+        var tX = '0.06', tW = '1.494';
         var labelObjects =
             barcodeObj +
-            txt('EMPRESA', 'SANLUCAR FRUIT · IT', tX, '0.06', tW, '0.18', '7',   'False', '0.51', '0.51', '0.51') +
-            txt('ID',      id,                        tX, '0.27', tW, '0.32', '11',  'True',  '0',    '0',    '0'   ) +
-            txt('TIPO',    tipo,                       tX, '0.63', tW, '0.26', '9',   'True',  '0.12', '0.12', '0.12') +
-            txt('MODELO',  modelo,                     tX, '0.93', tW, '0.22', '7.5', 'False', '0.27', '0.27', '0.27') +
-            txt('NS',      ns,                         tX, '1.18', tW, '0.20', '6.5', 'False', '0.39', '0.39', '0.39') +
-            txt('SOC',     soc,                        tX, '1.41', tW, '0.16', '6',   'False', '0.59', '0.59', '0.59');
+            txt('EMPRESA', 'SANLUCAR FRUIT · IT', tX, '1.52', tW, '0.18', '6',   'False', '0.51', '0.51', '0.51') +
+            txt('ID',      id,                        tX, '1.72', tW, '0.36', '8',   'True',  '0',    '0',    '0'   ) +
+            txt('TIPO',    tipo,                       tX, '2.10', tW, '0.30', '9',   'True',  '0.12', '0.12', '0.12') +
+            txt('MODELO',  modelo,                     tX, '2.42', tW, '0.26', '8',   'False', '0.27', '0.27', '0.27') +
+            txt('NS',      ns,                         tX, '2.70', tW, '0.24', '7',   'False', '0.39', '0.39', '0.39') +
+            txt('SOC',     soc,                        tX, '2.96', tW, '0.20', '6.5', 'False', '0.59', '0.59', '0.59');
 
         return '<?xml version="1.0" encoding="utf-8"?>' +
             '<DesktopLabel Version="1">' +
@@ -1012,7 +1015,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     '<BorderStyle>SolidLine</BorderStyle>' +
                     '<DYMORect>' +
                         '<DYMOPoint><X>0.06</X><Y>0.06</Y></DYMOPoint>' +
-                        '<Size><Width>3.38</Width><Height>1.49</Height></Size>' +
+                        '<Size><Width>1.494</Width><Height>3.384</Height></Size>' +
                     '</DYMORect>' +
                     '<BorderColor><SolidColorBrush><Color A="1" R="0" G="0" B="0"/></SolidColorBrush></BorderColor>' +
                     '<BorderThickness>1</BorderThickness>' +
