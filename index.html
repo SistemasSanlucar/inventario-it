@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.1.5'
+        version: '3.1.6'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -507,7 +507,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 catalogo.forEach(item => {
                     const tipo = item.Title, modelo = item.Modelo;
                     const activo = item.Activo !== 'No' && item.Activo !== false;
-                    const llevaEtiqueta = item.LlevaEtiqueta === 'Si';
+                    const llevaEtiqueta = item.LlevaEtiqueta === 'Si' || item.LlevaEtiqueta === null || item.LlevaEtiqueta === undefined || item.LlevaEtiqueta === '';
                     if (!catalogoTipos[tipo]) catalogoTipos[tipo] = { llevaEtiqueta };
                     if (llevaEtiqueta) catalogoTipos[tipo].llevaEtiqueta = true;
                     if (activo && tipo && modelo) {
@@ -551,7 +551,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         async deleteCatalogItem(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.catalogo, itemId); }
         async getCatalogoRaw() {
             const items = await this.graph.getListItems(CONFIG.sharepoint.lists.catalogo);
-            return items.map(item => ({ id: item.sharePointId, tipo: item.Title, modelo: item.Modelo, activo: item.Activo !== 'No' && item.Activo !== false, llevaEtiqueta: item.LlevaEtiqueta === 'Si' }));
+            return items.map(item => ({ id: item.sharePointId, tipo: item.Title, modelo: item.Modelo, activo: item.Activo !== 'No' && item.Activo !== false, llevaEtiqueta: item.LlevaEtiqueta === 'Si' || item.LlevaEtiqueta === null || item.LlevaEtiqueta === undefined || item.LlevaEtiqueta === '' }));
         }
         async addToCatalog(tipo, modelo, llevaEtiqueta) {
             const fields = { Title: tipo, Activo: 'Si', LlevaEtiqueta: llevaEtiqueta ? 'Si' : 'No' };
@@ -4939,7 +4939,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         btn('Escanear QR', '📷', '#58a6ff', launchScanner, 'Abrir cámara'),
                         btn('Asignaciones', '📋', '#3fb950', () => setScreen('asignaciones'), misAsig + ' activas'),
                         btn('Inventario', '📦', '#a855f7', () => setScreen('inventario'), state.inventory.length + ' productos'),
-                        btn('Recepción', '📥', '#fbbf24', () => onOpenModal('entrada', null), 'Nuevo material')
+                        btn('Recepción', '📥', '#fbbf24', () => setScreen('recepcion'), 'Nuevo material')
                     ),
                     // Búsqueda rápida por ID
                     e('div', { style: { marginTop: '8px' } },
@@ -5099,6 +5099,20 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                                     )
                                 );
                             })
+                    )
+                );
+            }
+
+            // Recepcion screen
+            if (screen === 'recepcion') {
+                return e('div', { style: { display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-primary)' } },
+                    e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)' } },
+                        e('button', { onClick: () => setScreen('home'), style: { background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: '22px', cursor: 'pointer', lineHeight: 1 } }, '←'),
+                        e('h2', { style: { fontSize: '18px', fontWeight: '700', margin: 0 } }, '📦 Recepción de lote')
+                    ),
+                    e('div', { style: { flex: 1, overflow: 'auto', padding: '16px' } },
+                        e('p', { style: { color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' } }, 'Para equipos etiquetados usa el escritorio. Aquí puedes hacer entradas de inventario fungible.'),
+                        e('button', { className: 'button button-primary', style: { width: '100%', padding: '16px', fontSize: '16px' }, onClick: () => { setScreen('home'); onOpenModal('entrada', null); } }, '📥 Nueva entrada de inventario')
                     )
                 );
             }
