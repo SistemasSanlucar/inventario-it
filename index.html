@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.1.0'
+        version: '3.1.1'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -910,27 +910,10 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
     ];
 
     // Detecta el PaperName correcto consultando la impresora
-    // Detecta el LabelName correcto consultando la impresora (formato DCD v1.6)
-    async function detectDymoLabelName() {
-        return localStorage.getItem('dymo_label_name') || 'WhiteNameBadgeS0722560';
-    }
+    // ── DYMO Print ─────────────────────────────────────────────────────────
+    // Usa DLS API con DesktopLabel XML y form-urlencoded — VALIDADO manualmente
+    const DYMO_DLS_PRINT = DYMO_URL + '/DYMO/DLS/Printing/PrintLabel';
 
-    async function detectDymoLabelName_unused() {
-        const cached = localStorage.getItem('dymo_label_name');
-        if (cached) { console.log('[DYMO] Usando LabelName guardado:', cached); return cached; }
-        try {
-            const resp = await fetch(DYMO_URL + '/dcd/api/get-default-label/LabelWriter');
-            if (resp.ok) {
-                const data = await resp.json();
-                const rv = data.responseValue || data;
-                const ln = rv && rv.label && rv.label.name;
-                if (ln) { console.log('[DYMO] LabelName desde get-default-label:', ln); return ln; }
-            }
-        } catch(e) { console.warn('[DYMO] get-default-label falló:', e.message); }
-        return null;
-    }
-
-    // Construye XML DesktopLabel — estructura VALIDADA manualmente contra DYMO Connect 1.6.0.36
     function buildDymoLabelXml(activo) {
         var labelName = localStorage.getItem('dymo_label_name') || 'WhiteNameBadgeS0722560';
         var qrUrl = window.location.href.split('?')[0].split('#')[0] + '?equipo=' + activo.idEtiqueta;
@@ -940,7 +923,6 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         var ns     = activo.numSerie ? 'N/S: ' + safePdfText(activo.numSerie) : '';
         var soc    = activo.sociedad ? safePdfText(activo.sociedad) : '';
 
-        // Brushes reutilizable
         var brushes =
             '<Brushes>' +
                 '<BackgroundBrush><SolidColorBrush><Color A="0" R="1" G="1" B="1"/></SolidColorBrush></BackgroundBrush>' +
@@ -956,7 +938,6 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             '<BorderStyle>SolidLine</BorderStyle>' +
             '<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0"/></Margin>';
 
-        // FontInfo con FontBrush — requerido por DYMO 1.6
         var fontInfo = function(size, bold, r, g, b) {
             return '<FontInfo>' +
                 '<FontName>Segoe UI</FontName>' +
@@ -968,13 +949,11 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             '</FontInfo>';
         };
 
-        // TextObject — validado contra schema DYMO 1.6
         var txt = function(name, text, x, y, w, h, size, bold, r, g, b) {
             if (!text) return '';
             return '<TextObject>' +
                 '<Name>' + name + '</Name>' +
-                brushes +
-                commonProps +
+                brushes + commonProps +
                 '<HorizontalAlignment>Left</HorizontalAlignment>' +
                 '<VerticalAlignment>Middle</VerticalAlignment>' +
                 '<FitMode>AlwaysFit</FitMode>' +
@@ -984,12 +963,10 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     '<HorizontalAlignment>Left</HorizontalAlignment>' +
                     '<VerticalAlignment>Middle</VerticalAlignment>' +
                     '<IsVertical>False</IsVertical>' +
-                    '<LineTextSpan>' +
-                        '<TextSpan>' +
-                            '<Text>' + text + '</Text>' +
-                            fontInfo(size, bold, r, g, b) +
-                        '</TextSpan>' +
-                    '</LineTextSpan>' +
+                    '<LineTextSpan><TextSpan>' +
+                        '<Text>' + text + '</Text>' +
+                        fontInfo(size, bold, r, g, b) +
+                    '</TextSpan></LineTextSpan>' +
                 '</FormattedText>' +
                 '<ObjectLayout>' +
                     '<DYMOPoint><X>' + x + '</X><Y>' + y + '</Y></DYMOPoint>' +
@@ -998,12 +975,10 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             '</TextObject>';
         };
 
-        // BarcodeObject — estructura exacta validada con status:true
         var barcodeObj =
             '<BarcodeObject>' +
                 '<Name>QR1</Name>' +
-                brushes +
-                commonProps +
+                brushes + commonProps +
                 '<BarcodeFormat>QRCode</BarcodeFormat>' +
                 '<Data><DataString>' + qrUrl + '</DataString></Data>' +
                 '<HorizontalAlignment>Center</HorizontalAlignment>' +
@@ -1017,11 +992,10 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 '</ObjectLayout>' +
             '</BarcodeObject>';
 
-        // Texto a la derecha del QR
         var tX = '1.62', tW = '1.82';
         var labelObjects =
             barcodeObj +
-            txt('EMPRESA', 'SANLUCAR FRUIT \xB7 IT', tX, '0.06', tW, '0.18', '7',   'False', '0.51', '0.51', '0.51') +
+            txt('EMPRESA', 'SANLUCAR FRUIT · IT', tX, '0.06', tW, '0.18', '7',   'False', '0.51', '0.51', '0.51') +
             txt('ID',      id,                        tX, '0.27', tW, '0.32', '11',  'True',  '0',    '0',    '0'   ) +
             txt('TIPO',    tipo,                       tX, '0.63', tW, '0.26', '9',   'True',  '0.12', '0.12', '0.12') +
             txt('MODELO',  modelo,                     tX, '0.93', tW, '0.22', '7.5', 'False', '0.27', '0.27', '0.27') +
@@ -1053,49 +1027,36 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             '</DesktopLabel>';
     }
 
-    // Envía XML a la API REST de DYMO Connect 1.6
-    async function sendDymoPrint(labelXml) {
-        const body = JSON.stringify({ printerName: DYMO_PRINTER, labelXml, copies: 1 });
-        const resp = await fetch(DYMO_URL + '/dcd/api/print-label', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body
+    // Imprime usando DLS API con form-urlencoded — ÚNICO MÉTODO QUE FUNCIONA
+    async function printDymoLabel(activo) {
+        var labelXml = buildDymoLabelXml(activo);
+        var printParams = '<?xml version="1.0" encoding="utf-8"?>' +
+            '<LabelWriterPrintParams>' +
+                '<Copies>1</Copies>' +
+                '<PrinterName>' + DYMO_PRINTER + '</PrinterName>' +
+            '</LabelWriterPrintParams>';
+        var labelSetXml = '<LabelSet><LabelRecord></LabelRecord></LabelSet>';
+
+        var body = 'printerName=' + encodeURIComponent(DYMO_PRINTER) +
+            '&printParamsXml=' + encodeURIComponent(printParams) +
+            '&labelXml=' + encodeURIComponent(labelXml) +
+            '&labelSetXml=' + encodeURIComponent(labelSetXml);
+
+        var resp = await fetch(DYMO_DLS_PRINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body
         });
-        const text = await resp.text();
-        let data; try { data = JSON.parse(text); } catch(e) { data = { status: resp.ok }; }
-        if (!resp.ok || data.status === false) {
-            throw new Error(data.error || text.slice(0, 300));
+
+        var text = await resp.text();
+        console.log('[DYMO] DLS response:', resp.status, text.slice(0, 200));
+
+        if (!resp.ok) {
+            throw new Error('DYMO DLS error ' + resp.status + ': ' + text.slice(0, 200));
         }
         return true;
     }
 
-    // LabelNames a probar en orden
-    const DYMO_LABEL_FALLBACKS = ['WhiteNameBadgeS0722560'];
-
-    async function printDymoLabel(activo) {
-        const detectedName = await detectDymoLabelName();
-        const namesToTry = detectedName
-            ? [detectedName, ...DYMO_LABEL_FALLBACKS.filter(function(n) { return n !== detectedName; })]
-            : DYMO_LABEL_FALLBACKS;
-        var lastError = null;
-        for (var i = 0; i < namesToTry.length; i++) {
-            var labelName = namesToTry[i];
-            try {
-                console.log('[DYMO] Intentando LabelName:', labelName);
-                var labelXml = buildDymoLabelXml(activo, labelName);
-                await sendDymoPrint(labelXml);
-                console.log('[DYMO] ✅ OK con LabelName:', labelName);
-                try { localStorage.setItem('dymo_label_name', labelName); } catch(e) {}
-                return true;
-            } catch(e) {
-                console.warn('[DYMO] ❌ Falló "' + labelName + '":', e.message.slice(0, 150));
-                lastError = e;
-                var msg = e.message || '';
-                if (!msg.includes('not declared') && !msg.includes('Invalid label') &&
-                    !msg.includes('LabelName') && !msg.includes('not found') &&
-                    !msg.includes('DesktopLabel') && !msg.includes('DYMOLabel')) break;
-            }
-        }
-        throw new Error('No se pudo imprimir. Último error: ' + (lastError ? lastError.message.slice(0, 200) : 'desconocido'));
-    }
 
     // Genera QR como data URL — usa librería embebida, sin CDN
     function generateQRDataUrl(text) {
