@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.1.2'
+        version: '3.1.4'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -369,6 +369,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             changeStatus: '🔄 Change status', printLabel: '🖨️ Print label',
         }
     };
+    const PAISES_LIST = ['Afganistán', 'Albania', 'Alemania', 'Andorra', 'Angola', 'Arabia Saudita', 'Argelia', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaiyán', 'Bahamas', 'Bangladés', 'Bélgica', 'Belice', 'Benín', 'Bielorrusia', 'Bolivia', 'Bosnia y Herzegovina', 'Botsuana', 'Brasil', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Bután', 'Cabo Verde', 'Camboya', 'Camerún', 'Canadá', 'Chad', 'Chile', 'China', 'Chipre', 'Colombia', 'Comoras', 'Congo', 'Corea del Norte', 'Corea del Sur', 'Costa de Marfil', 'Costa Rica', 'Croacia', 'Cuba', 'Dinamarca', 'Dominica', 'Ecuador', 'Egipto', 'El Salvador', 'Emiratos Árabes Unidos', 'Eritrea', 'Eslovaquia', 'Eslovenia', 'España', 'Estados Unidos', 'Estonia', 'Etiopía', 'Filipinas', 'Finlandia', 'Fiyi', 'Francia', 'Gabón', 'Gambia', 'Georgia', 'Ghana', 'Granada', 'Grecia', 'Guatemala', 'Guinea', 'Guinea-Bisáu', 'Guinea Ecuatorial', 'Guyana', 'Haití', 'Honduras', 'Hungría', 'India', 'Indonesia', 'Irak', 'Irán', 'Irlanda', 'Islandia', 'Islas Marshall', 'Islas Salomón', 'Israel', 'Italia', 'Jamaica', 'Japón', 'Jordania', 'Kazajistán', 'Kenia', 'Kirguistán', 'Kiribati', 'Kuwait', 'Laos', 'Lesoto', 'Letonia', 'Líbano', 'Liberia', 'Libia', 'Liechtenstein', 'Lituania', 'Luxemburgo', 'Macedonia del Norte', 'Madagascar', 'Malasia', 'Malaui', 'Maldivas', 'Malí', 'Malta', 'Marruecos', 'Mauricio', 'Mauritania', 'México', 'Micronesia', 'Moldavia', 'Mónaco', 'Mongolia', 'Montenegro', 'Mozambique', 'Namibia', 'Nauru', 'Nepal', 'Nicaragua', 'Níger', 'Nigeria', 'Noruega', 'Nueva Zelanda', 'Omán', 'Países Bajos', 'Pakistán', 'Palaos', 'Panamá', 'Papúa Nueva Guinea', 'Paraguay', 'Perú', 'Polonia', 'Portugal', 'Qatar', 'Reino Unido', 'República Centroafricana', 'República Checa', 'República Democrática del Congo', 'República Dominicana', 'Ruanda', 'Rumanía', 'Rusia', 'Samoa', 'San Cristóbal y Nieves', 'San Marino', 'San Vicente y las Granadinas', 'Santa Lucía', 'Santo Tomé y Príncipe', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leona', 'Singapur', 'Siria', 'Somalia', 'Sri Lanka', 'Suazilandia', 'Sudáfrica', 'Sudán', 'Sudán del Sur', 'Suecia', 'Suiza', 'Surinam', 'Tailandia', 'Tanzania', 'Tayikistán', 'Timor Oriental', 'Togo', 'Tonga', 'Trinidad y Tobago', 'Túnez', 'Turkmenistán', 'Turquía', 'Tuvalu', 'Ucrania', 'Uganda', 'Uruguay', 'Uzbekistán', 'Vanuatu', 'Venezuela', 'Vietnam', 'Yemen', 'Yibuti', 'Zambia', 'Zimbabue'];
     let currentLang = localStorage.getItem('inv_lang') || 'es';
     const T = (lang) => TRANSLATIONS[lang || currentLang] || TRANSLATIONS.es;
 
@@ -552,8 +553,8 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const items = await this.graph.getListItems(CONFIG.sharepoint.lists.catalogo);
             return items.map(item => ({ id: item.sharePointId, tipo: item.Title, modelo: item.Modelo, activo: item.Activo !== 'No' && item.Activo !== false, llevaEtiqueta: item.LlevaEtiqueta === 'Si' }));
         }
-        async addToCatalog(tipo, modelo) {
-            const fields = { Title: tipo, Activo: 'Si' };
+        async addToCatalog(tipo, modelo, llevaEtiqueta) {
+            const fields = { Title: tipo, Activo: 'Si', LlevaEtiqueta: llevaEtiqueta ? 'Si' : 'No' };
             if (modelo && modelo.trim()) fields.Modelo = modelo.trim();
             return await this.graph.createListItem(CONFIG.sharepoint.lists.catalogo, fields);
         }
@@ -4119,6 +4120,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const [catalogoRaw, setCatalogoRaw] = useState([]);
             const [catalogoLoaded, setCatalogoLoaded] = useState(false);
             const [newTipo, setNewTipo] = useState('');
+            const [newTipoEtiqueta, setNewTipoEtiqueta] = useState(false);
             const [newModelo, setNewModelo] = useState('');
             const [newModeloTipo, setNewModeloTipo] = useState('');
             const [stockMinimoInput, setStockMinimoInput] = useState(String(state.stockMinimoDefault || 2));
@@ -4243,8 +4245,20 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     // Añadir tipo nuevo
                     e('div', { style: { marginBottom: '20px' } },
                         e('div', { className: 'form-label', style: { marginBottom: '8px' } }, 'Nuevo Tipo'),
-                        addRow('Nombre del tipo (ej: Docking Stations)', newTipo, setNewTipo,
-                            () => act(async () => { await dataManager.addToCatalog(newTipo.trim(), ''); setCatalogoLoaded(false); await onRefresh(); }, 'Tipo añadido').then(() => setNewTipo('')))
+                        e('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } },
+                            e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre del tipo (ej: Docking Stations)', value: newTipo, onChange: ev => setNewTipo(ev.target.value), style: { flex: 1 } }),
+                            e('button', {
+                                onClick: () => { setNewTipoEtiqueta(v => !v); },
+                                style: { padding: '8px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '700',
+                                    background: newTipoEtiqueta ? 'rgba(63,185,80,.15)' : 'rgba(88,166,255,.1)',
+                                    color: newTipoEtiqueta ? 'var(--accent-green)' : 'var(--accent-blue)', whiteSpace: 'nowrap' }
+                            }, newTipoEtiqueta ? '💻 Lleva etiqueta' : '📦 Sin etiqueta'),
+                            e('button', { className: 'button button-success', onClick: () => act(async () => {
+                                await dataManager.addToCatalog(newTipo.trim(), '', newTipoEtiqueta);
+                                setCatalogoLoaded(false); await onRefresh();
+                            }, 'Tipo añadido').then(() => { setNewTipo(''); setNewTipoEtiqueta(false); }),
+                            disabled: loading || !newTipo.trim(), style: { padding: '8px 16px' } }, '+ Añadir')
+                        )
                     ),
                     // Añadir modelo a tipo existente
                     e('div', { style: { marginBottom: '20px' } },
@@ -4252,7 +4266,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         e('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } },
                             e('select', { className: 'form-select', value: newModeloTipo, onChange: ev => setNewModeloTipo(ev.target.value), style: { flex: 1 } },
                                 e('option', { value: '' }, '-- Selecciona tipo --'),
-                                Object.keys(state.catalogoTipos || {}).map(t => e('option', { key: t, value: t }, t))
+                                Object.keys(state.catalogoTipos || {}).filter(t => !(state.catalogoTipos[t] || {}).llevaEtiqueta).map(t => e('option', { key: t, value: t }, t))
                             ),
                             e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre del modelo', value: newModelo, onChange: ev => setNewModelo(ev.target.value), style: { flex: 2 }, onKeyDown: ev => { if (ev.key === 'Enter' && newModeloTipo && newModelo.trim()) act(async () => { await dataManager.addToCatalog(newModeloTipo, newModelo.trim()); setCatalogoLoaded(false); }, 'Modelo añadido').then(() => setNewModelo('')); } }),
                             e('button', { className: 'button button-success', onClick: () => act(async () => { await dataManager.addToCatalog(newModeloTipo, newModelo.trim()); setCatalogoLoaded(false); }, 'Modelo añadido').then(() => setNewModelo('')), disabled: loading || !newModeloTipo || !newModelo.trim(), style: { padding: '12px 20px' } }, '+ Añadir')
@@ -4269,19 +4283,24 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         return e('div', { key: tipo, style: { marginBottom: '16px' } },
                             e('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' } },
                                 e('div', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--accent-blue)', textTransform: 'uppercase', flex: 1 } }, tipo),
-                                e('label', { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: tieneEtiqueta ? 'var(--accent-green)' : 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' } },
-                                    e('input', { type: 'checkbox', checked: tieneEtiqueta, onChange: async () => {
+                                e('button', {
+                                    onClick: async () => {
                                         try {
                                             for (const m of modelos) {
                                                 await dataManager.updateCatalogLlevaEtiqueta(m.id, !tieneEtiqueta);
                                             }
                                             setCatalogoLoaded(false);
                                             await onRefresh();
-                                            showToast(tieneEtiqueta ? 'Etiqueta desactivada' : 'Etiqueta activada ✓', 'success');
+                                            showToast(!tieneEtiqueta ? '💻 Lleva etiqueta activado' : '📦 Sin etiqueta activado', 'success');
                                         } catch(err) { showToast('Error: ' + err.message, 'error'); }
-                                    }, style: { width: '16px', height: '16px', cursor: 'pointer' } }),
-                                    tieneEtiqueta ? '🏷️ Lleva etiqueta' : 'Sin etiqueta'
-                                )
+                                    },
+                                    style: {
+                                        padding: '5px 12px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '700',
+                                        background: tieneEtiqueta ? 'rgba(63,185,80,.15)' : 'rgba(88,166,255,.1)',
+                                        color: tieneEtiqueta ? 'var(--accent-green)' : 'var(--accent-blue)',
+                                        transition: 'all .2s'
+                                    }
+                                }, tieneEtiqueta ? '💻 Lleva etiqueta' : '📦 Sin etiqueta')
                             ),
                             modelos.filter(m => m.modelo).map(m => e('div', { key: m.id, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: m.activo ? 'var(--bg-primary)' : 'rgba(239,68,68,.05)', borderRadius: '6px', marginBottom: '4px', opacity: m.activo ? 1 : 0.6 } },
                                 e('span', { style: { flex: 1, fontSize: '14px' } }, m.modelo),
@@ -4502,7 +4521,10 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         e('div', { style: { display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px', marginBottom: '8px' } },
                             e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre completo', value: newSoc.nombre, onChange: ev => setNewSoc(s => ({ ...s, nombre: ev.target.value })) }),
                             e('input', { type: 'text', className: 'form-input', placeholder: 'Cód (3)', maxLength: 3, value: newSoc.codigo, onChange: ev => setNewSoc(s => ({ ...s, codigo: ev.target.value.toUpperCase() })), style: { width: '80px', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '700' } }),
-                            e('input', { type: 'text', className: 'form-input', placeholder: 'País', value: newSoc.pais, onChange: ev => setNewSoc(s => ({ ...s, pais: ev.target.value })), style: { width: '110px' } })
+                            e('select', { className: 'form-select', value: newSoc.pais, onChange: ev => setNewSoc(s => ({ ...s, pais: ev.target.value })), style: { width: '150px' } },
+                            e('option', { value: '' }, 'País'),
+                            PAISES_LIST.map(p => e('option', { key: p, value: p }, p))
+                        )
                         ),
                         newSoc.codigo.length === 3 && (state.sociedades || []).some(s => s.codigo === newSoc.codigo) ? e('div', { style: { color: 'var(--accent-red)', fontSize: '13px', marginBottom: '8px' } }, '⚠️ Código "' + newSoc.codigo + '" ya existe.') : null,
                         e('button', { className: 'button button-success', onClick: () => { if ((state.sociedades||[]).some(s=>s.codigo===newSoc.codigo)){showToast('Código duplicado','error');return;} act(()=>dataManager.createSociedad(newSoc),'Sociedad añadida').then(()=>setNewSoc({nombre:'',codigo:'',pais:''})); }, disabled: loading||!newSoc.nombre.trim()||newSoc.codigo.length!==3||!newSoc.pais.trim(), style:{width:'100%'} }, '+ Añadir Sociedad')
@@ -4515,7 +4537,10 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             isEditing ? e('div', { style: { flex: 1, display: 'flex', gap: '8px' } },
                                 e('input', { type: 'text', className: 'form-input', value: editingSocData.nombre||'', onChange: ev=>setEditingSocData(d=>({...d,nombre:ev.target.value})), style:{flex:1,padding:'6px 10px',fontSize:'14px'} }),
                                 e('input', { type: 'text', className: 'form-input', maxLength:3, value: editingSocData.codigo||'', onChange: ev=>setEditingSocData(d=>({...d,codigo:ev.target.value.toUpperCase()})), style:{width:'70px',fontFamily:'IBM Plex Mono,monospace',fontWeight:'700',padding:'6px 10px',fontSize:'14px'} }),
-                                e('input', { type: 'text', className: 'form-input', value: editingSocData.pais||'', onChange: ev=>setEditingSocData(d=>({...d,pais:ev.target.value})), style:{width:'100px',padding:'6px 10px',fontSize:'14px'} })
+                                e('select', { className: 'form-select', value: editingSocData.pais||'', onChange: ev=>setEditingSocData(d=>({...d,pais:ev.target.value})), style:{width:'150px',padding:'6px 10px',fontSize:'14px'} },
+                                e('option', { value: '' }, 'País'),
+                                PAISES_LIST.map(p => e('option', { key: p, value: p }, p))
+                            )
                             ) : e('div', { style: { flex: 1 } }, e('div', { style: { fontWeight: '600', fontSize: '14px' } }, s.nombre), e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, s.pais)),
                             isEditing ? e('button', { className: 'button button-success', onClick: () => { const dup=editingSocData.codigo!==s.codigo&&(state.sociedades||[]).some(x=>x.codigo===editingSocData.codigo); if(dup){showToast('Código duplicado','error');return;} act(()=>dataManager.updateSociedad(s.id,editingSocData),'Actualizada').then(()=>setEditingSocId(null)); }, style:{padding:'6px 12px',fontSize:'12px'} }, '✓') :
                                 e('button', { className: 'button button-secondary', onClick: ()=>{setEditingSocId(s.id);setEditingSocData({nombre:s.nombre,codigo:s.codigo,pais:s.pais});}, style:{padding:'6px 10px',fontSize:'12px'} }, '✏️'),
