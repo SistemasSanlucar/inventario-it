@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.1.6'
+        version: '3.1.7'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -589,8 +589,33 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         async getNextEtiquetaId(codigoSociedad) {
             const anyo = new Date().getFullYear().toString().slice(-2);
             const codigo = (codigoSociedad || 'SLF').toUpperCase();
-            const unique = crypto.randomUUID().replace(/-/g, '').toUpperCase().slice(0, 8);
-            return codigo + '-' + anyo + '-' + unique;
+            const prefix = codigo + '-' + anyo + '-';
+
+            // Consultar SharePoint directamente para obtener todos los IDs existentes
+            // incluyendo equipos en Baja (para no reutilizar números)
+            try {
+                let maxNum = 0;
+                let endpoint = '/sites/' + CONFIG.sharepoint.sitePath + ':/lists/' + CONFIG.sharepoint.lists.activos + '/items?$select=fields/IDEtiqueta&$expand=fields&$top=500';
+                while (endpoint) {
+                    const result = await this.graph.request(endpoint);
+                    for (const item of (result.value || [])) {
+                        const id = (item.fields && item.fields.IDEtiqueta) || '';
+                        if (id.startsWith(prefix)) {
+                            const numStr = id.slice(prefix.length);
+                            const num = parseInt(numStr, 10);
+                            if (!isNaN(num) && num > maxNum) maxNum = num;
+                        }
+                    }
+                    endpoint = result['@odata.nextLink'] ? result['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0', '') : null;
+                }
+                const nextNum = (maxNum + 1).toString().padStart(5, '0');
+                console.log('[ID] Próximo ID:', prefix + nextNum, '(máximo actual:', maxNum + ')');
+                return prefix + nextNum;
+            } catch(e) {
+                console.warn('[ID] Error obteniendo correlativo, usando timestamp:', e.message);
+                const fallback = Date.now().toString().slice(-5).padStart(5, '0');
+                return prefix + fallback;
+            }
         }
         async createActivo(data) {
             return await this.graph.createListItem(CONFIG.sharepoint.lists.activos, {
@@ -979,9 +1004,10 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         // Layout portrait: 1.614" ancho x 3.504" alto
         // QR centrado arriba (1.4"x1.4"), texto debajo
         var qrX = '0.107';
+        // QR: 1.35x1.35 centrado verticalmente en 1.49" de alto
         var barcodeObj =
             '<BarcodeObject>' +
-                '<Name>QR1</Name>' +
+                '<' + 'Name>QR1</' + 'Name>' +
                 brushes + commonProps +
                 '<BarcodeFormat>QRCode</BarcodeFormat>' +
                 '<Data><DataString>' + qrUrl + '</DataString></Data>' +
@@ -991,20 +1017,20 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 '<TextPosition>None</TextPosition>' +
                 fontInfo('8', 'False', '0', '0', '0') +
                 '<ObjectLayout>' +
-                    '<DYMOPoint><X>0.06</X><Y>0.06</Y></DYMOPoint>' +
-                    '<Size><Width>1.44</Width><Height>1.44</Height></Size>' +
+                    '<DYMOPoint><X>0.06</X><Y>0.07</Y></DYMOPoint>' +
+                    '<Size><Width>1.35</Width><Height>1.35</Height></Size>' +
                 '</ObjectLayout>' +
-            '</BarcodeObject>';
+            '</BarcodeObject>'
 
-        var tX = '1.62', tW = '1.82';
+        var tX = '1.52', tW = '1.80';
         var labelObjects =
             barcodeObj +
-            txt('EMPRESA', 'SANLUCAR FRUIT · IT', tX, '0.06', tW, '0.18', '7',   'False', '0.51', '0.51', '0.51') +
-            txt('ID',      id,                        tX, '0.27', tW, '0.32', '11',  'True',  '0',    '0',    '0'   ) +
-            txt('TIPO',    tipo,                       tX, '0.63', tW, '0.26', '9',   'True',  '0.12', '0.12', '0.12') +
-            txt('MODELO',  modelo,                     tX, '0.93', tW, '0.22', '7.5', 'False', '0.27', '0.27', '0.27') +
-            txt('NS',      ns,                         tX, '1.18', tW, '0.20', '6.5', 'False', '0.39', '0.39', '0.39') +
-            txt('SOC',     soc,                        tX, '1.41', tW, '0.16', '6',   'False', '0.59', '0.59', '0.59')
+            txt('EMPRESA', 'SANLUCAR FRUIT · IT', tX, '0.05', tW, '0.16', '6',   'False', '0.51', '0.51', '0.51') +
+            txt('ID',      id,                        tX, '0.22', tW, '0.30', '9',   'True',  '0',    '0',    '0'   ) +
+            txt('TIPO',    tipo,                       tX, '0.55', tW, '0.25', '8.5', 'True',  '0.12', '0.12', '0.12') +
+            txt('MODELO',  modelo,                     tX, '0.83', tW, '0.22', '7',   'False', '0.27', '0.27', '0.27') +
+            txt('NS',      ns,                         tX, '1.08', tW, '0.20', '6.5', 'False', '0.39', '0.39', '0.39') +
+            txt('SOC',     soc,                        tX, '1.31', tW, '0.16', '6',   'False', '0.59', '0.59', '0.59')
 
         return '<?xml version="1.0" encoding="utf-8"?>' +
             '<DesktopLabel Version="1">' +
