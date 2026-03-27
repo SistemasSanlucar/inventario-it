@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.1.9'
+        version: '3.2.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -680,7 +680,44 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const titulo = data.esPrestamo ? 'Prestamo - ' + data.nombreEmpleado : 'Asignacion - ' + data.nombreEmpleado + ' - ' + new Date().toLocaleDateString('es-ES');
             const todosProductos = (data.productosAsignados || []).concat(data.equiposAsignados || []);
             const detalleProductos = todosProductos.map((p, i) => (i + 1) + '. ' + p.nombre + ' (Cod: ' + (p.barcode || p.idEtiqueta || '') + ')').join('\n');
-            return await this.graph.createListItem(CONFIG.sharepoint.lists.asignaciones, { Title: titulo, NombreEmpleado: data.nombreEmpleado, EmailEmpleado: data.emailEmpleado, Departamento: data.departamento, Puesto: data.puesto, FechaIncorporacion: data.fechaIncorporacion, ProductosAsignados: JSON.stringify(todosProductos), CantidadProductos: todosProductos.length, FirmaEmpleado: data.firmaEmpleado, TecnicoResponsable: data.tecnicoResponsable, FechaAsignacion: new Date().toISOString(), Estado: 'Activo', Observaciones: data.observaciones || '', EsPrestamo: data.esPrestamo ? 'Si' : 'No', DetalleProductos: detalleProductos, Foto1: '', Foto2: '', Foto3: '' });
+
+            // Generar HTML de detalle de productos para el correo de Power Automate
+            const tipoAsig = data.esPrestamo ? 'PRÉSTAMO' : 'ASIGNACIÓN';
+            const colorTipo = data.esPrestamo ? '#f97316' : '#1e5c3a';
+            var filasHTML = todosProductos.map(function(p, i) {
+                var esEquipo = !!p.idEtiqueta || p.esEquipo;
+                var icono = esEquipo ? '💻' : '📦';
+                var idStr = p.idEtiqueta ? '<span style="font-family:monospace;font-size:12px;background:#e8f4ed;color:#1e5c3a;padding:2px 6px;border-radius:4px;">' + p.idEtiqueta + '</span>' : '—';
+                var nsStr = p.numSerie ? p.numSerie : '—';
+                var modeloStr = p.modelo ? p.modelo : '—';
+                var bg = i % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                return '<tr style="background:' + bg + ';">' +
+                    '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;">' + (i+1) + '</td>' +
+                    '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;">' + icono + ' ' + (p.nombre || p.tipo || '—') + '</td>' +
+                    '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;">' + modeloStr + '</td>' +
+                    '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;">' + idStr + '</td>' +
+                    '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;font-family:monospace;">' + nsStr + '</td>' +
+                '</tr>';
+            }).join('');
+
+            var detalleProductosHTML =
+                '<div style="margin:0;">' +
+                '<div style="background:' + colorTipo + ';color:white;padding:10px 15px;border-radius:8px 8px 0 0;font-size:13px;font-weight:700;">' +
+                '📦 DETALLE DE MATERIAL EN ' + tipoAsig + ' — ' + todosProductos.length + ' artículo(s)' +
+                '</div>' +
+                '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+                '<thead><tr style="background:#f0f0f0;">' +
+                '<th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;border-bottom:2px solid #ddd;width:30px;">#</th>' +
+                '<th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;border-bottom:2px solid #ddd;">Producto</th>' +
+                '<th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;border-bottom:2px solid #ddd;">Modelo</th>' +
+                '<th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;border-bottom:2px solid #ddd;">ID Etiqueta</th>' +
+                '<th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;border-bottom:2px solid #ddd;">N/S</th>' +
+                '</tr></thead>' +
+                '<tbody>' + filasHTML + '</tbody>' +
+                '</table>' +
+                '</div>';
+
+            return await this.graph.createListItem(CONFIG.sharepoint.lists.asignaciones, { Title: titulo, NombreEmpleado: data.nombreEmpleado, EmailEmpleado: data.emailEmpleado, Departamento: data.departamento, Puesto: data.puesto, FechaIncorporacion: data.fechaIncorporacion, ProductosAsignados: JSON.stringify(todosProductos), CantidadProductos: todosProductos.length, FirmaEmpleado: data.firmaEmpleado, TecnicoResponsable: data.tecnicoResponsable, FechaAsignacion: new Date().toISOString(), Estado: 'Activo', Observaciones: data.observaciones || '', EsPrestamo: data.esPrestamo ? 'Si' : 'No', DetalleProductos: detalleProductos, DetalleProductosHTML: detalleProductosHTML, Foto1: '', Foto2: '', Foto3: '' });
         }
         async updateAssignmentStatus(itemId, nuevoEstado) { await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, itemId, { Estado: nuevoEstado }); }
         async deleteAssignment(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.asignaciones, itemId); }
