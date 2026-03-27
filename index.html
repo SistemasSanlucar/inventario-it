@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.2.1'
+        version: '3.2.2'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -1043,12 +1043,9 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
 
         var tX = '0.84', tW = '1.18';
         var labelObjects = imageObj +
-            txt('EMPRESA', 'SANLUCAR FRUIT · IT', tX, '0.03', tW, '0.11', '5',   'False', '0.51', '0.51', '0.51') +
-            txt('ID',      id,                        tX, '0.14', tW, '0.18', '7',   'True',  '0',    '0',    '0'   ) +
-            txt('TIPO',    tipo,                       tX, '0.34', tW, '0.15', '6',   'True',  '0.12', '0.12', '0.12') +
-            txt('MODELO',  modelo,                     tX, '0.50', tW, '0.14', '5.5', 'False', '0.27', '0.27', '0.27') +
-            txt('NS',      ns,                         tX, '0.65', tW, '0.12', '5',   'False', '0.39', '0.39', '0.39') +
-            txt('SOC',     soc,                        tX, '0.78', tW, '0.10', '4.5', 'False', '0.59', '0.59', '0.59');
+            txt('ID',      id,      tX, '0.04', tW, '0.22', '7', 'True',  '0',    '0',    '0'   ) +
+            txt('MODELO',  modelo,  tX, '0.30', tW, '0.22', '7', 'True',  '0',    '0',    '0'   ) +
+            txt('NS',      ns,      tX, '0.56', tW, '0.22', '7', 'True',  '0',    '0',    '0'   );
 
         return '<?xml version="1.0" encoding="utf-8"?>' +
             '<DesktopLabel Version="1"><DYMOLabel Version="3">' +
