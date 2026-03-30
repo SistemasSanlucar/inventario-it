@@ -202,6 +202,32 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
     <div id="root"></div>
     <script>
     // ==========================================
+    // ERROR LOG SYSTEM
+    // ==========================================
+    const ErrorLog = (function() {
+        const MAX = 200;
+        const entries = [];
+        const listeners = [];
+        function notify() { listeners.forEach(function(fn) { try { fn(); } catch(e) {} }); }
+        return {
+            add: function(level, context, message, detail) {
+                entries.unshift({ id: Date.now() + Math.random(), ts: new Date().toISOString(), level: level, context: context, message: message, detail: detail || '' });
+                if (entries.length > MAX) entries.length = MAX;
+                notify();
+                if (level === 'error') console.error('[' + context + ']', message, detail || '');
+                else if (level === 'warn') console.warn('[' + context + ']', message);
+            },
+            error: function(ctx, msg, detail) { ErrorLog.add('error', ctx, msg, detail); },
+            warn:  function(ctx, msg, detail) { ErrorLog.add('warn',  ctx, msg, detail); },
+            info:  function(ctx, msg, detail) { ErrorLog.add('info',  ctx, msg, detail); },
+            getAll: function() { return entries.slice(); },
+            clear:  function() { entries.length = 0; notify(); },
+            onChange: function(fn) { listeners.push(fn); },
+            count: function(level) { return level ? entries.filter(function(e) { return e.level === level; }).length : entries.length; }
+        };
+    })();
+
+    // ==========================================
     // CONFIGURACION GLOBAL
     // ==========================================
     const CONFIG = {
@@ -226,7 +252,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.3.0'
+        version: '3.3.1'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -529,7 +555,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     ubicacionesAll: ubicacionesRaw.map(item => ({ id: item.sharePointId, nombre: item.Title, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' })),
                     adminsAll: admins.map(item => ({ id: item.sharePointId, email: item.Email, activo: item.Activo === 'Si' || item.Activo === true || item.Activo === 'Yes' }))
                 };
-            } catch(error) { console.error('Error cargando datos:', error); throw error; }
+            } catch(error) { ErrorLog.error('DataManager.loadAllData', error.message || 'Error cargando datos', endpoint || ''); throw error; }
         }
         async checkBarcodeExists(barcode) {
             try { const items = await this.graph.getListItems(CONFIG.sharepoint.lists.inventario); return items.some(item => item.CodigoBarras === barcode); } catch(e) { return false; }
@@ -1117,13 +1143,19 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     showToast('✓ Etiqueta enviada a DYMO LabelWriter 550', 'success');
                     return;
                 } catch(e) {
-                    console.error('DYMO directo falló:', e.message, e);
-                    showToast('⚠️ DYMO no disponible. Generando PDF...', 'warning');
+                    ErrorLog.error('DYMO.print', e.message || 'DYMO falló', e.stack ? e.stack.slice(0,200) : ''); console.error('DYMO directo falló:', e.message, e);
+                    // Detectar si el error es de certificado SSL (fetch failed / network error)
+                    const isCertError = e.message && (e.message.toLowerCase().includes('fetch') || e.message.toLowerCase().includes('network') || e.message.toLowerCase().includes('failed'));
+                    if (isCertError) {
+                        showToast('⚠️ DYMO: acepta el certificado en https://127.0.0.1:41951 y vuelve a intentarlo. Generando PDF...', 'warning');
+                    } else {
+                        showToast('⚠️ DYMO no disponible. Generando PDF...', 'warning');
+                    }
                 }
             }
-            // PDF fallback (también para lotes de >1)
+            // PDF fallback (también para lotes de >1) — etiqueta 54x25mm
             if (typeof jspdf === 'undefined' || !jspdf.jsPDF) { showToast('PDF no disponible', 'error'); return; }
-            const W = 89, H = 41;
+            const W = 54, H = 25;
             const baseUrl = window.location.href.split('?')[0].split('#')[0];
             const doc = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: [H, W] });
             for (let idx = 0; idx < activos.length; idx++) {
@@ -1135,29 +1167,41 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 try {
                     // Generar QR en canvas — librería embebida, sin CDN
                     const qrDataUrl = await generateQRDataUrl(qrUrl);
+                    // Layout 54x25mm: QR izquierda (22x22), texto derecha
+                    const QR_SIZE = 22, QR_X = 1.5, QR_Y = 1.5;
                     if (qrDataUrl) {
-                        doc.addImage(qrDataUrl, 'PNG', 1, 1, 38, 38);
+                        doc.addImage(qrDataUrl, 'PNG', QR_X, QR_Y, QR_SIZE, QR_SIZE);
                     } else {
-                        doc.setFillColor(245,245,245); doc.rect(1, 1, 38, 38, 'F');
-                        doc.setDrawColor(180,180,180); doc.rect(1, 1, 38, 38, 'S');
-                        doc.setFontSize(4.5); doc.setTextColor(100,100,100);
-                        doc.text('ESCANEAR EN APP', 20, 16, { align:'center' });
-                        doc.setFontSize(5.5); doc.setTextColor(50,50,50);
-                        doc.text(activo.idEtiqueta, 20, 24, { align:'center' });
+                        doc.setFillColor(245,245,245); doc.rect(QR_X, QR_Y, QR_SIZE, QR_SIZE, 'F');
+                        doc.setDrawColor(180,180,180); doc.rect(QR_X, QR_Y, QR_SIZE, QR_SIZE, 'S');
+                        doc.setFontSize(4); doc.setTextColor(120,120,120);
+                        doc.text('QR', QR_X + QR_SIZE/2, QR_Y + QR_SIZE/2, { align:'center' });
                     }
                 } catch(e) { console.error('QR error:', e); }
-                doc.setDrawColor(220, 220, 220);
-                doc.line(41, 3, 41, H - 3);
-                const xT = 44;
-                doc.setFontSize(6); doc.setFont(undefined, 'bold'); doc.setTextColor(120, 120, 120);
-                doc.text('SANLUCAR FRUIT  ·  IT DEPT', xT, 7);
-                doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
-                doc.text(safePdfText(activo.idEtiqueta), xT, 15);
-                doc.setFontSize(7.5); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 30, 30);
-                doc.text(safePdfText(activo.tipo), xT, 22);
-                if (activo.modelo) { doc.setFontSize(6.5); doc.setFont(undefined, 'normal'); doc.setTextColor(70, 70, 70); doc.text(safePdfText(activo.modelo), xT, 27.5); }
-                if (activo.numSerie) { doc.setFontSize(5.5); doc.setFont(undefined, 'normal'); doc.setTextColor(110, 110, 110); doc.text('N/S: ' + safePdfText(activo.numSerie), xT, 33); }
-                if (activo.sociedad) { doc.setFontSize(5); doc.setTextColor(160, 160, 160); doc.text(safePdfText(activo.sociedad), xT, 38.5); }
+                // Línea separadora vertical
+                doc.setDrawColor(200, 200, 200);
+                doc.line(25, 2, 25, H - 2);
+                // Texto — zona derecha: x=26.5, ancho útil ~26mm
+                const xT = 26.5, maxW = 26;
+                // Cabecera pequeña
+                doc.setFontSize(4.5); doc.setFont(undefined, 'normal'); doc.setTextColor(150, 150, 150);
+                doc.text('SANLUCAR FRUIT · IT', xT, 4.5);
+                // ID etiqueta — grande y negrita
+                doc.setFontSize(7.5); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+                doc.text(safePdfText(activo.idEtiqueta), xT, 10, { maxWidth: maxW });
+                // Tipo
+                doc.setFontSize(6); doc.setFont(undefined, 'bold'); doc.setTextColor(40, 40, 40);
+                doc.text(safePdfText(activo.tipo), xT, 15.5, { maxWidth: maxW });
+                // Modelo
+                if (activo.modelo) {
+                    doc.setFontSize(5.5); doc.setFont(undefined, 'normal'); doc.setTextColor(80, 80, 80);
+                    doc.text(safePdfText(activo.modelo), xT, 19.5, { maxWidth: maxW });
+                }
+                // N/S
+                if (activo.numSerie) {
+                    doc.setFontSize(5); doc.setFont(undefined, 'normal'); doc.setTextColor(120, 120, 120);
+                    doc.text('N/S: ' + safePdfText(activo.numSerie), xT, 23, { maxWidth: maxW });
+                }
             }
             doc.autoPrint();
             const pdfBlob = doc.output('blob');
@@ -1253,7 +1297,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 doc.save('Asignacion_' + safePdfText(assignment.nombreEmpleado).replace(/\s+/g, '_') + '_' + new Date().toISOString().split('T')[0] + '.pdf');
                 showToast('PDF generado correctamente', 'success');
             });
-        } catch(e) { console.error('Error generando PDF:', e); showToast('Error generando PDF: ' + (e.message || 'desconocido'), 'error'); }
+        } catch(e) { ErrorLog.error('exportPDF', e.message || 'Error generando PDF'); console.error('Error generando PDF:', e); showToast('Error generando PDF: ' + (e.message || 'desconocido'), 'error'); }
     }
 
     // ==========================================
@@ -2208,6 +2252,54 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             );
         }
 
+
+        // ---- ErrorLogPanel (panel de errores en Admin) ----
+        function ErrorLogPanel() {
+            const [entries, setEntries] = useState(ErrorLog.getAll());
+            const [filter, setFilter] = useState('all');
+            useEffect(function() {
+                ErrorLog.onChange(function() { setEntries(ErrorLog.getAll()); });
+            }, []);
+            const levelColor = { error: '#ef4444', warn: '#f97316', info: '#58a6ff' };
+            const levelBg   = { error: 'rgba(239,68,68,.1)', warn: 'rgba(249,115,22,.1)', info: 'rgba(88,166,255,.1)' };
+            const filtered = filter === 'all' ? entries : entries.filter(function(e) { return e.level === filter; });
+            return e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' } },
+                e('div', { style: { padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' } },
+                    e('div', null,
+                        e('div', { style: { fontWeight: '700', fontSize: '16px' } }, '🐛 Log de Errores'),
+                        e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' } }, 'Se limpia al recargar la página · ' + entries.length + ' entrada(s)')
+                    ),
+                    e('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' } },
+                        e('select', { className: 'filter-select', value: filter, onChange: function(ev) { setFilter(ev.target.value); } },
+                            e('option', { value: 'all' }, 'Todos (' + entries.length + ')'),
+                            e('option', { value: 'error' }, '🔴 Errores (' + ErrorLog.count('error') + ')'),
+                            e('option', { value: 'warn' },  '🟡 Avisos (' + ErrorLog.count('warn')  + ')'),
+                            e('option', { value: 'info' },  '🔵 Info ('   + ErrorLog.count('info')  + ')')
+                        ),
+                        e('button', { className: 'button button-secondary', onClick: function() { ErrorLog.clear(); setEntries([]); }, style: { padding: '8px 14px', fontSize: '13px' } }, '🗑️ Limpiar')
+                    )
+                ),
+                e('div', { style: { maxHeight: '520px', overflowY: 'auto', padding: '12px 16px' } },
+                    filtered.length === 0
+                        ? e('div', { style: { textAlign: 'center', padding: '40px', color: 'var(--text-secondary)', fontSize: '14px' } }, '✅ Sin entradas' + (filter !== 'all' ? ' con este filtro' : ''))
+                        : filtered.map(function(entry) {
+                            var d = new Date(entry.ts);
+                            var hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                            var fecha = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                            return e('div', { key: entry.id, style: { background: levelBg[entry.level] || 'var(--bg-secondary)', border: '1px solid ' + (levelColor[entry.level] || 'var(--border)') + '33', borderRadius: '8px', padding: '10px 14px', marginBottom: '8px' } },
+                                e('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' } },
+                                    e('span', { style: { background: levelColor[entry.level] || '#888', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase' } }, entry.level),
+                                    e('span', { style: { fontFamily: 'IBM Plex Mono,monospace', fontSize: '11px', color: 'var(--text-secondary)' } }, fecha + ' ' + hora),
+                                    e('span', { style: { background: 'var(--bg-primary)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' } }, entry.context)
+                                ),
+                                e('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: entry.detail ? '4px' : '0' } }, entry.message),
+                                entry.detail ? e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'IBM Plex Mono,monospace', background: 'var(--bg-primary)', padding: '6px 10px', borderRadius: '6px', marginTop: '4px', wordBreak: 'break-all', whiteSpace: 'pre-wrap', maxHeight: '80px', overflowY: 'auto' } }, entry.detail) : null
+                            );
+                        })
+                )
+            );
+        }
+
         // ---- ProductsGrid (componente separado para cumplir Rules of Hooks) ----
         function ProductsGrid({ inventory, selectedProducts, onAdd, onQuickCreate }) {
             const [prodSearch, setProdSearch] = useState('');
@@ -2815,7 +2907,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     setSelectedProducts(function(prev) { return prev.concat([newItem]); });
                     showToast('✓ Producto "' + nombre + '" creado y añadido', 'success');
                     return newItem;
-                } catch(err) { showToast('Error creando producto: ' + (err.message || ''), 'error'); return null; }
+                } catch(err) { ErrorLog.error('QuickCreate', err.message || 'Error creando producto'); showToast('Error creando producto: ' + (err.message || ''), 'error'); return null; }
             };
 
             const genBarcode = function() {
@@ -2920,6 +3012,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         if (!formData.nombreEmpleado.trim()) { showToast('Selecciona un empleado', 'error'); setLoading(false); return; }
                         const totalItems = selectedProducts.length + selectedEquipos.length;
                         if (totalItems === 0) { showToast('Añade al menos un producto o equipo', 'error'); setLoading(false); return; }
+                        if (!signature) { showToast('⚠️ La firma del empleado es obligatoria', 'error'); setLoading(false); var cv = document.querySelector('canvas'); if (cv) { cv.style.border = '2px solid #ef4444'; cv.style.boxShadow = '0 0 0 3px rgba(239,68,68,.3)'; setTimeout(function() { cv.style.border = ''; cv.style.boxShadow = ''; }, 3000); } return; }
                         const pendientes = selectedEquipos.filter(function(eq) { return eq.pendienteEscaneo; });
                         if (pendientes.length > 0) { showToast('Faltan ' + pendientes.length + ' equipo(s) por escanear', 'error'); setLoading(false); return; }
                         // Material fungible — descuenta stock
@@ -4792,7 +4885,8 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         isAdmin && openGroups.sistema && e('div', { style: { display: 'flex', flexDirection: 'column', gap: '3px', paddingLeft: '10px', borderLeft: '2px solid rgba(168,85,247,.3)' } },
                             sectionBtn('ajustes', T().settings, '⚙️'),
                             sectionBtn('exportar', T().exportAudit, '📊'),
-                            sectionBtn('log', T().actionLog, '📋')
+                            sectionBtn('log', T().actionLog, '📋'),
+                            sectionBtn('errores', '🔴 Errores', '🐛')
                         )
                     ),
                     e('div', { style: { flex: 1, minWidth: '300px' } },
@@ -4805,6 +4899,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         activeSection === 'admins' && renderAdmins(),
                         activeSection === 'ajustes' && renderAjustes(),
                         activeSection === 'exportar' && renderExportar(),
+                        activeSection === 'errores' && e(ErrorLogPanel, { key: 'errpanel' }),
                         activeSection === 'log' && e('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' } },
                             e('div', { style: { padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: '700', fontSize: '16px' } }, '📋 Log de Acciones'),
                             e('div', { style: { padding: '20px' } },
@@ -5286,7 +5381,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const refreshData = async () => {
                 if (!dataManager) return;
                 try { const data = await dataManager.loadAllData(); setDataState(data); }
-                catch(e) { console.error('Error refreshing:', e); }
+                catch(e) { ErrorLog.error('App.refresh', e.message || 'Error refreshing'); console.error('Error refreshing:', e); }
             };
 
             // handleLogout: reset COMPLETO del estado — sin residuos entre cuentas
@@ -5314,7 +5409,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     const data = await dataManager.loadAllData();
                     setDataState(data, { syncing: false });
                     if (showMsg) showToast('Sincronizado correctamente', 'success');
-                } catch(e) { setState(s => ({ ...s, syncing: false })); }
+                } catch(e) { ErrorLog.error('App.sync', e.message || 'Sync error'); setState(s => ({ ...s, syncing: false })); }
             };
 
             // handleTabChange: solo cambia pestaña — NO hace sync (innecesario y lento)
