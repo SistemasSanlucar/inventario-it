@@ -226,7 +226,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.2.2'
+        version: '3.3.0'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -1199,9 +1199,29 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             y += 10;
             doc.setFont(undefined, 'bold'); doc.setFontSize(11); doc.text('CONDICIONES DE USO', margin, y); y += 8;
             doc.setFont(undefined, 'normal'); doc.setFontSize(9);
-            const conditions = ['El empleado declara haber recibido el material en perfecto estado.', 'Se compromete a hacer un uso adecuado del mismo.', 'Mantendra el material en buen estado de conservacion.', 'Lo devolvera cuando finalice su relacion laboral o cuando se solicite.'];
+            // Si hay observaciones que indiquen daños/incidencias, sustituir la cláusula de perfecto estado
+            const tieneObsRelevantes = assignment.observaciones && assignment.observaciones.trim().length > 0;
+            const conditions = [
+                tieneObsRelevantes
+                    ? 'El empleado declara conocer el estado del material recibido, detallado en las observaciones.'
+                    : 'El empleado declara haber recibido el material en perfecto estado.',
+                'Se compromete a hacer un uso adecuado del mismo.',
+                'Mantendra el material en buen estado de conservacion.',
+                'Lo devolvera cuando finalice su relacion laboral o cuando se solicite.'
+            ];
             conditions.forEach(cond => { doc.text('- ' + cond, margin, y); y += 5; });
-            if (assignment.observaciones) { y += 5; doc.setFont(undefined, 'bold'); doc.text('OBSERVACIONES:', margin, y); y += 6; doc.setFont(undefined, 'normal'); doc.text(safePdfText(assignment.observaciones), margin, y); y += 10; }
+            if (tieneObsRelevantes) {
+                y += 5;
+                doc.setFont(undefined, 'bold');
+                doc.setFillColor(255, 243, 205);
+                doc.rect(margin - 2, y - 4, pageWidth - margin * 2 + 4, 6 + Math.ceil(assignment.observaciones.length / 90) * 5, 'F');
+                doc.text('⚠ OBSERVACIONES / ESTADO DEL MATERIAL:', margin, y);
+                y += 6;
+                doc.setFont(undefined, 'normal');
+                const obsLines = doc.splitTextToSize(safePdfText(assignment.observaciones), pageWidth - margin * 2);
+                doc.text(obsLines, margin, y);
+                y += obsLines.length * 5 + 5;
+            }
             // Firma si existe
             if (assignment.firmaEmpleado) {
                 y += 10;
@@ -2189,23 +2209,35 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         }
 
         // ---- ProductsGrid (componente separado para cumplir Rules of Hooks) ----
-        function ProductsGrid({ inventory, selectedProducts, onAdd }) {
+        function ProductsGrid({ inventory, selectedProducts, onAdd, onQuickCreate }) {
             const [prodSearch, setProdSearch] = useState('');
+            const [showQuickCreate, setShowQuickCreate] = useState(false);
+            const [quickNombre, setQuickNombre] = useState('');
+            const [quickSaving, setQuickSaving] = useState(false);
             const available = inventory.filter(function(item) {
                 return item.stock > 0 && !selectedProducts.find(function(p) { return p.barcode === item.barcode; });
             });
-            // Con búsqueda activa muestra todos los resultados; sin búsqueda limita a 60
-            // para no saturar el DOM del iPad con listas muy largas
             const filtered = prodSearch.trim()
                 ? available.filter(function(item) { return item.nombre.toLowerCase().includes(prodSearch.toLowerCase()) || item.categoria.toLowerCase().includes(prodSearch.toLowerCase()); })
                 : available.slice(0, 60);
             const hiddenCount = !prodSearch.trim() && available.length > 60 ? available.length - 60 : 0;
+            const handleQuickCreate = async function() {
+                if (!quickNombre.trim() || !onQuickCreate) return;
+                setQuickSaving(true);
+                try {
+                    const newItem = await onQuickCreate(quickNombre.trim());
+                    if (newItem) { onAdd(newItem.barcode); setProdSearch(''); setShowQuickCreate(false); setQuickNombre(''); }
+                } catch(e) { /* error handled upstream */ }
+                finally { setQuickSaving(false); }
+            };
             return e('div', { style: { marginBottom: '16px' } },
-                e('input', { type: 'text', className: 'form-input', placeholder: '🔍 Buscar producto por nombre (cables, ratones, auriculares...)', value: prodSearch, onChange: function(ev) { setProdSearch(ev.target.value); }, style: { marginBottom: '8px', fontSize: '14px' } }),
+                e('input', { type: 'text', className: 'form-input', placeholder: '🔍 Buscar producto por nombre (cables, ratones, auriculares...)', value: prodSearch, onChange: function(ev) { setProdSearch(ev.target.value); setShowQuickCreate(false); }, style: { marginBottom: '8px', fontSize: '14px' } }),
                 e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '600' } }, 'Stock disponible — toca para añadir'),
                 e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px', maxHeight: '220px', overflowY: 'auto', padding: '4px' } },
                     filtered.length === 0
-                        ? e('div', { style: { color: 'var(--text-secondary)', fontSize: '13px', padding: '12px', gridColumn: '1/-1' } }, prodSearch ? 'No se encontró "' + prodSearch + '"' : 'No hay más productos con stock disponible')
+                        ? e('div', { style: { color: 'var(--text-secondary)', fontSize: '13px', padding: '12px', gridColumn: '1/-1' } },
+                            prodSearch ? 'No se encontró "' + prodSearch + '"' : 'No hay más productos con stock disponible'
+                          )
                         : filtered.map(function(item) {
                             return e('div', {
                                 key: item.barcode,
@@ -2223,7 +2255,23 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             );
                         })
                 ),
-                hiddenCount > 0 ? e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', textAlign: 'center' } }, 'Busca para ver los ' + hiddenCount + ' productos restantes') : null
+                hiddenCount > 0 ? e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', textAlign: 'center' } }, 'Busca para ver los ' + hiddenCount + ' productos restantes') : null,
+                // Quick-create: mostrar cuando hay búsqueda activa sin resultados o botón explícito
+                onQuickCreate ? e('div', { style: { marginTop: '10px' } },
+                    !showQuickCreate
+                        ? e('button', { type: 'button', onClick: function() { setShowQuickCreate(true); setQuickNombre(prodSearch); }, style: { background: 'none', border: '1px dashed var(--accent-blue)', borderRadius: '8px', color: 'var(--accent-blue)', padding: '8px 14px', fontSize: '13px', cursor: 'pointer', width: '100%' } },
+                            '+ Añadir producto que no está en la lista...'
+                          )
+                        : e('div', { style: { background: 'rgba(88,166,255,.08)', border: '1px solid var(--accent-blue)', borderRadius: '10px', padding: '12px 14px' } },
+                            e('div', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--accent-blue)', marginBottom: '8px' } }, '➕ Crear producto rápido'),
+                            e('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' } }, 'Se creará con stock 0 y se añadirá a esta asignación. Recuerda actualizar el stock luego en Inventario.'),
+                            e('div', { style: { display: 'flex', gap: '8px' } },
+                                e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre del producto (ej: Cable USB-C 2m)', value: quickNombre, onChange: function(ev) { setQuickNombre(ev.target.value); }, style: { flex: 1, fontSize: '14px' }, onKeyDown: function(ev) { if (ev.key === 'Enter') handleQuickCreate(); } }),
+                                e('button', { type: 'button', onClick: handleQuickCreate, disabled: quickSaving || !quickNombre.trim(), className: 'button button-success', style: { padding: '10px 14px' } }, quickSaving ? e('span', { className: 'loading-spinner' }) : '✓'),
+                                e('button', { type: 'button', onClick: function() { setShowQuickCreate(false); setQuickNombre(''); }, style: { background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px', padding: '0 4px' } }, '✕')
+                            )
+                          )
+                ) : null
             );
         }
 
@@ -2580,7 +2628,9 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 nombreTecnico: '',
                 emailTecnico: '',
                 showAddTipo: false,
-                showAddModelo: false
+                showAddModelo: false,
+                modeloDetalle: '',
+                fechaDevolucion: ''
             });
             const [signature, setSignature] = useState(null);
             const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -2755,6 +2805,19 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 showToast('Añadido: ' + item.nombre, 'success');
             };
 
+            const quickCreateProduct = async function(nombre) {
+                try {
+                    const barcode = 'SL' + crypto.randomUUID().replace(/-/g, '').toUpperCase().slice(0, 10);
+                    await dataManager.createInventoryItem({ nombre: nombre, categoria: 'Otros', barcode: barcode, stock: 0, stockMinimo: 0, ubicacion: '', estado: 'Nuevo' });
+                    await onRefresh();
+                    // Tras refresh, buscar el item recién creado para añadirlo a la selección
+                    const newItem = { nombre: nombre, barcode: barcode, id: barcode, categoria: 'Otros' };
+                    setSelectedProducts(function(prev) { return prev.concat([newItem]); });
+                    showToast('✓ Producto "' + nombre + '" creado y añadido', 'success');
+                    return newItem;
+                } catch(err) { showToast('Error creando producto: ' + (err.message || ''), 'error'); return null; }
+            };
+
             const genBarcode = function() {
                 // crypto.randomUUID garantiza unicidad sin colisiones entre dispositivos simultáneos
                 const unique = crypto.randomUUID().replace(/-/g, '').toUpperCase().slice(0, 10);
@@ -2793,7 +2856,8 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const handleSubmit = async function() {
                 setLoading(true);
                 try {
-                    const nombreProducto = (formData.tipo && formData.modelo) ? (formData.tipo + ' - ' + formData.modelo) : (formData.tipo || '');
+                    const modeloFinal = (formData.modeloDetalle && formData.modeloDetalle.trim() && /otro|vario/i.test(formData.modelo)) ? formData.modelo + ' (' + formData.modeloDetalle.trim() + ')' : formData.modelo;
+                    const nombreProducto = (formData.tipo && modeloFinal) ? (formData.tipo + ' - ' + modeloFinal) : (formData.tipo || '');
 
                     if (modalType === 'entrada' && !selectedItem) {
                         if (!formData.tipo || !formData.modelo) { showToast('Selecciona tipo y modelo', 'error'); setLoading(false); return; }
@@ -2873,7 +2937,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         }
                         // Crea la asignación con todos los items
                         const equiposParaAsignacion = selectedEquipos.map(function(eq) { return { nombre: eq.nombre, idEtiqueta: eq.idEtiqueta, esEquipo: true }; });
-                        await dataManager.createAssignment({ nombreEmpleado: formData.nombreEmpleado, emailEmpleado: formData.emailEmpleado, departamento: formData.departamento, puesto: formData.puesto, fechaIncorporacion: formData.fechaIncorporacion, productosAsignados: selectedProducts, equiposAsignados: equiposParaAsignacion, firmaEmpleado: signature || '', tecnicoResponsable: tecnicoActual, observaciones: formData.observaciones, esPrestamo: formData.esPrestamo });
+                        await dataManager.createAssignment({ nombreEmpleado: formData.nombreEmpleado, emailEmpleado: formData.emailEmpleado, departamento: formData.departamento, puesto: formData.puesto, fechaIncorporacion: formData.fechaIncorporacion, productosAsignados: selectedProducts, equiposAsignados: equiposParaAsignacion, firmaEmpleado: signature || '', tecnicoResponsable: tecnicoActual, observaciones: (formData.esPrestamo && formData.fechaDevolucion ? '[Dev. prevista: ' + new Date(formData.fechaDevolucion + 'T12:00:00').toLocaleDateString('es-ES') + '] ' : '') + (formData.observaciones || ''), esPrestamo: formData.esPrestamo });
                         showToast(formData.esPrestamo ? 'Préstamo registrado' : 'Asignación creada', 'success');
 
                     } else if (modalType === 'devolver-material') {
@@ -2962,6 +3026,9 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             state.isAdmin && formData.showAddModelo ? e('div', { style: { display: 'flex', gap: '8px', marginTop: '8px' } },
                                 e('input', { type: 'text', className: 'form-input', placeholder: 'Nombre del nuevo modelo...', value: formData.modeloNuevo, onChange: function(ev) { upd('modeloNuevo', ev.target.value); }, style: { flex: 1 } }),
                                 e('button', { type: 'button', className: 'button button-success', onClick: saveModeloNuevo, disabled: savingCatalog || !formData.modeloNuevo.trim(), style: { padding: '10px 16px' } }, savingCatalog ? e('span', { className: 'loading-spinner' }) : '✓ Guardar')
+                            ) : null,
+                            (formData.modelo && /otro|vario/i.test(formData.modelo)) ? e('div', { style: { marginTop: '8px' } },
+                                e('input', { type: 'text', className: 'form-input', placeholder: '✏️ Describe el modelo específico...', value: formData.modeloDetalle || '', onChange: function(ev) { upd('modeloDetalle', ev.target.value); } })
                             ) : null
                         ), true
                     ) : null
@@ -3006,7 +3073,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 );
             };
             const productsGrid = function() {
-                return e(ProductsGrid, { inventory: state.inventory, selectedProducts, onAdd: addProductByBarcode });
+                return e(ProductsGrid, { inventory: state.inventory, selectedProducts, onAdd: addProductByBarcode, onQuickCreate: quickCreateProduct });
             };
 
             // Render body
@@ -3236,6 +3303,14 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             e('span', { style: { color: 'var(--accent-green)' } }, selectedProducts.length + ' consumible(s)')
                         ),
                         fld('Observaciones', inp('observaciones', 'Opcional')),
+                        formData.esPrestamo ? fld('Fecha de devolución prevista',
+                            e('div', null,
+                                e('input', { type: 'date', className: 'form-input', value: formData.fechaDevolucion || '', min: new Date().toISOString().split('T')[0], onChange: function(ev) { upd('fechaDevolucion', ev.target.value); } }),
+                                formData.fechaDevolucion ? e('div', { style: { marginTop: '6px', fontSize: '12px', color: 'var(--accent-orange)', fontWeight: '600' } },
+                                    '⏰ Devolución: ' + new Date(formData.fechaDevolucion + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                                ) : e('div', { style: { marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' } }, 'Sin fecha límite establecida')
+                            )
+                        ) : null,
                         signatureBlock()
                     );
                 }
@@ -3629,7 +3704,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const [filterEstado, setFilterEstado] = useState('all');
             const [fichaEquipo, setFichaEquipo] = useState(null); // equipo seleccionado para ver ficha
             // Recepción en lote
-            const [sublotes, setSublotes] = useState([{ id: 1, tipo: '', modelo: '', ubicacion: '', cantidad: 1, sociedad: '' }]);
+            const [sublotes, setSublotes] = useState([{ id: 1, tipo: '', modelo: '', modeloDetalle: '', ubicacion: '', cantidad: 1, sociedad: '' }]);
             const [creatingProgress, setCreatingProgress] = useState(null);
             // Inline N/S editing
             const [inlineNS, setInlineNS] = useState({});
@@ -3681,7 +3756,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             const estadoLabel = { 'Pendiente': '⚠️ Pendiente N/S', 'Almacen': 'En Almacén', 'Asignado': 'Asignado', 'Baja': 'Baja' };
 
             // ---- Sublote helpers ----
-            const addSublote = function() { setSublotes(function(prev) { return prev.concat([{ id: Date.now(), tipo: '', modelo: '', ubicacion: '', cantidad: 1, sociedad: '' }]); }); };
+            const addSublote = function() { setSublotes(function(prev) { return prev.concat([{ id: Date.now(), tipo: '', modelo: '', modeloDetalle: '', ubicacion: '', cantidad: 1, sociedad: '' }]); }); };
             const removeSublote = function(id) { setSublotes(function(prev) { return prev.filter(function(s) { return s.id !== id; }); }); };
             const updateSublote = function(id, field, value) {
                 setSublotes(function(prev) {
@@ -3727,7 +3802,8 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         const cant = parseInt(sublote.cantidad) || 1;
                         for (var i = 0; i < cant; i++) {
                             const idEtiqueta = await dataManager.getNextEtiquetaId(sublote.sociedad);
-                            await dataManager.createActivo({ idEtiqueta, tipo: sublote.tipo, modelo: sublote.modelo, ubicacion: sublote.ubicacion, numSerie: '', notas: '', estado: 'Pendiente', sociedad: sublote.sociedad });
+                            const modeloFinalSublote = (sublote.modeloDetalle && sublote.modeloDetalle.trim() && /otro|vario/i.test(sublote.modelo)) ? sublote.modelo + ' (' + sublote.modeloDetalle.trim() + ')' : sublote.modelo;
+                            await dataManager.createActivo({ idEtiqueta, tipo: sublote.tipo, modelo: modeloFinalSublote, ubicacion: sublote.ubicacion, numSerie: '', notas: '', estado: 'Pendiente', sociedad: sublote.sociedad });
                             current++;
                             setCreatingProgress({ current, total });
                         }
@@ -3799,10 +3875,11 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                                 ),
                                 e('div', { className: 'form-group' },
                                     e('label', { className: 'form-label' }, 'Modelo *'),
-                                    e('select', { className: 'form-select', value: sublote.modelo, onChange: function(ev) { updateSublote(sublote.id, 'modelo', ev.target.value); }, disabled: !sublote.tipo },
+                                    e('select', { className: 'form-select', value: sublote.modelo, onChange: function(ev) { updateSublote(sublote.id, 'modelo', ev.target.value); updateSublote(sublote.id, 'modeloDetalle', ''); }, disabled: !sublote.tipo },
                                         e('option', { value: '' }, '-- Modelo --'),
                                         modelosDisponibles.map(function(m) { return e('option', { key: m, value: m }, m); })
-                                    )
+                                    ),
+                                    sublote.modelo && /otro|vario/i.test(sublote.modelo) ? e('input', { type: 'text', className: 'form-input', style: { marginTop: '6px' }, placeholder: '✏️ Describe el modelo específico...', value: sublote.modeloDetalle || '', onChange: function(ev) { updateSublote(sublote.id, 'modeloDetalle', ev.target.value); } }) : null
                                 ),
                                 e('div', { className: 'form-group' },
                                     e('label', { className: 'form-label' }, 'Ubicación inicial *'),
