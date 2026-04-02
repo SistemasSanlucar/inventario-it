@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inventario IT - Sanlucar</title>
+    <title>StockControl IT v3.3.2 — Sanlucar Fruit</title>
     <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -227,6 +227,26 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         };
     })();
 
+
+    // ── Fecha efectiva de vencimiento de préstamo ─────────────────────────────
+    // Si el técnico especificó fecha en observaciones ([Dev. prevista: DD/MM/YYYY])
+    // se usa esa. Si no, el día de la asignación (vence al día siguiente).
+    function getFechaVencimientoPrestamo(asignacion) {
+        if (!asignacion.esPrestamo) return null;
+        const obs = asignacion.observaciones || '';
+        const match = obs.match(/\[Dev\. prevista:\s*(\d{1,2}\/\d{1,2}\/\d{4})\]/);
+        if (match) {
+            const parts = match[1].split('/');
+            const d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
+            d.setHours(23, 59, 59, 0);
+            return d;
+        }
+        // Sin fecha → vence al final del día de la asignación
+        const fa = new Date(asignacion.fechaAsignacion);
+        fa.setHours(23, 59, 59, 0);
+        return fa;
+    }
+
     // ==========================================
     // CONFIGURACION GLOBAL
     // ==========================================
@@ -252,7 +272,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             redirectUri: window.location.href.split('?')[0].split('#')[0]
         },
         scopes: ['User.Read', 'Sites.ReadWrite.All'],
-        version: '3.3.1'
+        version: '3.3.2'
     };
 
     let msalInstance, graphClient, dataManager;
@@ -441,12 +461,36 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
     // ==========================================
     class GraphAPIClient {
         constructor(accessToken) { this.accessToken = accessToken; this.baseUrl = 'https://graph.microsoft.com/v1.0'; }
+        async getValidToken() {
+            // Siempre intenta refrescar el token silenciosamente antes de cada llamada
+            // Esto evita fallos por expiración tras 1h de sesión activa
+            try {
+                const fresh = await getAccessToken();
+                if (fresh) { this.accessToken = fresh; return fresh; }
+            } catch(e) {}
+            return this.accessToken; // Fallback al token actual si falla el refresh
+        }
         async request(endpoint, options = {}) {
+            const token = await this.getValidToken();
             const url = this.baseUrl + endpoint;
-            const headers = { 'Authorization': 'Bearer ' + this.accessToken, 'Content-Type': 'application/json', ...options.headers };
+            const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ...options.headers };
             try {
                 const response = await fetch(url, { ...options, headers });
-                if (!response.ok) { const error = await response.json(); throw new Error(error.error?.message || 'HTTP ' + response.status); }
+                if (response.status === 401) {
+                    // Token expirado — forzar login silencioso y reintentar una vez
+                    ErrorLog.warn('GraphAPI', 'Token expirado, reintentando login silencioso...');
+                    try {
+                        const newToken = await getAccessToken();
+                        if (newToken) {
+                            this.accessToken = newToken;
+                            const retry = await fetch(url, { ...options, headers: { ...headers, 'Authorization': 'Bearer ' + newToken } });
+                            if (!retry.ok) { const err = await retry.json(); throw new Error(err.error?.message || 'HTTP ' + retry.status); }
+                            if (retry.status === 204) return null;
+                            return await retry.json();
+                        }
+                    } catch(retryErr) { ErrorLog.error('GraphAPI.tokenRefresh', retryErr.message || 'No se pudo refrescar el token'); }
+                }
+                if (!response.ok) { const error = await response.json().catch(() => ({})); throw new Error(error.error?.message || 'HTTP ' + response.status); }
                 if (response.status === 204) return null;
                 return await response.json();
             } catch(error) { console.error('Graph API Error:', error); throw error; }
@@ -557,6 +601,40 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 };
             } catch(error) { ErrorLog.error('DataManager.loadAllData', error.message || 'Error cargando datos', endpoint || ''); throw error; }
         }
+        // ── Recargas selectivas — solo recarga las listas que cambiaron ──────────
+        async refreshInventory() {
+            const items = await this.graph.getListItems(CONFIG.sharepoint.lists.inventario, true);
+            return { inventory: items.map(item => ({ id: item.sharePointId, nombre: item.Nombre || item.Title, categoria: item.Categoria, barcode: item.CodigoBarras, stock: parseInt(item.Stock) || 0, stockMinimo: parseInt(item.StockMinimo) || 0, ubicacion: item.Ubicacion || '', estado: item.Estado || 'Nuevo' })) };
+        }
+        async refreshActivos() {
+            const items = await this.graph.getListItems(CONFIG.sharepoint.lists.activos, true);
+            return { activos: items.map(item => ({ id: item.sharePointId, idEtiqueta: item.IDEtiqueta || '', tipo: item.TipoMaterial || '', modelo: item.ModeloMaterial || '', estado: item.EstadoActivo || 'Almacen', ubicacion: item.UbicacionActivo || '', numSerie: item.NumSerie || '', notas: item.Notas || '', sociedad: item.Sociedad || '', asignadoA: item.AsignadoA || '', emailAsignadoA: item.EmailAsignadoA || '', fechaAsignacion: item.FechaAsignacion || null, transitoDestino: item.TransitoDestino || '', motivoIncidencia: item.MotivoIncidencia || '', proveedor: item.Proveedor || '', numAlbaran: item.NumAlbaran || '', fechaCompra: item.FechaCompra || null, fechaGarantia: item.FechaGarantia || null, accesorios: item.Accesorios || '' })) };
+        }
+        async refreshAsignaciones() {
+            const items = await this.graph.getListItems(CONFIG.sharepoint.lists.asignaciones, true);
+            return { assignments: items.map(item => ({ id: item.sharePointId, nombreEmpleado: item.NombreEmpleado, emailEmpleado: item.EmailEmpleado, departamento: item.Departamento, puesto: item.Puesto, fechaIncorporacion: item.FechaIncorporacion, productosAsignados: JSON.parse(item.ProductosAsignados || '[]'), cantidadProductos: parseInt(item.CantidadProductos) || 0, firmaEmpleado: item.FirmaEmpleado, tecnicoResponsable: item.TecnicoResponsable, fechaAsignacion: item.FechaAsignacion, estado: item.Estado, observaciones: item.Observaciones || '', esPrestamo: item.EsPrestamo === 'Si' })).sort((a,b) => new Date(b.fechaAsignacion) - new Date(a.fechaAsignacion)) };
+        }
+        async refreshHistorial() {
+            const items = await this.graph.getListItems(CONFIG.sharepoint.lists.historial, true);
+            return { history: items.map(item => ({ id: item.sharePointId, fecha: item.FechaHora || item.Created, tipo: item.TipoMovimiento, producto: item.Producto, cantidad: parseInt(item.Cantidad) || 0, ticket: item.Ticket || '', usuario: item.Usuario || '', tecnico: item.Tecnico || '', idEtiqueta: item.IDEtiqueta || '', motivo: item.MotivoIncidencia || '' })).sort((a,b) => new Date(b.fecha) - new Date(a.fecha)) };
+        }
+        async refreshCatalogo() {
+            const items = await this.graph.getListItems(CONFIG.sharepoint.lists.catalogo, true);
+            const catalogoProcessed = {}, catalogoTipos = {}, catalogoAccesorios = {};
+            items.forEach(item => {
+                const tipo = item.Title, modelo = item.Modelo;
+                const activo = item.Activo !== 'No' && item.Activo !== false;
+                const llevaEtiqueta = item.LlevaEtiqueta === 'Si' || item.LlevaEtiqueta === null || item.LlevaEtiqueta === undefined || item.LlevaEtiqueta === '';
+                if (!catalogoTipos[tipo]) catalogoTipos[tipo] = { llevaEtiqueta };
+                if (llevaEtiqueta) catalogoTipos[tipo].llevaEtiqueta = true;
+                if (activo && tipo && modelo) {
+                    if (!catalogoProcessed[tipo]) catalogoProcessed[tipo] = [];
+                    catalogoProcessed[tipo].push(modelo);
+                    if (item.Accesorios) catalogoAccesorios[tipo + '|' + modelo] = item.Accesorios;
+                }
+            });
+            return { catalogo: catalogoProcessed, catalogoTipos, catalogoAccesorios };
+        }
         async checkBarcodeExists(barcode) {
             try { const items = await this.graph.getListItems(CONFIG.sharepoint.lists.inventario); return items.some(item => item.CodigoBarras === barcode); } catch(e) { return false; }
         }
@@ -566,7 +644,8 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         async updateInventoryItem(itemId, data) { await this.graph.updateListItem(CONFIG.sharepoint.lists.inventario, itemId, data); }
         async deleteInventoryItem(itemId) { await this.graph.deleteListItem(CONFIG.sharepoint.lists.inventario, itemId); }
         async addToHistory(data) {
-            await this.graph.createListItem(CONFIG.sharepoint.lists.historial, { Title: data.tipo + ' - ' + data.producto, TipoMovimiento: data.tipo, Producto: data.producto, Cantidad: data.cantidad, Ticket: data.ticket || '', Usuario: data.usuario || '', Tecnico: data.tecnico || '', FechaHora: new Date().toISOString(), Firma: data.firma || '', IDEtiqueta: data.idEtiqueta || '', MotivoIncidencia: data.motivo || '' });
+            // Firma NO se guarda en historial — solo en Asignaciones (evita inflar SharePoint con base64)
+            await this.graph.createListItem(CONFIG.sharepoint.lists.historial, { Title: data.tipo + ' - ' + data.producto, TipoMovimiento: data.tipo, Producto: data.producto, Cantidad: data.cantidad, Ticket: data.ticket || '', Usuario: data.usuario || '', Tecnico: data.tecnico || '', FechaHora: new Date().toISOString(), IDEtiqueta: data.idEtiqueta || '', MotivoIncidencia: data.motivo || '' });
         }
         // UBICACIONES CRUD
         async createUbicacion(nombre) { return await this.graph.createListItem(CONFIG.sharepoint.lists.ubicaciones, { Title: nombre, Activo: 'Si' }); }
@@ -751,7 +830,26 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
         async returnMaterial(assignmentId, returnedProducts, allProducts, observaciones, tecnico, inventoryData, activosData) {
             const fullyReturned = returnedProducts.length === allProducts.length;
             const newState = fullyReturned ? 'Devuelto' : 'Parcial';
-            await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, assignmentId, { Estado: newState, Observaciones: observaciones });
+            // Calcular qué productos quedan pendientes de devolución
+            const returnedKeys = new Set(returnedProducts.map(p => p.idEtiqueta || p.barcode));
+            const remainingProducts = fullyReturned ? [] : allProducts.filter(p => !returnedKeys.has(p.idEtiqueta || p.barcode));
+            // Actualizar estado + ProductosAsignados con los items restantes + HTML actualizado
+            const updateFields = { Estado: newState, Observaciones: observaciones, ProductosAsignados: JSON.stringify(remainingProducts), CantidadProductos: remainingProducts.length };
+            if (!fullyReturned && remainingProducts.length > 0) {
+                // Regenerar DetalleProductosHTML con solo los items pendientes
+                const filasHTML = remainingProducts.map(function(p, i) {
+                    var esEquipo = !!p.idEtiqueta || p.esEquipo;
+                    var idStr = p.idEtiqueta ? '<span style="font-family:monospace;font-size:12px;background:#e8f4ed;color:#1e5c3a;padding:2px 6px;border-radius:4px;">' + p.idEtiqueta + '</span>' : '—';
+                    var bg = i % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                    return '<tr style="background:' + bg + ';"><td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;">' + (i+1) + '</td>' +
+                        '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;">' + (esEquipo ? '💻' : '📦') + ' ' + (p.nombre || p.tipo || '—') + '</td>' +
+                        '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;">' + (p.modelo || '—') + '</td>' +
+                        '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;">' + idStr + '</td>' +
+                        '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;font-family:monospace;">' + (p.numSerie || '—') + '</td></tr>';
+                }).join('');
+                updateFields.DetalleProductosHTML = '<div style="margin:0;"><div style="background:#f97316;color:white;padding:10px 15px;border-radius:8px 8px 0 0;font-size:13px;font-weight:700;">📦 PENDIENTE DEVOLUCIÓN — ' + remainingProducts.length + ' artículo(s)</div><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f0f0f0;"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;border-bottom:2px solid #ddd;width:30px;">#</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;border-bottom:2px solid #ddd;">Producto</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;border-bottom:2px solid #ddd;">Modelo</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;border-bottom:2px solid #ddd;">ID Etiqueta</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;border-bottom:2px solid #ddd;">N/S</th></tr></thead><tbody>' + filasHTML + '</tbody></table></div>';
+            }
+            await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, assignmentId, updateFields);
             // Agrupar productos fungibles por barcode para sumar cantidades correctamente
             const fungibleMap = {};
             for (const prod of returnedProducts) {
@@ -1414,7 +1512,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 sinStock: state.inventory.filter(i => i.stock === 0).length,
             };
             const movHoy = state.history.filter(h => new Date(h.fecha).toDateString() === new Date().toDateString()).length;
-            const prestamosVencidos = state.assignments.filter(a => a.esPrestamo && a.estado === 'Activo' && new Date(a.fechaAsignacion) < hoy);
+            const prestamosVencidos = state.assignments.filter(a => a.esPrestamo && a.estado === 'Activo' && getFechaVencimientoPrestamo(a) < hoy);
 
             // ── Alertas ────────────────────────────────────────────────────────
             const alertas = [];
@@ -2392,7 +2490,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 let matchesEstado = true;
                 if (filterEstado === 'vencido') {
                     const fa = new Date(a.fechaAsignacion); fa.setHours(0,0,0,0);
-                    matchesEstado = a.esPrestamo && a.estado === 'Activo' && fa < hoy;
+                    matchesEstado = a.esPrestamo && a.estado === 'Activo' && getFechaVencimientoPrestamo(a) < hoy;
                 } else {
                     matchesEstado = filterEstado === 'all' || a.estado === filterEstado;
                 }
@@ -2402,7 +2500,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
 
             const departamentos = [...new Set((state.assignments || []).map(a => a.departamento))].filter(Boolean);
             const prestamosActivos = (state.assignments || []).filter(a => a.esPrestamo && a.estado === 'Activo');
-            const vencidos = prestamosActivos.filter(function(a) { const f = new Date(a.fechaAsignacion); f.setHours(0,0,0,0); return f < hoy; });
+            const vencidos = prestamosActivos.filter(function(a) { return getFechaVencimientoPrestamo(a) < hoy; });
 
             // ── Helpers ───────────────────────────────────────────────────────
             const avatarColors = ['#58a6ff','#3fb950','#a855f7','#fbbf24','#f97316','#ef4444','#06b6d4','#84cc16'];
@@ -2452,7 +2550,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
             // ── Card de asignación ────────────────────────────────────────────
             const assignCard = function(a) {
                 const fa = new Date(a.fechaAsignacion); fa.setHours(0,0,0,0);
-                const vencido = a.esPrestamo && a.estado === 'Activo' && fa < hoy;
+                const vencido = a.esPrestamo && a.estado === 'Activo' && getFechaVencimientoPrestamo(a) < hoy;
                 const isExpanded = expandedId === a.id;
                 const col = avatarColor(a.nombreEmpleado);
                 const estadoColor = { 'Activo':'#3fb950', 'Devuelto':'#6b7280', 'Parcial':'#fbbf24' }[a.estado] || '#6b7280';
@@ -2648,7 +2746,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             )),
                             e('tbody', null, filtered.map(function(a) {
                                 const fa = new Date(a.fechaAsignacion); fa.setHours(0,0,0,0);
-                                const vencido = a.esPrestamo && a.estado === 'Activo' && fa < hoy;
+                                const vencido = a.esPrestamo && a.estado === 'Activo' && getFechaVencimientoPrestamo(a) < hoy;
                                 const col = avatarColor(a.nombreEmpleado);
                                 const estadoColor = { 'Activo':'#3fb950', 'Devuelto':'#6b7280', 'Parcial':'#fbbf24' }[a.estado] || '#6b7280';
                                 return e('tr', { key:a.id, style:{ borderLeft: '3px solid ' + (vencido ? '#ef4444' : col), background: vencido ? 'rgba(239,68,68,.04)' : 'transparent' } },
@@ -2901,7 +2999,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 try {
                     const barcode = 'SL' + crypto.randomUUID().replace(/-/g, '').toUpperCase().slice(0, 10);
                     await dataManager.createInventoryItem({ nombre: nombre, categoria: 'Otros', barcode: barcode, stock: 0, stockMinimo: 0, ubicacion: '', estado: 'Nuevo' });
-                    await onRefresh();
+                    await onRefresh(['inventory']);
                     // Tras refresh, buscar el item recién creado para añadirlo a la selección
                     const newItem = { nombre: nombre, barcode: barcode, id: barcode, categoria: 'Otros' };
                     setSelectedProducts(function(prev) { return prev.concat([newItem]); });
@@ -2926,7 +3024,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     upd('tipo', formData.tipoNuevo.trim());
                     upd('tipoNuevo', '');
                     upd('showAddTipo', false);
-                    await onRefresh();
+                    await onRefresh(['catalogo']);
                 } catch(err) { showToast('Error guardando tipo', 'error'); }
                 finally { setSavingCatalog(false); }
             };
@@ -2939,7 +3037,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     upd('modelo', formData.modeloNuevo.trim());
                     upd('modeloNuevo', '');
                     upd('showAddModelo', false);
-                    await onRefresh();
+                    await onRefresh(['catalogo']);
                 } catch(err) { showToast('Error guardando modelo', 'error'); }
                 finally { setSavingCatalog(false); }
             };
@@ -2960,24 +3058,24 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             const addCant = parseInt(formData.stock) || 1;
                             const newStock = productoExistente.stock + addCant;
                             await dataManager.updateInventoryItem(productoExistente.id, { Stock: newStock });
-                            await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: addCant, ticket: '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
-                            showToast('Stock actualizado: ' + newStock + ' uds de ' + nombreProducto, 'success');
+                            await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: addCant, ticket: '', usuario: '', tecnico: tecnicoActual });
+                            showToast('Stock actualizado: ' + newStock + ' uds de ' + nombreProducto, 'success'); await onRefresh(['inventory','historial']);
                         } else {
                             if (!formData.barcode.trim()) { showToast('El código de barras es obligatorio', 'error'); setLoading(false); return; }
                             const exists = await dataManager.checkBarcodeExists(formData.barcode);
                             if (exists) { showToast('El código de barras ya existe', 'error'); setLoading(false); return; }
                             await dataManager.createInventoryItem({ nombre: nombreProducto, categoria: formData.tipo, barcode: formData.barcode, stock: parseInt(formData.stock) || 0, stockMinimo: parseInt(formData.stockMinimo) || 0, ubicacion: formData.ubicacion, estado: formData.estado });
                             if (parseInt(formData.stock) > 0) {
-                                await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: parseInt(formData.stock) || 1, ticket: '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
+                                await dataManager.addToHistory({ tipo: 'Entrada', producto: nombreProducto, cantidad: parseInt(formData.stock) || 1, ticket: '', usuario: '', tecnico: tecnicoActual });
                             }
-                            showToast('Producto creado: ' + nombreProducto, 'success');
+                            showToast('Producto creado: ' + nombreProducto, 'success'); await onRefresh(['inventory','historial']);
                         }
 
                     } else if (modalType === 'entrada' && selectedItem) {
                         const addCant = parseInt(formData.cantidad) || 1;
                         const newStock = selectedItem.stock + addCant;
                         await dataManager.updateInventoryItem(selectedItem.id, { Stock: newStock });
-                        await dataManager.addToHistory({ tipo: 'Entrada', producto: selectedItem.nombre, cantidad: addCant, ticket: formData.ticket || '', usuario: '', tecnico: tecnicoActual, firma: signature || '' });
+                        await dataManager.addToHistory({ tipo: 'Entrada', producto: selectedItem.nombre, cantidad: addCant, ticket: formData.ticket || '', usuario: '', tecnico: tecnicoActual });
                         showToast('+' + addCant + ' uds → Stock: ' + newStock, 'success');
 
                     } else if (modalType === 'salida') {
@@ -2985,14 +3083,14 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                         if (selectedItem.stock < cant) { showToast('Stock insuficiente (' + selectedItem.stock + ' disponibles)', 'error'); setLoading(false); return; }
                         if (!formData.usuario) { showToast('Selecciona el destinatario', 'error'); setLoading(false); return; }
                         await dataManager.updateInventoryItem(selectedItem.id, { Stock: selectedItem.stock - cant });
-                        await dataManager.addToHistory({ tipo: 'Salida', producto: selectedItem.nombre, cantidad: cant, ticket: formData.ticket || '', usuario: formData.usuario, tecnico: tecnicoActual, firma: signature || '' });
+                        await dataManager.addToHistory({ tipo: 'Salida', producto: selectedItem.nombre, cantidad: cant, ticket: formData.ticket || '', usuario: formData.usuario, tecnico: tecnicoActual });
                         showToast('Salida: ' + cant + ' x ' + selectedItem.nombre, 'success');
 
                     } else if (modalType === 'editar') {
                         if (!formData.tipo || !formData.modelo) { showToast('Selecciona tipo y modelo', 'error'); setLoading(false); return; }
                         if (!formData.ubicacion) { showToast('Selecciona una ubicación', 'error'); setLoading(false); return; }
                         await dataManager.updateInventoryItem(selectedItem.id, { Title: nombreProducto, Nombre: nombreProducto, Categoria: formData.tipo, CodigoBarras: formData.barcode, Stock: parseInt(formData.stock) || 0, StockMinimo: parseInt(formData.stockMinimo) || 0, Ubicacion: formData.ubicacion, Estado: formData.estado });
-                        showToast('Producto actualizado: ' + nombreProducto, 'success');
+                        showToast('Producto actualizado: ' + nombreProducto, 'success'); await onRefresh(['inventory']);
 
                     } else if (modalType === 'duplicar') {
                         if (!formData.barcode.trim()) { showToast('Genera un nuevo código', 'error'); setLoading(false); return; }
@@ -3020,24 +3118,24 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             const prod = selectedProducts[i];
                             const invItem = state.inventory.find(function(inv) { return inv.id === prod.id; });
                             if (invItem) await dataManager.updateInventoryItem(invItem.id, { Stock: invItem.stock - 1 });
-                            await dataManager.addToHistory({ tipo: formData.esPrestamo ? 'Prestamo' : 'Asignacion', producto: prod.nombre, cantidad: 1, ticket: '', usuario: formData.nombreEmpleado, tecnico: tecnicoActual, firma: signature || '' });
+                            await dataManager.addToHistory({ tipo: formData.esPrestamo ? 'Prestamo' : 'Asignacion', producto: prod.nombre, cantidad: 1, ticket: '', usuario: formData.nombreEmpleado, tecnico: tecnicoActual });
                         }
                         // Equipos etiquetados — cambia estado a Asignado
                         for (var j = 0; j < selectedEquipos.length; j++) {
                             const eq = selectedEquipos[j];
                             await dataManager.cambiarEstadoActivo(eq.id, 'Asignado', { asignadoA: formData.nombreEmpleado, emailAsignadoA: formData.emailEmpleado, fechaAsignacion: new Date().toISOString() });
-                            await dataManager.addToHistory({ tipo: formData.esPrestamo ? 'Prestamo' : 'Asignacion', producto: eq.nombre, cantidad: 1, ticket: '', usuario: formData.nombreEmpleado, tecnico: tecnicoActual, firma: signature || '', idEtiqueta: eq.idEtiqueta });
+                            await dataManager.addToHistory({ tipo: formData.esPrestamo ? 'Prestamo' : 'Asignacion', producto: eq.nombre, cantidad: 1, ticket: '', usuario: formData.nombreEmpleado, tecnico: tecnicoActual, idEtiqueta: eq.idEtiqueta });
                         }
                         // Crea la asignación con todos los items
                         const equiposParaAsignacion = selectedEquipos.map(function(eq) { return { nombre: eq.nombre, idEtiqueta: eq.idEtiqueta, esEquipo: true }; });
                         await dataManager.createAssignment({ nombreEmpleado: formData.nombreEmpleado, emailEmpleado: formData.emailEmpleado, departamento: formData.departamento, puesto: formData.puesto, fechaIncorporacion: formData.fechaIncorporacion, productosAsignados: selectedProducts, equiposAsignados: equiposParaAsignacion, firmaEmpleado: signature || '', tecnicoResponsable: tecnicoActual, observaciones: (formData.esPrestamo && formData.fechaDevolucion ? '[Dev. prevista: ' + new Date(formData.fechaDevolucion + 'T12:00:00').toLocaleDateString('es-ES') + '] ' : '') + (formData.observaciones || ''), esPrestamo: formData.esPrestamo });
-                        showToast(formData.esPrestamo ? 'Préstamo registrado' : 'Asignación creada', 'success');
+                        showToast(formData.esPrestamo ? 'Préstamo registrado' : 'Asignación creada', 'success'); await onRefresh(['asignaciones','inventory','activos','historial']);
 
                     } else if (modalType === 'devolver-material') {
                         const toReturn = (selectedItem.productosAsignados || []).filter(function(p) { return returnSelections[p.barcode || p.idEtiqueta]; });
                         if (toReturn.length === 0) { showToast('Selecciona al menos un producto', 'warning'); setLoading(false); return; }
                         await dataManager.returnMaterial(selectedItem.id, toReturn, selectedItem.productosAsignados || [], formData.observaciones || '', tecnicoActual, state.inventory, state.activos);
-                        showToast('Devolución registrada: ' + toReturn.length + ' producto(s)', 'success');
+                        showToast('Devolución registrada: ' + toReturn.length + ' producto(s)', 'success'); await onRefresh(['asignaciones','inventory','activos','historial']);
 
                     } else if (modalType === 'baja-empleado') {
                         if (!bajaSelected) { showToast('Selecciona un empleado', 'error'); setLoading(false); return; }
@@ -3053,11 +3151,11 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                                 await dataManager.updateAssignmentStatus(asig.id, 'Devuelto');
                             }
                         }
-                        showToast('Baja procesada: ' + toReturn.length + ' item(s) devuelto(s)', 'success');
+                        showToast('Baja procesada: ' + toReturn.length + ' item(s) devuelto(s)', 'success'); await onRefresh(['asignaciones','inventory','activos','historial']);
                     }
 
                     onClose();
-                    await onRefresh();
+                    // Scoped refresh already fired above
                 } catch(error) {
                     console.error('Error en formulario:', error);
                     showToast('Error: ' + (error.message || 'Error desconocido'), 'error');
@@ -3879,7 +3977,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     await dataManager.addToHistory({ tipo: 'CambioEstado', producto: equipo.tipo + ' - ' + equipo.modelo, cantidad: 1, usuario: '', tecnico: state.user.name, idEtiqueta: equipo.idEtiqueta, motivo: nuevoEstado + (cambioMotivo ? ': ' + cambioMotivo : '') });
                     showToast('Estado actualizado: ' + nuevoEstado, 'success');
                     setCambioEstado(null); setCambioMotivo(''); setCambioDestino('');
-                    await onRefresh();
+                    await onRefresh(['activos']);
                 } catch(err) { showToast('Error: ' + err.message, 'error'); }
                 finally { setSavingEstado(false); }
             };
@@ -3904,7 +4002,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                     showToast(total + ' equipo(s) registrados. Ahora añade los N/S para completarlos.', 'success');
                     setSublotes([{ id: Date.now(), tipo: '', modelo: '', ubicacion: '', cantidad: 1, sociedad: '' }]);
                     setView('pendientes');
-                    await onRefresh();
+                    await onRefresh(['activos']);
                 } catch(err) { showToast('Error: ' + err.message, 'error'); }
                 finally { setCreatingProgress(null); }
             };
@@ -3918,7 +4016,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 try {
                     await dataManager.updateActivoNS(activo.id, ns);
                     setInlineNS(function(prev) { var n = Object.assign({}, prev); delete n[activo.id]; return n; });
-                    await onRefresh();
+                    await onRefresh(['activos']);
                     showToast('✓ N/S guardado · Equipo listo para etiquetar', 'success');
                 } catch(err) { showToast('Error guardando N/S', 'error'); }
                 finally { setSavingNS(function(prev) { var n = Object.assign({}, prev); delete n[activo.id]; return n; }); }
@@ -4138,7 +4236,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                                 isPendiente && e('div', { className: 'action-icon tooltip', 'data-tooltip': 'Añadir N/S', onClick: function() { setView('pendientes'); }, style: { color: 'var(--accent-orange)' } }, '✏️'),
                                 confirmDeleteId === activo.id
                                     ? e('div', { style: { display: 'flex', gap: '4px' } },
-                                        e('button', { className: 'button button-danger', onClick: async function() { await dataManager.deleteActivo(activo.id); setConfirmDeleteId(null); await onRefresh(); showToast('Equipo eliminado', 'success'); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✓'),
+                                        e('button', { className: 'button button-danger', onClick: async function() { await dataManager.deleteActivo(activo.id); setConfirmDeleteId(null); await onRefresh(['activos']); showToast('Equipo eliminado', 'success'); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✓'),
                                         e('button', { className: 'button button-secondary', onClick: function() { setConfirmDeleteId(null); }, style: { padding: '6px 10px', fontSize: '12px' } }, '✕'))
                                     : e('div', { className: 'action-icon danger tooltip', 'data-tooltip': 'Eliminar', onClick: function() { setConfirmDeleteId(activo.id); } }, '🗑️')
                             ))
@@ -4245,7 +4343,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                                 // Guardar accesorios si han cambiado
                                 const original = (state.activos || []).find(function(a) { return a.id === fichaEquipo.id; });
                                 if (original && original.accesorios !== fichaEquipo.accesorios) {
-                                    try { await dataManager.updateActivoAccesorios(fichaEquipo.id, fichaEquipo.accesorios || ''); await onRefresh(); showToast('Accesorios guardados', 'success'); } catch(err) { showToast('Error guardando accesorios', 'error'); }
+                                    try { await dataManager.updateActivoAccesorios(fichaEquipo.id, fichaEquipo.accesorios || ''); await onRefresh(['activos']); showToast('Accesorios guardados', 'success'); } catch(err) { showToast('Error guardando accesorios', 'error'); }
                                 }
                                 setFichaEquipo(null);
                             } }, T().saveChanges),
@@ -4447,7 +4545,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                             }, newTipoEtiqueta ? '💻 Lleva etiqueta' : '📦 Sin etiqueta'),
                             e('button', { className: 'button button-success', onClick: () => act(async () => {
                                 await dataManager.addToCatalog(newTipo.trim(), '', newTipoEtiqueta);
-                                setCatalogoLoaded(false); await onRefresh();
+                                setCatalogoLoaded(false); await onRefresh(['catalogo']);
                             }, 'Tipo añadido').then(() => { setNewTipo(''); setNewTipoEtiqueta(false); }),
                             disabled: loading || !newTipo.trim(), style: { padding: '8px 16px' } }, '+ Añadir')
                         )
@@ -4482,7 +4580,7 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                                                 await dataManager.updateCatalogLlevaEtiqueta(m.id, !tieneEtiqueta);
                                             }
                                             setCatalogoLoaded(false);
-                                            await onRefresh();
+                                            await onRefresh(['catalogo']);
                                             showToast(!tieneEtiqueta ? '💻 Lleva etiqueta activado' : '📦 Sin etiqueta activado', 'success');
                                         } catch(err) { showToast('Error: ' + err.message, 'error'); }
                                     },
@@ -5377,11 +5475,26 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
 
             const handleLogin = async () => { try { await login(); await initializeApp(); } catch(e) { showToast('Error al iniciar sesion', 'error'); } };
 
-            // refreshData: recarga datos sin toast. Usado en onRefresh de modales y AdminPanel.
-            const refreshData = async () => {
+            // refreshData: refresh completo o selectivo según scope
+            // scope = array de listas a recargar, ej: ['inventory','historial']
+            // Sin scope = refresh completo (solo sync manual)
+            const refreshData = async (scope) => {
                 if (!dataManager) return;
-                try { const data = await dataManager.loadAllData(); setDataState(data); }
-                catch(e) { ErrorLog.error('App.refresh', e.message || 'Error refreshing'); console.error('Error refreshing:', e); }
+                try {
+                    if (!scope) {
+                        const data = await dataManager.loadAllData();
+                        setDataState(data);
+                    } else {
+                        let partial = {};
+                        if (scope.includes('inventory'))    Object.assign(partial, await dataManager.refreshInventory());
+                        if (scope.includes('activos'))      Object.assign(partial, await dataManager.refreshActivos());
+                        if (scope.includes('asignaciones')) Object.assign(partial, await dataManager.refreshAsignaciones());
+                        if (scope.includes('historial'))    Object.assign(partial, await dataManager.refreshHistorial());
+                        if (scope.includes('catalogo'))     Object.assign(partial, await dataManager.refreshCatalogo());
+                        if (Object.keys(partial).length > 0) setState(s => ({ ...s, ...partial }));
+                    }
+                }
+                catch(e) { ErrorLog.error('App.refresh', e.message || 'Error refreshing'); }
             };
 
             // handleLogout: reset COMPLETO del estado — sin residuos entre cuentas
@@ -5485,8 +5598,16 @@ window.QRCode = (typeof module !== 'undefined' && module.exports) ? module.expor
                 e('header', { className: 'header' },
                     e('div', { className: 'header-left' },
                         e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
-                            e('img', { src: 'https://sanlucar.com/wp-content/uploads/2023/03/SanLucar_LOGO_final.svg', alt: 'Sanlúcar', style: { height: '32px', width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }, onError: function(ev) { ev.target.style.display='none'; } }),
-                            e('h1', null, T().appTitle),
+                            e('img', {
+                                src: 'https://sanlucar.com/wp-content/uploads/2023/03/SanLucar_LOGO_final.svg',
+                                alt: 'Sanlúcar', title: 'Ir al Dashboard',
+                                style: { height: '32px', width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)', cursor: 'pointer', transition: 'opacity .2s, transform .2s' },
+                                onClick: function() { onNavigate('dashboard'); },
+                                onMouseEnter: function(ev) { ev.target.style.opacity = '0.75'; ev.target.style.transform = 'scale(1.08)'; },
+                                onMouseLeave: function(ev) { ev.target.style.opacity = '1'; ev.target.style.transform = ''; },
+                                onError: function(ev) { ev.target.style.display='none'; }
+                            }),
+                            e('h1', { style: { cursor: 'pointer' }, onClick: function() { onNavigate('dashboard'); }, title: 'Ir al Dashboard' }, T().appTitle),
                             e('span', { style: { fontSize: '12px', padding: '4px 8px', background: 'rgba(88,166,255,.15)', color: 'var(--accent-blue)', borderRadius: '6px', fontFamily: 'IBM Plex Mono,monospace', fontWeight: '600' } }, 'v' + CONFIG.version)
                         ),
                         e('div', { className: 'user-badges' }, e('span', { className: 'user-badge ' + (state.isAdmin ? 'admin' : 'technician') }, state.isAdmin ? '🛡️ Admin' : '🔧 Técnico', ': ', state.user.name))
