@@ -147,11 +147,9 @@ function AppContent() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/inventario" element={<InventoryView />} />
           <Route path="/equipos" element={<EquiposView />} />
-          <Route path="/equipos/:id" element={<EquiposView />} />
           <Route path="/asignaciones" element={<AssignmentsView />} />
           <Route path="/historial" element={<HistoryView />} />
           <Route path="/admin" element={<AdminPanel />} />
-          <Route path="/admin/:section" element={<AdminPanel />} />
           <Route path="*" element={<Dashboard />} />
         </Routes>
       </ErrorBoundary>

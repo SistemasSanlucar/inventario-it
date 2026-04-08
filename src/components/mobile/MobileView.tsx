@@ -40,7 +40,7 @@ export default function MobileView() {
   const openSignature = () => {
     setSigData(null)
     setSigFullscreen(true)
-    try { (screen as any).orientation?.lock?.('landscape').catch(() => {}) } catch (_) {}
+    try { (window.screen.orientation as any)?.lock?.('landscape')?.catch(() => {}) } catch (_) {}
     setTimeout(() => {
       const c = sigCanvasRef.current
       if (c) { c.width = c.offsetWidth; c.height = c.offsetHeight; c.getContext('2d')!.clearRect(0, 0, c.width, c.height) }
@@ -50,7 +50,7 @@ export default function MobileView() {
   const closeSignature = (save: boolean) => {
     if (save && sigCanvasRef.current) setSigData(sigCanvasRef.current.toDataURL())
     setSigFullscreen(false)
-    try { (screen as any).orientation?.unlock?.() } catch (_) {}
+    try { (window.screen.orientation as any)?.unlock?.() } catch (_) {}
   }
 
   const drawMove = (ev: React.MouseEvent | React.TouchEvent, lineWidth: number) => {

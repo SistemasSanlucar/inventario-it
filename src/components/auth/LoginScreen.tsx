@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { T } from '../../i18n'
+import { CONFIG } from '../../config'
 import { showToast } from '../../hooks/useToast'
 
 interface LoginScreenProps {
@@ -46,7 +47,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           {loading && <span className="loading-spinner" />}
           {loading ? ' ' + t.loginIng : ' ' + t.login}
         </button>
-        <p style={{ fontSize: '12px', marginTop: '24px' }}>{t.loginNote}</p>
+        <p style={{ fontSize: '12px', marginTop: '24px' }}>{t.loginNote} (v{CONFIG.version})</p>
       </div>
     </div>
   )
