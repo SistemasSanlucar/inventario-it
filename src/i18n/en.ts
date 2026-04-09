@@ -1,5 +1,5 @@
 export const en = {
-  appTitle: 'IT Inventory System',
+  appTitle: 'IT Inventory System Nacho',
   login: 'Sign in with Microsoft', loginIng: 'Signing in...',
   loginDesc: 'Sign in with your Microsoft 365 corporate account to access the inventory management system.',
   loginNote: 'Use your @sanlucar.com account',
