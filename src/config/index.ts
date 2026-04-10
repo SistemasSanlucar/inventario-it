@@ -20,5 +20,5 @@ export const CONFIG = {
     redirectUri: window.location.href.split('?')[0].split('#')[0],
   },
   scopes: ['User.Read', 'Sites.ReadWrite.All'] as const,
-  version: import.meta.env.VITE_APP_VERSION || '3.4.0',
+  version: import.meta.env.VITE_APP_VERSION || '3.4.1',
 }

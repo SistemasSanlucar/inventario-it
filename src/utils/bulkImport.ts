@@ -78,46 +78,75 @@ function setRange(ws: XLSX.WorkSheet, cols: number, rows: number) {
 
 // ── Template generation ──
 
+/** Apply a yellow highlight fill to a cell (SheetJS community uses 's' property) */
+function highlightCell(ws: XLSX.WorkSheet, col: number, row: number) {
+  const ref = XLSX.utils.encode_cell({ c: col, r: row })
+  if (ws[ref]) {
+    ws[ref].s = { fill: { fgColor: { rgb: 'FFF9C4' } }, font: { color: { rgb: '1565C0' }, bold: true } }
+  }
+}
+
 export function generateImportTemplate(state: AppState): void {
-  console.log('PLANTILLA EXCEL v2 — generando .xlsx vacío, NO csv')
   const wb = XLSX.utils.book_new()
 
   // Gather catalog values
-  const tipos = Object.keys(state.catalogo || {})
+  const catalogo = state.catalogo || {}
+  const catalogoTipos = state.catalogoTipos || {}
+  const tipos = Object.keys(catalogo)
   const allModelos: string[] = []
   for (const tipo of tipos) {
-    for (const modelo of (state.catalogo[tipo] || [])) {
+    for (const modelo of (catalogo[tipo] || [])) {
       allModelos.push(modelo)
     }
   }
   const sociedades = (state.sociedades || []).filter((s) => s.activo).map((s) => s.nombre)
   const ubicaciones = (state.ubicaciones || []).filter((u) => u.activo).map((u) => u.nombre)
+  const defaultUbi = ubicaciones[0] || ''
+  const defaultSoc = sociedades[0] || ''
   const estados = ['Nuevo', 'Usado']
   const tiers = ['Estándar', 'Premium']
 
-  const EXAMPLE_ROW = 1  // 0-indexed (row 2 in Excel)
-  const DATA_START = 2   // 0-indexed (row 3 in Excel)
-  const TOTAL_ROWS = DATA_START + 50  // 50 empty rows after example
+  // ────────────────────────────────────────────────
+  // Build data rows from catalog
+  // ────────────────────────────────────────────────
+
+  // Inventario: one row per tipo+modelo
+  const invRows: (string | number)[][] = []
+  for (const tipo of tipos) {
+    for (const modelo of (catalogo[tipo] || [])) {
+      invRows.push([tipo + ' - ' + modelo, tipo, 0, 2, defaultUbi, 'Nuevo', 'Estándar'])
+    }
+  }
+
+  // Equipos: only tipos with llevaEtiqueta = true
+  const eqRows: (string | number)[][] = []
+  for (const tipo of tipos) {
+    if (!catalogoTipos[tipo]?.llevaEtiqueta) continue
+    for (const modelo of (catalogo[tipo] || [])) {
+      eqRows.push([tipo, modelo, '', defaultSoc, defaultUbi, '', '', ''])
+    }
+  }
 
   // ────────────────────────────────────────────────
   // Sheet 1: Inventario fungible
   // ────────────────────────────────────────────────
   const invHeaders = ['nombre', 'categoria', 'stock', 'stockMinimo', 'ubicacion', 'estado', 'tier']
-  const invExample = ['Ratones - Logitech M90', tipos[0] || 'Ratones', 10, 2, ubicaciones[0] || 'Puzol - Almacén', 'Nuevo', 'Estándar']
+  const invData: (string | number)[][] = [invHeaders, ...invRows]
+  const wsInv = XLSX.utils.aoa_to_sheet(invData)
+  const invTotalRows = invData.length + 10 // extra empty rows
+  setRange(wsInv, invHeaders.length, invTotalRows)
+  wsInv['!cols'] = [{ wch: 35 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 12 }, { wch: 12 }]
 
-  const wsInv = XLSX.utils.aoa_to_sheet([invHeaders])
-  // Write example row
-  invExample.forEach((val, col) => setCell(wsInv, col, EXAMPLE_ROW, val))
-  // Extend range to include 50 empty rows
-  setRange(wsInv, invHeaders.length, TOTAL_ROWS)
-  wsInv['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 20 }, { wch: 12 }, { wch: 12 }]
+  // Highlight stock column (col index 2) for all data rows in yellow
+  for (let r = 1; r < invData.length; r++) {
+    highlightCell(wsInv, 2, r)
+  }
 
-  // Data validations: categoria (col B), ubicacion (col E), estado (col F), tier (col G)
-  // References to Listas sheet: A=tipos, B=sociedades, C=ubicaciones, D=estados, E=tiers, F=modelos
-  if (tipos.length > 0) applyValidationToRange(wsInv, 1, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('A', tipos.length))
-  if (ubicaciones.length > 0) applyValidationToRange(wsInv, 4, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('C', ubicaciones.length))
-  applyValidationToRange(wsInv, 5, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('D', estados.length))
-  applyValidationToRange(wsInv, 6, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('E', tiers.length))
+  // Data validations (from row 2 to end)
+  if (tipos.length > 0) applyValidationToRange(wsInv, 1, 2, invTotalRows, listValidation('A', tipos.length))
+  if (ubicaciones.length > 0) applyValidationToRange(wsInv, 4, 2, invTotalRows, listValidation('C', ubicaciones.length))
+  applyValidationToRange(wsInv, 5, 2, invTotalRows, listValidation('D', estados.length))
+  applyValidationToRange(wsInv, 6, 2, invTotalRows, listValidation('E', tiers.length))
 
   XLSX.utils.book_append_sheet(wb, wsInv, 'Inventario fungible')
 
@@ -125,86 +154,75 @@ export function generateImportTemplate(state: AppState): void {
   // Sheet 2: Equipos
   // ────────────────────────────────────────────────
   const eqHeaders = ['tipo', 'modelo', 'numSerie', 'sociedad', 'ubicacion', 'proveedor', 'numAlbaran', 'fechaCompra']
-  const eqExample = [tipos[0] || 'Portátil', allModelos[0] || 'HP EliteBook 840 G10', 'ABC123456', sociedades[0] || 'Sanlúcar', ubicaciones[0] || 'Almacén IT', '', '', '2026-01-15']
+  const eqData: (string | number)[][] = [eqHeaders, ...eqRows]
+  const wsEq = XLSX.utils.aoa_to_sheet(eqData)
+  const eqTotalRows = eqData.length + 10
+  setRange(wsEq, eqHeaders.length, eqTotalRows)
+  wsEq['!cols'] = [{ wch: 18 }, { wch: 30 }, { wch: 22 }, { wch: 20 }, { wch: 24 }, { wch: 20 }, { wch: 16 }, { wch: 16 }]
 
-  const wsEq = XLSX.utils.aoa_to_sheet([eqHeaders])
-  eqExample.forEach((val, col) => setCell(wsEq, col, EXAMPLE_ROW, val))
-  setRange(wsEq, eqHeaders.length, TOTAL_ROWS)
-  wsEq['!cols'] = [{ wch: 18 }, { wch: 30 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 16 }]
+  // Highlight numSerie column (col index 2) for all data rows in yellow
+  for (let r = 1; r < eqData.length; r++) {
+    highlightCell(wsEq, 2, r)
+  }
 
-  // Data validations: tipo (col A), modelo (col B), sociedad (col D), ubicacion (col E)
-  if (tipos.length > 0) applyValidationToRange(wsEq, 0, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('A', tipos.length))
-  if (allModelos.length > 0) applyValidationToRange(wsEq, 1, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('F', allModelos.length))
-  if (sociedades.length > 0) applyValidationToRange(wsEq, 3, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('B', sociedades.length))
-  if (ubicaciones.length > 0) applyValidationToRange(wsEq, 4, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('C', ubicaciones.length))
+  // Data validations (from row 2 to end)
+  if (tipos.length > 0) applyValidationToRange(wsEq, 0, 2, eqTotalRows, listValidation('A', tipos.length))
+  if (allModelos.length > 0) applyValidationToRange(wsEq, 1, 2, eqTotalRows, listValidation('F', allModelos.length))
+  if (sociedades.length > 0) applyValidationToRange(wsEq, 3, 2, eqTotalRows, listValidation('B', sociedades.length))
+  if (ubicaciones.length > 0) applyValidationToRange(wsEq, 4, 2, eqTotalRows, listValidation('C', ubicaciones.length))
 
   XLSX.utils.book_append_sheet(wb, wsEq, 'Equipos')
 
   // ────────────────────────────────────────────────
   // Sheet 3: Instrucciones
   // ────────────────────────────────────────────────
-  const modelosPorTipo = tipos.map((t) => t + ': ' + ((state.catalogo || {})[t] || []).join(', '))
-
   const instrucciones = [
     ['INSTRUCCIONES PARA LA IMPORTACION MASIVA'],
+    [''],
+    ['La plantilla ya viene PRE-RELLENADA con todos los productos del catalogo.'],
+    ['Solo tienes que rellenar las CELDAS EN AMARILLO.'],
+    ['No borres filas — si un producto no aplica, deja el stock en 0 y se ignorara al importar.'],
     [''],
     ['REGLAS GENERALES:'],
     ['- NO modifiques los nombres de las columnas (fila 1 de cada hoja).'],
     ['- NO añadas columnas nuevas.'],
-    ['- La fila 2 de cada hoja es un ejemplo con fondo gris. Puedes sobreescribirla o empezar en la fila 3.'],
     ['- Las celdas con desplegable muestran los valores validos al hacer clic.'],
-    ['- Las filas completamente vacias se ignoran automaticamente.'],
+    ['- Puedes cambiar cualquier valor pre-rellenado si lo necesitas (tarifa, ubicacion, etc).'],
+    ['- Las filas con stock = 0 en Inventario se ignoraran al importar.'],
     [''],
     ['HOJA "Inventario fungible":'],
-    ['- nombre: Nombre descriptivo del producto (obligatorio, texto libre).'],
-    ['- categoria: Debe ser un tipo del catalogo (desplegable). Obligatorio.'],
-    ['- stock: Stock inicial, numero positivo. Obligatorio.'],
-    ['- stockMinimo: Umbral de alerta, numero. Si lo dejas vacio, se usara 2.'],
-    ['- ubicacion: Ubicacion activa del sistema (desplegable). Opcional.'],
-    ['- estado: "Nuevo" o "Usado" (desplegable). Por defecto "Nuevo".'],
-    ['- tier: "Estandar" o "Premium" (desplegable). Por defecto "Estandar".'],
+    ['- Cada fila es un producto del catalogo (Tipo - Modelo).'],
+    ['- La columna STOCK (en amarillo) es lo unico obligatorio: pon las unidades recibidas.'],
+    ['- Si dejas stock en 0, esa fila no se importara.'],
+    ['- categoria, ubicacion, estado y tier se pueden cambiar con los desplegables.'],
     ['- El codigo de barras se genera automaticamente al importar.'],
     [''],
     ['HOJA "Equipos":'],
-    ['- tipo: Tipo de equipo del catalogo (desplegable). Obligatorio.'],
-    ['- modelo: Modelo del catalogo (desplegable). Obligatorio.'],
-    ['- numSerie: Numero de serie del equipo (texto). Opcional. Si tiene N/S el estado sera "Almacen", si no, "Pendiente".'],
-    ['- sociedad: Sociedad activa del sistema (desplegable). Obligatorio.'],
-    ['- ubicacion: Ubicacion activa del sistema (desplegable). Opcional.'],
-    ['- proveedor: Nombre del proveedor (texto libre). Opcional.'],
-    ['- numAlbaran: Numero de albaran (texto libre). Opcional.'],
-    ['- fechaCompra: Fecha en formato YYYY-MM-DD (ej: 2026-01-15). Opcional.'],
+    ['- Solo aparecen los tipos que llevan etiqueta (portatiles, moviles, monitores, etc).'],
+    ['- La columna NUMSERIE (en amarillo) es lo mas importante: pon el numero de serie de cada equipo.'],
+    ['- Si un equipo no tiene N/S, dejalo vacio y se creara con estado "Pendiente".'],
+    ['- sociedad, ubicacion, tipo y modelo se pueden cambiar con los desplegables.'],
     ['- El ID de etiqueta se genera automaticamente al importar (correlativo por sociedad).'],
+    ['- proveedor, numAlbaran y fechaCompra son opcionales (texto libre / fecha YYYY-MM-DD).'],
     [''],
     ['VALORES VALIDOS:'],
     [''],
     ['Tipos: ' + tipos.join(', ')],
     ['Sociedades: ' + sociedades.join(', ')],
     ['Ubicaciones: ' + ubicaciones.join(', ')],
-    [''],
-    ['Modelos por tipo:'],
-    ...modelosPorTipo.map((m) => ['  ' + m]),
   ]
   const wsInstr = XLSX.utils.aoa_to_sheet(instrucciones)
   wsInstr['!cols'] = [{ wch: 100 }]
   XLSX.utils.book_append_sheet(wb, wsInstr, 'Instrucciones')
 
   // ────────────────────────────────────────────────
-  // Sheet 4: Listas (hidden reference for dropdowns)
+  // Sheet 4: Listas (reference for dropdowns)
   // ────────────────────────────────────────────────
-  // Column layout: A=tipos, B=sociedades, C=ubicaciones, D=estados, E=tiers, F=modelos
   const listsHeader = ['Tipos', 'Sociedades', 'Ubicaciones', 'Estados', 'Tiers', 'Modelos']
   const maxLen = Math.max(tipos.length, sociedades.length, ubicaciones.length, estados.length, tiers.length, allModelos.length)
   const listasData: (string | undefined)[][] = [listsHeader]
   for (let i = 0; i < maxLen; i++) {
-    listasData.push([
-      tipos[i],
-      sociedades[i],
-      ubicaciones[i],
-      estados[i],
-      tiers[i],
-      allModelos[i],
-    ])
+    listasData.push([tipos[i], sociedades[i], ubicaciones[i], estados[i], tiers[i], allModelos[i]])
   }
   const wsListas = XLSX.utils.aoa_to_sheet(listasData)
   wsListas['!cols'] = [{ wch: 18 }, { wch: 22 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 30 }]
@@ -298,11 +316,12 @@ export function validateImportData(
       const estado = String(r['estado'] || r['Estado'] || 'Nuevo').trim()
       const tier = String(r['tier'] || r['Tier'] || 'Estándar').trim()
 
-      // Skip completely empty rows
+      // Skip completely empty rows or rows with stock = 0 (pre-filled but not needed)
       if (!nombre && !categoria && stockRaw === '' && !ubicacion) return
+      const stock = Number(stockRaw)
+      if (stock === 0 && nombre && categoria) return // pre-filled row, user left stock at 0 → skip
 
       const errors: string[] = []
-      const stock = Number(stockRaw)
       const stockMinimo = stockMinRaw === '' || stockMinRaw === undefined ? 2 : Number(stockMinRaw)
 
       if (!nombre) errors.push('Nombre obligatorio')
