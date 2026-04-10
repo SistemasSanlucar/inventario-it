@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext'
 import { useAuth } from '../../context/AuthContext'
 import { exportAssignmentToPDF } from '../../utils/pdf'
 import { showToast } from '../../hooks/useToast'
+import { useTabNavigation } from '../../hooks/useTabNavigation'
 import { getFechaVencimientoPrestamo } from '../../utils/assignments'
 import type { Assignment } from '../../types/assignment'
 
@@ -51,6 +52,7 @@ function parseProducts(a: Assignment) {
 export default function AssignmentsView() {
   const { state, dispatch } = useAppContext()
   const { isAdmin } = useAuth()
+  const { goToTab } = useTabNavigation()
   const t = T()
 
   const [search, setSearch] = useState('')
@@ -180,6 +182,7 @@ export default function AssignmentsView() {
             <button className="button button-secondary" style={{ padding: '9px 14px', fontSize: '13px', flex: 1, minWidth: '80px' }} onClick={() => setExpandedId(isExpanded ? null : a.id)}>{isExpanded ? '▲ Menos' : '▼ Más'}</button>
             <button className="button button-secondary" style={{ padding: '9px 14px', fontSize: '13px' }} onClick={() => openModal('ver-asignacion', a)} title="Ver detalle">📄</button>
             <button className="button button-secondary" style={{ padding: '9px 14px', fontSize: '13px' }} onClick={() => exportAssignmentToPDF(a, showToast as any)} title="Descargar PDF">📥</button>
+            <button className="button button-secondary" style={{ padding: '9px 14px', fontSize: '13px' }} onClick={() => goToTab('historial', { usuario: a.nombreEmpleado })} title={t.viewHistory}>📜</button>
             {a.estado === 'Activo' && <button className="button button-warning" style={{ padding: '9px 16px', fontSize: '13px', flex: 1 }} onClick={() => openModal('devolver-material', a)}>↩️ Devolver</button>}
             {isAdmin && <button style={{ padding: '9px 14px', fontSize: '13px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: '#ef4444', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }} onClick={() => openConfirm('eliminar-asignacion', a)} title="Eliminar">🗑️</button>}
           </div>
@@ -213,6 +216,7 @@ export default function AssignmentsView() {
           <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
             <div className="action-icon" onClick={() => openModal('ver-asignacion', a)} title="Ver">📄</div>
             <div className="action-icon" onClick={() => exportAssignmentToPDF(a, showToast as any)} title="PDF">📥</div>
+            <div className="action-icon" onClick={() => goToTab('historial', { usuario: a.nombreEmpleado })} title={t.viewHistory}>📜</div>
             {a.estado === 'Activo' && <div className="action-icon" onClick={() => openModal('devolver-material', a)} title="Devolver">↩️</div>}
             {isAdmin && <div className="action-icon danger" onClick={() => openConfirm('eliminar-asignacion', a)} title="Eliminar">🗑️</div>}
           </div>

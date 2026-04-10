@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useAppContext } from './context/AppContext'
@@ -16,6 +16,8 @@ import AdminPanel from './components/admin/AdminPanel'
 import FormModal from './components/modals/FormModal'
 import ConfirmModal from './components/modals/ConfirmModal'
 import ErrorBoundary from './components/shared/ErrorBoundary'
+import ChangelogModal from './components/changelog/ChangelogModal'
+import { CONFIG } from './config'
 import { useModal } from './hooks/useModal'
 import { useAppData } from './hooks/useAppData'
 import { tabFromPath } from './hooks/useTabNavigation'
@@ -27,6 +29,7 @@ function AppContent() {
   const { refreshData } = useAppData()
   const location = useLocation()
   const navigate = useNavigate()
+  const [showChangelog, setShowChangelog] = useState(false)
 
   // Sync activeTab from URL
   useEffect(() => {
@@ -43,6 +46,11 @@ function AppContent() {
       dataManagerRef.current = result.dataManager
       dispatch({ type: 'SET_DATA', payload: result.data })
       dispatch({ type: 'SET_LOADING', payload: false })
+
+      // Changelog modal on version change
+      if (localStorage.getItem('inv_last_version') !== CONFIG.version) {
+        setShowChangelog(true)
+      }
 
       // Deep link: ?equipo=ID
       const urlParams = new URLSearchParams(window.location.search)
@@ -154,6 +162,7 @@ function AppContent() {
         </Routes>
       </ErrorBoundary>
       {modals}
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </AppLayout>
   )
 }

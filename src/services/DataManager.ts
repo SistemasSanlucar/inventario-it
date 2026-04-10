@@ -373,12 +373,12 @@ export class DataManager {
     return await this.graph.createListItem(CONFIG.sharepoint.lists.admins, {
       Title: email,
       Email: email,
-      Activo: 'Si',
+      Activo: true,
     })
   }
 
   async toggleAdmin(itemId: string, activo: boolean): Promise<void> {
-    await this.graph.updateListItem(CONFIG.sharepoint.lists.admins, itemId, { Activo: activo ? 'No' : 'Si' })
+    await this.graph.updateListItem(CONFIG.sharepoint.lists.admins, itemId, { Activo: !activo })
   }
 
   async deleteAdmin(itemId: string): Promise<void> {
@@ -468,8 +468,11 @@ export class DataManager {
     numSerie?: string
     notas?: string
     sociedad?: string
+    proveedor?: string
+    numAlbaran?: string
+    fechaCompra?: string | null
   }): Promise<any> {
-    return await this.graph.createListItem(CONFIG.sharepoint.lists.activos, {
+    const fields: Record<string, any> = {
       Title: data.idEtiqueta,
       IDEtiqueta: data.idEtiqueta,
       TipoMaterial: data.tipo,
@@ -479,7 +482,11 @@ export class DataManager {
       NumSerie: data.numSerie || '',
       Notas: data.notas || '',
       Sociedad: data.sociedad || '',
-    })
+    }
+    if (data.proveedor) fields.Proveedor = data.proveedor
+    if (data.numAlbaran) fields.NumAlbaran = data.numAlbaran
+    if (data.fechaCompra) fields.FechaCompra = data.fechaCompra
+    return await this.graph.createListItem(CONFIG.sharepoint.lists.activos, fields)
   }
 
   async cambiarEstadoActivo(

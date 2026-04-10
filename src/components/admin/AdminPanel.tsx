@@ -9,7 +9,9 @@ import { printTechnicianCard } from '../../utils/pdf'
 import { PacksManager } from '../../services/PacksManager'
 import { ErrorLog } from '../../services/ErrorLog'
 import { PAISES_LIST } from '../../config/constants'
+import { CHANGELOG, entryIcon } from '../../config/changelog'
 import type { CatalogoRawItem } from '../../types/equipment'
+import BulkImportSection from './BulkImportSection'
 
 // ── ErrorLogPanel ──
 function ErrorLogPanel() {
@@ -56,6 +58,38 @@ function ErrorLogPanel() {
               )
             })}
       </div>
+    </div>
+  )
+}
+
+// ── ChangelogSection ──
+function ChangelogSection() {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set([CHANGELOG[0]?.version]))
+  const toggle = (v: string) => setExpanded((prev) => {
+    const next = new Set(prev)
+    next.has(v) ? next.delete(v) : next.add(v)
+    return next
+  })
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {CHANGELOG.map((ver) => (
+        <div key={ver.version} style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+          <button onClick={() => toggle(ver.version)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}>
+            <span style={{ fontWeight: 700, fontSize: '15px' }}>v{ver.version} <span style={{ fontWeight: 400, fontSize: '12px', color: 'var(--text-secondary)', marginLeft: '8px' }}>{ver.date}</span></span>
+            <span style={{ color: 'var(--text-secondary)' }}>{expanded.has(ver.version) ? '▾' : '▸'}</span>
+          </button>
+          {expanded.has(ver.version) && (
+            <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {ver.entries.map((entry, i) => (
+                <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '14px', flexShrink: 0 }}>{entryIcon(entry.type)}</span>
+                  <span style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{entry.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
@@ -709,6 +743,8 @@ export default function AdminPanel() {
                   {sectionBtn('exportar', t.exportAudit, '📊')}
                   {sectionBtn('log', t.actionLog, '📋')}
                   {sectionBtn('errores', '🔴 Errores', '🐛')}
+                  {sectionBtn('importar', t.bulkImport, '📥')}
+                  {sectionBtn('changelog', t.changelog, '📋')}
                 </div>
               )}
             </>
@@ -728,6 +764,8 @@ export default function AdminPanel() {
           {activeSection === 'exportar' && renderExportar()}
           {activeSection === 'errores' && <ErrorLogPanel />}
           {activeSection === 'log' && renderLog()}
+          {activeSection === 'importar' && <BulkImportSection />}
+          {activeSection === 'changelog' && <ChangelogSection />}
         </div>
       </div>
     </div>

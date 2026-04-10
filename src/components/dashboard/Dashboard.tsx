@@ -85,6 +85,8 @@ export default function Dashboard() {
   if (prestamosVencidos.length > 0) alertas.push({ tipo: 'error', icon: '⏰', msg: `${prestamosVencidos.length} préstamo(s) vencido(s)`, nav: () => onNavigate('asignaciones', { tipo: 'prestamo', estado: 'vencido' }) })
   if (eq.extraviado > 0) alertas.push({ tipo: 'error', icon: '🔍', msg: `${eq.extraviado} equipo(s) extraviado(s)`, nav: () => onNavigate('equipos', { estado: 'Extraviado' }) })
   if (eq.transito > 0) alertas.push({ tipo: 'warning', icon: '🚚', msg: `${eq.transito} equipo(s) en tránsito`, nav: () => onNavigate('equipos', { estado: 'Transito' }) })
+  const sinEtiqueta = (state.activos || []).filter((a) => a.numSerie && !a.etiquetaImpresa && a.estado !== 'Baja').length
+  if (sinEtiqueta > 0) alertas.push({ tipo: 'warning', icon: '🏷️', msg: `${sinEtiqueta} ${t.unlabeledAlert}`, nav: () => onNavigate('equipos', { estado: 'sinEtiqueta' }) })
 
   // Health score
   let health = 100

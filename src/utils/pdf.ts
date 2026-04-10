@@ -166,8 +166,9 @@ export function exportAssignmentToPDF(
       try { prods = JSON.parse(prods as any) } catch (_) { /* ignore */ }
     }
     prods.forEach((prod, idx) => {
+      const tierText = prod.tier ? ' [' + prod.tier + ']' : ''
       const line =
-        idx + 1 + '. ' + safePdfText(prod.nombre) +
+        idx + 1 + '. ' + safePdfText(prod.nombre) + tierText +
         (prod.idEtiqueta ? ' [' + prod.idEtiqueta + ']' : prod.barcode ? ' (Cod: ' + prod.barcode + ')' : '')
       doc.text(line, margin, y)
       y += 6

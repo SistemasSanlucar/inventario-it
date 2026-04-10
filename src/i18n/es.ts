@@ -60,4 +60,11 @@ export const es = {
   noMovementsYet: 'Sin movimientos registrados aún',
   accessories: '🔌 Accesorios incluidos', saveChanges: 'Guardar cambios',
   changeStatus: '🔄 Cambiar estado', printLabel: '🖨️ Imprimir etiqueta',
+  changelog: 'Changelog', whatsNew: 'Novedades en', understood: 'Entendido',
+  bulkImport: 'Importacion masiva', downloadTemplate: 'Descargar plantilla Excel',
+  importExcel: 'Importar Excel', importPreview: 'Vista previa de importacion',
+  confirmImport: 'Confirmar importacion', rowsProcessed: 'registros procesados',
+  rowsWithErrors: 'registros con errores', importing: 'Importando...',
+  unlabeledAlert: 'equipo(s) con N/S sin etiqueta impresa',
+  viewHistory: 'Ver historial', errors: 'Errores',
 } as const

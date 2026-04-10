@@ -33,13 +33,12 @@ export function useGlobalSearch() {
         r.push({ type: 'equipo', icon: '💻', label: a.tipo + ' · ' + a.modelo, sub: a.idEtiqueta, tab: 'equipos' })
       }
     })
-    ;(state.assignments || [])
-      .filter((a) => a.estado === 'Activo')
-      .forEach((a) => {
-        if ((a.nombreEmpleado || '').toLowerCase().includes(q) || (a.emailEmpleado || '').toLowerCase().includes(q)) {
-          r.push({ type: 'asignacion', icon: '📋', label: a.nombreEmpleado, sub: a.emailEmpleado, tab: 'asignaciones' })
-        }
-      })
+    ;(state.assignments || []).forEach((a) => {
+      if ((a.nombreEmpleado || '').toLowerCase().includes(q) || (a.emailEmpleado || '').toLowerCase().includes(q)) {
+        const estadoBadge = a.estado === 'Activo' ? '' : ' (' + a.estado + ')'
+        r.push({ type: 'asignacion', icon: '📋', label: a.nombreEmpleado + estadoBadge, sub: a.emailEmpleado, tab: 'asignaciones' })
+      }
+    })
 
     return r.slice(0, 8)
   }, [state.globalSearch, state.inventory, state.activos, state.assignments])

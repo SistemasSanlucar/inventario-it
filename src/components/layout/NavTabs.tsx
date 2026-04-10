@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { useRef, useState, useEffect, useCallback } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useAppContext } from '../../context/AppContext'
 import { T } from '../../i18n'
 
@@ -13,6 +14,9 @@ const TABS = [
 export default function NavTabs() {
   const { state } = useAppContext()
   const t = T()
+  const location = useLocation()
+  const navRef = useRef<HTMLElement>(null)
+  const [indicator, setIndicator] = useState({ left: 0, width: 0 })
 
   const labels: Record<string, string> = {
     dashboard: t.dashboard,
@@ -24,8 +28,22 @@ export default function NavTabs() {
 
   const pendientesCount = (state.activos || []).filter((a) => a.estado === 'Pendiente').length
 
+  const updateIndicator = useCallback(() => {
+    if (!navRef.current) return
+    const active = navRef.current.querySelector('.tab-button.active') as HTMLElement | null
+    if (active) {
+      setIndicator({ left: active.offsetLeft, width: active.offsetWidth })
+    }
+  }, [])
+
+  useEffect(() => {
+    // Small delay to let NavLink update its active class
+    const id = requestAnimationFrame(updateIndicator)
+    return () => cancelAnimationFrame(id)
+  }, [location.pathname, updateIndicator])
+
   return (
-    <nav className="nav-tabs">
+    <nav className="nav-tabs" ref={navRef}>
       {TABS.map((tab) => (
         <NavLink
           key={tab.key}
@@ -63,6 +81,7 @@ export default function NavTabs() {
       >
         {t.admin}
       </NavLink>
+      <div className="nav-indicator" style={{ left: indicator.left, width: indicator.width }} />
     </nav>
   )
 }

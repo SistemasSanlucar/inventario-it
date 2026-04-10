@@ -60,4 +60,11 @@ export const en = {
   noMovementsYet: 'No movements registered yet',
   accessories: '🔌 Included accessories', saveChanges: 'Save changes',
   changeStatus: '🔄 Change status', printLabel: '🖨️ Print label',
+  changelog: 'Changelog', whatsNew: 'What\'s new in', understood: 'Got it',
+  bulkImport: 'Bulk Import', downloadTemplate: 'Download Excel template',
+  importExcel: 'Import Excel', importPreview: 'Import preview',
+  confirmImport: 'Confirm import', rowsProcessed: 'rows processed',
+  rowsWithErrors: 'rows with errors', importing: 'Importing...',
+  unlabeledAlert: 'equipment with S/N but no printed label',
+  viewHistory: 'View history', errors: 'Errors',
 } as const

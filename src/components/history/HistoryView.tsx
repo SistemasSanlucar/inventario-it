@@ -26,6 +26,9 @@ export default function HistoryView() {
       setFilterDateFrom(hoy)
       setFilterDateTo(hoy)
     }
+    if (f.usuario) {
+      setSearch(f.usuario)
+    }
   }, [])
 
   const toggleSort = (col: string) => {
