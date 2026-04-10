@@ -1,9 +1,7 @@
 import type { GraphAPIClient } from './GraphAPIClient'
 import type { LineaRow, TarifaInfo } from '../types/lineas'
 
-const SITE = 'sanlucarfruit.sharepoint.com:/sites/InformationSystems:'
-const ITEM_ID = '935D9076-87D9-4A63-A37D-80F985C5ADD7'
-const BASE = '/sites/' + SITE + '/drive/items/' + ITEM_ID + '/workbook/worksheets'
+const WB = '/sites/sanlucarfruit.sharepoint.com:/sites/InformationSystems:/drive/items/935D9076-87D9-4A63-A37D-80F985C5ADD7/workbook/worksheets'
 
 // Column order in LINEAS / LINEAS VIP sheets:
 // 0:Tarifa 1:PERFIL 2:Column1(observaciones) 3:Numero 4:Extension 5:Usuario 6:IMEI 7:PIN 8:SIM2ª 9:PUK_SIM2ª 10:__PowerAppsId__
@@ -62,17 +60,17 @@ function parseRows(values: (string | number | null)[][], sheet: string): LineaRo
 }
 
 export async function fetchLineas(graph: GraphAPIClient): Promise<LineaRow[]> {
-  const res = await graph.request(BASE + '/LINEAS/usedRange')
+  const res = await graph.request(WB + '/LINEAS/usedRange')
   return parseRows(res.values, 'LINEAS')
 }
 
 export async function fetchLineasVIP(graph: GraphAPIClient): Promise<LineaRow[]> {
-  const res = await graph.request(BASE + '/LINEAS%20VIP/usedRange')
+  const res = await graph.request(WB + "/'LINEAS VIP'/usedRange")
   return parseRows(res.values, 'LINEAS VIP')
 }
 
 export async function fetchTarifas(graph: GraphAPIClient): Promise<TarifaInfo[]> {
-  const res = await graph.request(BASE + '/TARIFA/usedRange')
+  const res = await graph.request(WB + '/TARIFA/usedRange')
   if (!res.values || res.values.length < 2) return []
   const tarifas: TarifaInfo[] = []
   for (let i = 1; i < res.values.length; i++) {
@@ -104,7 +102,7 @@ export async function updateLineaCell(
   const cellRef = colToLetter(colIndex) + rowIndex
   const encodedSheet = encodeURIComponent(sheet)
   await graph.request(
-    BASE + '/' + encodedSheet + "/range(address='" + cellRef + "')",
+    WB + '/' + encodedSheet + "/range(address='" + cellRef + "')",
     {
       method: 'PATCH',
       body: JSON.stringify({ values: [[value]] }),

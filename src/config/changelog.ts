@@ -21,9 +21,13 @@ export function entryIcon(type: ChangelogEntry['type']): string {
 
 export const CHANGELOG: ChangelogVersion[] = [
   {
-    version: '3.3.4',
+    version: '3.4.0',
     date: '2026-04-10',
     entries: [
+      { type: 'feature', text: 'Nuevo modulo Lineas: gestion de lineas moviles corporativas desde Excel en SharePoint' },
+      { type: 'feature', text: 'Vista de lineas VIP con estilo diferenciado' },
+      { type: 'feature', text: 'Edicion de lineas (Usuario, Tarifa, Perfil, Observaciones) con guardado directo en Excel' },
+      { type: 'feature', text: 'Campos sensibles (IMEI, PIN, PUK) ocultos por defecto, visibles solo para admins' },
       { type: 'feature', text: 'Sistema de Changelog con modal de novedades al actualizar' },
       { type: 'feature', text: 'Importacion masiva desde Excel con plantilla descargable y validacion' },
       { type: 'mejora', text: 'Animacion deslizante en las tabs de navegacion' },
