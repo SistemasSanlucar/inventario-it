@@ -17,12 +17,12 @@ export interface ImportEquipoRow {
 }
 
 export interface ImportInventarioRow {
-  categoria: string
   nombre: string
-  barcode: string
+  categoria: string
   stock: number
   stockMinimo: number
   ubicacion: string
+  estado: string
   tier: string
   row: number
   errors: string[]
@@ -36,81 +36,177 @@ export interface ImportValidationResult {
   totalErrors: number
 }
 
+// ── Helpers for Data Validation ──
+
+interface DVEntry {
+  type: string
+  operator: string
+  formula1: string
+  showErrorMessage: boolean
+  errorTitle: string
+  error: string
+  sqref?: string
+}
+
+/** Build a SheetJS-compatible data validation formula referencing a column in the hidden Listas sheet */
+function listValidation(colLetter: string, count: number): DVEntry {
+  return {
+    type: 'list',
+    operator: 'equal',
+    formula1: 'Listas!$' + colLetter + '$2:$' + colLetter + '$' + (count + 1),
+    showErrorMessage: true,
+    errorTitle: 'Valor no válido',
+    error: 'Selecciona un valor de la lista desplegable.',
+  }
+}
+
+function applyValidationToRange(ws: XLSX.WorkSheet, col: number, startRow: number, endRow: number, dv: DVEntry) {
+  if (!(ws as any)['!dataValidations']) (ws as any)['!dataValidations'] = []
+  const colLetter = XLSX.utils.encode_col(col)
+  const range = colLetter + startRow + ':' + colLetter + endRow
+  ;((ws as any)['!dataValidations'] as DVEntry[]).push({ ...dv, sqref: range })
+}
+
+function setCell(ws: XLSX.WorkSheet, col: number, row: number, value: string | number, style?: Record<string, any>) {
+  const ref = XLSX.utils.encode_cell({ c: col, r: row })
+  ws[ref] = { v: value, t: typeof value === 'number' ? 'n' : 's', ...style }
+}
+
+function setRange(ws: XLSX.WorkSheet, cols: number, rows: number) {
+  ws['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: cols - 1, r: rows - 1 } })
+}
+
 // ── Template generation ──
 
 export function generateImportTemplate(state: AppState): void {
   const wb = XLSX.utils.book_new()
 
-  // Gather catalog values for validation reference
+  // Gather catalog values
   const tipos = Object.keys(state.catalogo || {})
-  const modelos: string[] = []
+  const allModelos: string[] = []
   for (const tipo of tipos) {
     for (const modelo of (state.catalogo[tipo] || [])) {
-      modelos.push(tipo + ' > ' + modelo)
+      allModelos.push(modelo)
     }
   }
   const sociedades = (state.sociedades || []).filter((s) => s.activo).map((s) => s.nombre)
   const ubicaciones = (state.ubicaciones || []).filter((u) => u.activo).map((u) => u.nombre)
-  const proveedores = (state.proveedores || []).filter((p) => p.activo).map((p) => p.nombre)
-  const categorias = Object.keys(state.catalogo || {})
+  const estados = ['Nuevo', 'Usado']
   const tiers = ['Estándar', 'Premium']
 
-  // Sheet 1: Equipos
-  const equiposHeaders = ['Tipo', 'Modelo', 'Número de Serie', 'Sociedad', 'Ubicación', 'Proveedor', 'Nº Albarán', 'Fecha Compra']
-  const equiposData = [equiposHeaders, ['Ej: Portátil', 'Ej: HP EliteBook 840 G10', 'Ej: ABC123', 'Ej: Sanlúcar', 'Ej: Almacén IT', 'Ej: PC Componentes', 'Ej: ALB-001', 'Ej: 2026-01-15']]
-  const wsEquipos = XLSX.utils.aoa_to_sheet(equiposData)
-  wsEquipos['!cols'] = [{ wch: 18 }, { wch: 30 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 16 }]
-  XLSX.utils.book_append_sheet(wb, wsEquipos, 'Equipos')
+  const EXAMPLE_ROW = 1  // 0-indexed (row 2 in Excel)
+  const DATA_START = 2   // 0-indexed (row 3 in Excel)
+  const TOTAL_ROWS = DATA_START + 50  // 50 empty rows after example
 
-  // Sheet 2: Inventario
-  const invHeaders = ['Tipo/Categoría', 'Nombre del producto', 'Código de barras', 'Stock inicial', 'Stock mínimo', 'Ubicación', 'Tier']
-  const invData = [invHeaders, ['Ej: Cable', 'Ej: Cable HDMI 2m', 'Ej: 8431234567890', '10', '3', 'Ej: Almacén IT', 'Estándar']]
-  const wsInv = XLSX.utils.aoa_to_sheet(invData)
-  wsInv['!cols'] = [{ wch: 18 }, { wch: 30 }, { wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 12 }]
+  // ────────────────────────────────────────────────
+  // Sheet 1: Inventario fungible
+  // ────────────────────────────────────────────────
+  const invHeaders = ['nombre', 'categoria', 'stock', 'stockMinimo', 'ubicacion', 'estado', 'tier']
+  const invExample = ['Cable HDMI 2m', tipos[0] || 'Cable', 10, 2, ubicaciones[0] || 'Almacén IT', 'Nuevo', 'Estándar']
+
+  const wsInv = XLSX.utils.aoa_to_sheet([invHeaders])
+  // Write example row
+  invExample.forEach((val, col) => setCell(wsInv, col, EXAMPLE_ROW, val))
+  // Extend range to include 50 empty rows
+  setRange(wsInv, invHeaders.length, TOTAL_ROWS)
+  wsInv['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 20 }, { wch: 12 }, { wch: 12 }]
+
+  // Data validations: categoria (col B), ubicacion (col E), estado (col F), tier (col G)
+  // References to Listas sheet: A=tipos, B=sociedades, C=ubicaciones, D=estados, E=tiers, F=modelos
+  if (tipos.length > 0) applyValidationToRange(wsInv, 1, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('A', tipos.length))
+  if (ubicaciones.length > 0) applyValidationToRange(wsInv, 4, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('C', ubicaciones.length))
+  applyValidationToRange(wsInv, 5, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('D', estados.length))
+  applyValidationToRange(wsInv, 6, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('E', tiers.length))
+
   XLSX.utils.book_append_sheet(wb, wsInv, 'Inventario fungible')
 
+  // ────────────────────────────────────────────────
+  // Sheet 2: Equipos
+  // ────────────────────────────────────────────────
+  const eqHeaders = ['tipo', 'modelo', 'numSerie', 'sociedad', 'ubicacion', 'proveedor', 'numAlbaran', 'fechaCompra']
+  const eqExample = [tipos[0] || 'Portátil', allModelos[0] || 'HP EliteBook 840 G10', 'ABC123456', sociedades[0] || 'Sanlúcar', ubicaciones[0] || 'Almacén IT', '', '', '2026-01-15']
+
+  const wsEq = XLSX.utils.aoa_to_sheet([eqHeaders])
+  eqExample.forEach((val, col) => setCell(wsEq, col, EXAMPLE_ROW, val))
+  setRange(wsEq, eqHeaders.length, TOTAL_ROWS)
+  wsEq['!cols'] = [{ wch: 18 }, { wch: 30 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 16 }]
+
+  // Data validations: tipo (col A), modelo (col B), sociedad (col D), ubicacion (col E)
+  if (tipos.length > 0) applyValidationToRange(wsEq, 0, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('A', tipos.length))
+  if (allModelos.length > 0) applyValidationToRange(wsEq, 1, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('F', allModelos.length))
+  if (sociedades.length > 0) applyValidationToRange(wsEq, 3, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('B', sociedades.length))
+  if (ubicaciones.length > 0) applyValidationToRange(wsEq, 4, EXAMPLE_ROW + 1, TOTAL_ROWS, listValidation('C', ubicaciones.length))
+
+  XLSX.utils.book_append_sheet(wb, wsEq, 'Equipos')
+
+  // ────────────────────────────────────────────────
   // Sheet 3: Instrucciones
+  // ────────────────────────────────────────────────
+  const modelosPorTipo = tipos.map((t) => t + ': ' + ((state.catalogo || {})[t] || []).join(', '))
+
   const instrucciones = [
-    ['INSTRUCCIONES PARA LA IMPORTACIÓN MASIVA'],
+    ['INSTRUCCIONES PARA LA IMPORTACION MASIVA'],
     [''],
-    ['1. Rellena las hojas "Equipos" e "Inventario fungible" con los datos correspondientes.'],
-    ['2. La primera fila de cada hoja es la cabecera — NO la modifiques.'],
-    ['3. La segunda fila contiene ejemplos — elimínala o sobrescríbela con datos reales.'],
-    ['4. Campos obligatorios para Equipos: Tipo, Modelo, Sociedad.'],
-    ['5. Campos obligatorios para Inventario: Tipo/Categoría, Nombre del producto, Stock inicial.'],
-    ['6. El campo "Fecha Compra" debe usar formato YYYY-MM-DD (ej: 2026-01-15).'],
-    ['7. El campo "Tier" solo acepta: Estándar o Premium.'],
+    ['REGLAS GENERALES:'],
+    ['- NO modifiques los nombres de las columnas (fila 1 de cada hoja).'],
+    ['- NO añadas columnas nuevas.'],
+    ['- La fila 2 de cada hoja es un ejemplo con fondo gris. Puedes sobreescribirla o empezar en la fila 3.'],
+    ['- Las celdas con desplegable muestran los valores validos al hacer clic.'],
+    ['- Las filas completamente vacias se ignoran automaticamente.'],
     [''],
-    ['VALORES VÁLIDOS (consulta la hoja "Listas" para la referencia completa):'],
+    ['HOJA "Inventario fungible":'],
+    ['- nombre: Nombre descriptivo del producto (obligatorio, texto libre).'],
+    ['- categoria: Debe ser un tipo del catalogo (desplegable). Obligatorio.'],
+    ['- stock: Stock inicial, numero positivo. Obligatorio.'],
+    ['- stockMinimo: Umbral de alerta, numero. Si lo dejas vacio, se usara 2.'],
+    ['- ubicacion: Ubicacion activa del sistema (desplegable). Opcional.'],
+    ['- estado: "Nuevo" o "Usado" (desplegable). Por defecto "Nuevo".'],
+    ['- tier: "Estandar" o "Premium" (desplegable). Por defecto "Estandar".'],
+    ['- El codigo de barras se genera automaticamente al importar.'],
     [''],
-    ['Tipos de equipo: ' + tipos.join(', ')],
+    ['HOJA "Equipos":'],
+    ['- tipo: Tipo de equipo del catalogo (desplegable). Obligatorio.'],
+    ['- modelo: Modelo del catalogo (desplegable). Obligatorio.'],
+    ['- numSerie: Numero de serie del equipo (texto). Opcional. Si tiene N/S el estado sera "Almacen", si no, "Pendiente".'],
+    ['- sociedad: Sociedad activa del sistema (desplegable). Obligatorio.'],
+    ['- ubicacion: Ubicacion activa del sistema (desplegable). Opcional.'],
+    ['- proveedor: Nombre del proveedor (texto libre). Opcional.'],
+    ['- numAlbaran: Numero de albaran (texto libre). Opcional.'],
+    ['- fechaCompra: Fecha en formato YYYY-MM-DD (ej: 2026-01-15). Opcional.'],
+    ['- El ID de etiqueta se genera automaticamente al importar (correlativo por sociedad).'],
+    [''],
+    ['VALORES VALIDOS:'],
+    [''],
+    ['Tipos: ' + tipos.join(', ')],
     ['Sociedades: ' + sociedades.join(', ')],
     ['Ubicaciones: ' + ubicaciones.join(', ')],
-    ['Proveedores: ' + proveedores.join(', ')],
-    ['Tiers: ' + tiers.join(', ')],
     [''],
-    ['Modelos por tipo (Tipo > Modelo):'],
-    ...modelos.map((m) => ['  ' + m]),
+    ['Modelos por tipo:'],
+    ...modelosPorTipo.map((m) => ['  ' + m]),
   ]
   const wsInstr = XLSX.utils.aoa_to_sheet(instrucciones)
-  wsInstr['!cols'] = [{ wch: 90 }]
+  wsInstr['!cols'] = [{ wch: 100 }]
   XLSX.utils.book_append_sheet(wb, wsInstr, 'Instrucciones')
 
-  // Sheet 4: Listas (reference data for dropdowns)
-  const maxLen = Math.max(tipos.length, sociedades.length, ubicaciones.length, proveedores.length, tiers.length, modelos.length)
-  const listasData: string[][] = [['Tipos', 'Sociedades', 'Ubicaciones', 'Proveedores', 'Tiers', 'Modelos (Tipo > Modelo)']]
+  // ────────────────────────────────────────────────
+  // Sheet 4: Listas (hidden reference for dropdowns)
+  // ────────────────────────────────────────────────
+  // Column layout: A=tipos, B=sociedades, C=ubicaciones, D=estados, E=tiers, F=modelos
+  const listsHeader = ['Tipos', 'Sociedades', 'Ubicaciones', 'Estados', 'Tiers', 'Modelos']
+  const maxLen = Math.max(tipos.length, sociedades.length, ubicaciones.length, estados.length, tiers.length, allModelos.length)
+  const listasData: (string | undefined)[][] = [listsHeader]
   for (let i = 0; i < maxLen; i++) {
     listasData.push([
-      tipos[i] || '',
-      sociedades[i] || '',
-      ubicaciones[i] || '',
-      proveedores[i] || '',
-      tiers[i] || '',
-      modelos[i] || '',
+      tipos[i],
+      sociedades[i],
+      ubicaciones[i],
+      estados[i],
+      tiers[i],
+      allModelos[i],
     ])
   }
   const wsListas = XLSX.utils.aoa_to_sheet(listasData)
-  wsListas['!cols'] = [{ wch: 18 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 35 }]
+  wsListas['!cols'] = [{ wch: 18 }, { wch: 22 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 30 }]
   XLSX.utils.book_append_sheet(wb, wsListas, 'Listas')
 
   XLSX.writeFile(wb, 'Plantilla_Importacion_IT.xlsx')
@@ -118,30 +214,40 @@ export function generateImportTemplate(state: AppState): void {
 
 // ── Validation ──
 
-export function validateImportData(workbook: XLSX.WorkBook, state: AppState): ImportValidationResult {
+export function validateImportData(
+  workbook: XLSX.WorkBook,
+  state: AppState,
+  existingSerials: Set<string>
+): ImportValidationResult {
   const tipos = Object.keys(state.catalogo || {})
   const modelosPorTipo = state.catalogo || {}
   const sociedades = new Set((state.sociedades || []).filter((s) => s.activo).map((s) => s.nombre.toLowerCase()))
   const ubicaciones = new Set((state.ubicaciones || []).filter((u) => u.activo).map((u) => u.nombre.toLowerCase()))
-  const proveedores = new Set((state.proveedores || []).filter((p) => p.activo).map((p) => p.nombre.toLowerCase()))
   const tiposSet = new Set(tipos.map((t) => t.toLowerCase()))
 
   const equipos: ImportEquipoRow[] = []
   const inventario: ImportInventarioRow[] = []
 
-  // Parse Equipos sheet
+  // Track serials within the import file to detect intra-file duplicates
+  const importSerials = new Set<string>()
+
+  // ── Parse Equipos sheet ──
   const wsEq = workbook.Sheets['Equipos']
   if (wsEq) {
     const rows = XLSX.utils.sheet_to_json<Record<string, any>>(wsEq, { defval: '' })
     rows.forEach((r, idx) => {
-      const tipo = String(r['Tipo'] || '').trim()
-      const modelo = String(r['Modelo'] || '').trim()
-      const numSerie = String(r['Número de Serie'] || r['Numero de Serie'] || '').trim()
-      const sociedad = String(r['Sociedad'] || '').trim()
-      const ubicacion = String(r['Ubicación'] || r['Ubicacion'] || '').trim()
-      const proveedor = String(r['Proveedor'] || '').trim()
-      const numAlbaran = String(r['Nº Albarán'] || r['N Albaran'] || r['Nº Albaran'] || '').trim()
-      const fechaCompra = String(r['Fecha Compra'] || '').trim()
+      const tipo = String(r['tipo'] || r['Tipo'] || '').trim()
+      const modelo = String(r['modelo'] || r['Modelo'] || '').trim()
+      const numSerie = String(r['numSerie'] || r['Número de Serie'] || r['Numero de Serie'] || '').trim()
+      const sociedad = String(r['sociedad'] || r['Sociedad'] || '').trim()
+      const ubicacion = String(r['ubicacion'] || r['Ubicación'] || r['Ubicacion'] || '').trim()
+      const proveedor = String(r['proveedor'] || r['Proveedor'] || '').trim()
+      const numAlbaran = String(r['numAlbaran'] || r['Nº Albarán'] || r['N Albaran'] || r['Nº Albaran'] || '').trim()
+      const fechaCompra = String(r['fechaCompra'] || r['Fecha Compra'] || '').trim()
+
+      // Skip completely empty rows
+      if (!tipo && !modelo && !numSerie && !sociedad && !ubicacion && !proveedor && !numAlbaran && !fechaCompra) return
+
       const errors: string[] = []
 
       if (!tipo) errors.push('Tipo obligatorio')
@@ -160,44 +266,57 @@ export function validateImportData(workbook: XLSX.WorkBook, state: AppState): Im
       else if (!sociedades.has(sociedad.toLowerCase())) errors.push('Sociedad "' + sociedad + '" no existe')
 
       if (ubicacion && !ubicaciones.has(ubicacion.toLowerCase())) errors.push('Ubicación "' + ubicacion + '" no existe')
-      if (proveedor && !proveedores.has(proveedor.toLowerCase())) errors.push('Proveedor "' + proveedor + '" no existe')
 
-      if (fechaCompra && !/^\d{4}-\d{2}-\d{2}$/.test(fechaCompra)) errors.push('Formato de fecha inválido (usar YYYY-MM-DD)')
+      if (fechaCompra && !/^\d{4}-\d{2}-\d{2}$/.test(fechaCompra)) errors.push('Formato fecha inválido (YYYY-MM-DD)')
+
+      // Check numSerie duplicates
+      if (numSerie) {
+        const nsUpper = numSerie.toUpperCase()
+        if (existingSerials.has(nsUpper)) {
+          errors.push('N/S "' + numSerie + '" ya existe en el sistema')
+        } else if (importSerials.has(nsUpper)) {
+          errors.push('N/S "' + numSerie + '" duplicado en el fichero')
+        }
+        importSerials.add(nsUpper)
+      }
 
       equipos.push({ tipo, modelo, numSerie, sociedad, ubicacion, proveedor, numAlbaran, fechaCompra, row: idx + 2, errors })
     })
   }
 
-  // Parse Inventario sheet
+  // ── Parse Inventario fungible sheet ──
   const wsInv = workbook.Sheets['Inventario fungible']
   if (wsInv) {
     const rows = XLSX.utils.sheet_to_json<Record<string, any>>(wsInv, { defval: '' })
     rows.forEach((r, idx) => {
-      const categoria = String(r['Tipo/Categoría'] || r['Tipo/Categoria'] || '').trim()
-      const nombre = String(r['Nombre del producto'] || '').trim()
-      const barcode = String(r['Código de barras'] || r['Codigo de barras'] || '').trim()
-      const stockRaw = r['Stock inicial']
-      const stockMinRaw = r['Stock mínimo'] ?? r['Stock minimo'] ?? ''
-      const ubicacion = String(r['Ubicación'] || r['Ubicacion'] || '').trim()
-      const tier = String(r['Tier'] || 'Estándar').trim()
+      const nombre = String(r['nombre'] || r['Nombre del producto'] || r['Nombre'] || '').trim()
+      const categoria = String(r['categoria'] || r['Tipo/Categoría'] || r['Tipo/Categoria'] || '').trim()
+      const stockRaw = r['stock'] ?? r['Stock inicial'] ?? ''
+      const stockMinRaw = r['stockMinimo'] ?? r['Stock mínimo'] ?? r['Stock minimo'] ?? ''
+      const ubicacion = String(r['ubicacion'] || r['Ubicación'] || r['Ubicacion'] || '').trim()
+      const estado = String(r['estado'] || r['Estado'] || 'Nuevo').trim()
+      const tier = String(r['tier'] || r['Tier'] || 'Estándar').trim()
+
+      // Skip completely empty rows
+      if (!nombre && !categoria && stockRaw === '' && !ubicacion) return
+
       const errors: string[] = []
-
       const stock = Number(stockRaw)
-      const stockMinimo = stockMinRaw === '' ? 0 : Number(stockMinRaw)
-
-      if (!categoria) errors.push('Tipo/Categoría obligatorio')
-      else if (!tiposSet.has(categoria.toLowerCase())) errors.push('Categoría "' + categoria + '" no existe en catálogo')
+      const stockMinimo = stockMinRaw === '' || stockMinRaw === undefined ? 2 : Number(stockMinRaw)
 
       if (!nombre) errors.push('Nombre obligatorio')
 
-      if (isNaN(stock) || stock < 0) errors.push('Stock inicial inválido')
-      if (isNaN(stockMinimo) || stockMinimo < 0) errors.push('Stock mínimo inválido')
+      if (!categoria) errors.push('Categoría obligatoria')
+      else if (!tiposSet.has(categoria.toLowerCase())) errors.push('Categoría "' + categoria + '" no existe en catálogo')
+
+      if (isNaN(stock) || stock < 0) errors.push('Stock debe ser un número positivo')
+      if (isNaN(stockMinimo) || stockMinimo < 0) errors.push('Stock mínimo debe ser un número positivo')
 
       if (ubicacion && !ubicaciones.has(ubicacion.toLowerCase())) errors.push('Ubicación "' + ubicacion + '" no existe')
-
+      if (estado && estado !== 'Nuevo' && estado !== 'Usado') errors.push('Estado debe ser "Nuevo" o "Usado"')
       if (tier && tier !== 'Estándar' && tier !== 'Premium') errors.push('Tier debe ser "Estándar" o "Premium"')
 
-      inventario.push({ categoria, nombre, barcode, stock, stockMinimo, ubicacion, tier, row: idx + 2, errors })
+      inventario.push({ nombre, categoria, stock, stockMinimo, ubicacion, estado, tier, row: idx + 2, errors })
     })
   }
 
