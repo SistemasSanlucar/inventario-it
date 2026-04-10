@@ -1,18 +1,29 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import * as XLSX from 'xlsx'
 import { T } from '../../i18n'
 import { useAppContext } from '../../context/AppContext'
+import { useAuth } from '../../context/AuthContext'
 import { useModal } from '../../hooks/useModal'
+import { useAppData } from '../../hooks/useAppData'
 import { startBarcodeScanner } from '../../utils/scanner'
-import { exportToCSV } from '../../utils/export'
 import { showToast } from '../../hooks/useToast'
+import { generateImportTemplate, validateImportData } from '../../utils/bulkImport'
+import type { ImportValidationResult, ImportEquipoRow, ImportInventarioRow } from '../../utils/bulkImport'
 import type { InventoryItem } from '../../types'
 
 export default function InventoryView() {
-  const { state } = useAppContext()
+  const { state, dataManagerRef } = useAppContext()
+  const { user } = useAuth()
   const { openModal } = useModal()
+  const { refreshData } = useAppData()
   const t = T()
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const [viewMode, setViewMode] = useState('zonas')
+  const [importPhase, setImportPhase] = useState<'none' | 'preview' | 'importing' | 'done'>('none')
+  const [importValidation, setImportValidation] = useState<ImportValidationResult | null>(null)
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, label: '' })
+  const [importResult, setImportResult] = useState<{ created: number; errors: string[] } | null>(null)
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   const [filterTier, setFilterTier] = useState('all')
@@ -133,8 +144,170 @@ export default function InventoryView() {
     )
   }
 
+  // ── Import handlers ──
+  const getExistingSerials = (): Set<string> => {
+    const serials = new Set<string>()
+    for (const a of (state.activos || [])) {
+      if (a.numSerie) serials.add(a.numSerie.toUpperCase())
+    }
+    return serials
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target!.result as ArrayBuffer)
+        const wb = XLSX.read(data, { type: 'array' })
+        const hasInv = wb.SheetNames.includes('Inventario fungible')
+        const hasEq = wb.SheetNames.includes('Equipos')
+        if (!hasInv && !hasEq) { showToast('El archivo no contiene hojas "Inventario fungible" ni "Equipos"', 'warning'); return }
+        const result = validateImportData(wb, state, getExistingSerials())
+        if (result.equipos.length === 0 && result.inventario.length === 0) { showToast('No se encontraron datos (filas vacías)', 'warning'); return }
+        setImportValidation(result)
+        setImportPhase('preview')
+      } catch (err: any) {
+        showToast('Error leyendo archivo: ' + err.message, 'error')
+      }
+    }
+    reader.readAsArrayBuffer(file)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  const handleImport = async () => {
+    if (!importValidation || !dataManagerRef.current) return
+    const dm = dataManagerRef.current
+    const errors: string[] = []
+    const tecnico = user?.name || 'Sistema'
+    const allValid = [...importValidation.inventarioValid, ...importValidation.equiposValid]
+    const totalItems = allValid.length
+    setImportProgress({ current: 0, total: totalItems, label: 'Preparando...' })
+    setImportPhase('importing')
+    let created = 0, n = 0
+
+    // Inventario
+    for (const row of importValidation.inventarioValid) {
+      n++
+      setImportProgress({ current: n, total: totalItems, label: 'Creando producto ' + n + ' de ' + totalItems + '...' })
+      try {
+        const matchedCat = Object.keys(state.catalogo || {}).find((t) => t.toLowerCase() === (row as ImportInventarioRow).categoria.toLowerCase()) || (row as ImportInventarioRow).categoria
+        const matchedUbi = (state.ubicaciones || []).find((u) => u.nombre.toLowerCase() === (row as ImportInventarioRow).ubicacion.toLowerCase())
+        const barcode = crypto.randomUUID().replace(/-/g, '').slice(0, 13).toUpperCase()
+        const inv = row as ImportInventarioRow
+        await dm.createInventoryItem({ nombre: inv.nombre, categoria: matchedCat, barcode, stock: inv.stock, stockMinimo: inv.stockMinimo, ubicacion: matchedUbi?.nombre || inv.ubicacion, estado: (inv.estado as any) || 'Nuevo', tier: (inv.tier as any) || 'Estándar' })
+        await dm.addToHistory({ tipo: 'Entrada', producto: inv.nombre, cantidad: inv.stock, tecnico, motivo: 'Importación masiva' })
+        created++
+      } catch (err: any) { errors.push('Fila ' + row.row + ' "' + (row as ImportInventarioRow).nombre + '": ' + (err.message || 'Error')) }
+    }
+
+    // Equipos
+    if (importValidation.equiposValid.length > 0) {
+      const bySoc: Record<string, ImportEquipoRow[]> = {}
+      for (const row of importValidation.equiposValid) {
+        const ms = (state.sociedades || []).find((s) => s.nombre.toLowerCase() === (row as ImportEquipoRow).sociedad.toLowerCase())
+        const cod = ms?.codigo || 'SLF'
+        if (!bySoc[cod]) bySoc[cod] = []
+        bySoc[cod].push(row as ImportEquipoRow)
+      }
+      for (const [codigo, rows] of Object.entries(bySoc)) {
+        let nextId: string
+        try { nextId = await dm.getNextEtiquetaId(codigo) } catch { rows.forEach((r) => { errors.push('Fila ' + r.row + ': Error ID ' + codigo); n++ }); setImportProgress({ current: n, total: totalItems, label: 'Procesando...' }); continue }
+        const prefix = nextId.slice(0, nextId.lastIndexOf('-') + 1)
+        let num = parseInt(nextId.slice(nextId.lastIndexOf('-') + 1), 10)
+        for (const row of rows) {
+          const id = prefix + num.toString().padStart(5, '0'); num++; n++
+          setImportProgress({ current: n, total: totalItems, label: 'Creando equipo ' + n + ' de ' + totalItems + ' (' + id + ')...' })
+          try {
+            const mt = Object.keys(state.catalogo || {}).find((t) => t.toLowerCase() === row.tipo.toLowerCase()) || row.tipo
+            const mods = (state.catalogo || {})[mt] || []
+            const mm = mods.find((m) => m.toLowerCase() === row.modelo.toLowerCase()) || row.modelo
+            const ms = (state.sociedades || []).find((s) => s.nombre.toLowerCase() === row.sociedad.toLowerCase())
+            const mu = (state.ubicaciones || []).find((u) => u.nombre.toLowerCase() === row.ubicacion.toLowerCase())
+            await dm.createActivo({ idEtiqueta: id, tipo: mt, modelo: mm, estado: row.numSerie ? 'Almacen' : 'Pendiente', ubicacion: mu?.nombre || row.ubicacion, numSerie: row.numSerie, sociedad: ms?.nombre || row.sociedad, proveedor: row.proveedor, numAlbaran: row.numAlbaran, fechaCompra: row.fechaCompra || null })
+            created++
+          } catch (err: any) { errors.push('Fila ' + row.row + ' "' + row.tipo + ' ' + row.modelo + '": ' + (err.message || 'Error')) }
+        }
+      }
+    }
+
+    setImportResult({ created, errors })
+    setImportPhase('done')
+    await refreshData()
+    showToast(created + ' registros importados', created > 0 ? 'success' : 'warning')
+  }
+
+  const resetImport = () => { setImportPhase('none'); setImportValidation(null); setImportResult(null); setImportProgress({ current: 0, total: 0, label: '' }) }
+  const iPct = importProgress.total > 0 ? Math.round((importProgress.current / importProgress.total) * 100) : 0
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Import overlay */}
+      {importPhase !== 'none' && (
+        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px', marginBottom: '8px' }}>
+          {importPhase === 'preview' && importValidation && (<>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px' }}>📥 Vista previa de importación</h3>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <span style={{ padding: '4px 12px', background: 'rgba(63,185,80,.1)', borderRadius: '6px', fontSize: '12px', color: '#3fb950', fontWeight: 700 }}>✅ {importValidation.equiposValid.length + importValidation.inventarioValid.length} válidos</span>
+                {importValidation.totalErrors > 0 && <span style={{ padding: '4px 12px', background: 'rgba(239,68,68,.1)', borderRadius: '6px', fontSize: '12px', color: '#ef4444', fontWeight: 700 }}>❌ {importValidation.totalErrors} con errores</span>}
+              </div>
+            </div>
+            {importValidation.inventario.length > 0 && (<>
+              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>📦 Inventario ({importValidation.inventario.length})</div>
+              <div style={{ overflowX: 'auto', maxHeight: '200px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '16px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                  <thead><tr>{['#', 'Nombre', 'Categoría', 'Stock', 'Ubicación', 'Estado'].map((h) => <th key={h} style={{ padding: '6px 8px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', position: 'sticky', top: 0, textAlign: 'left' }}>{h}</th>)}</tr></thead>
+                  <tbody>{importValidation.inventario.map((r) => (<tr key={r.row} style={{ background: r.errors.length ? 'rgba(239,68,68,.05)' : 'rgba(63,185,80,.03)' }}><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.row}</td><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.nombre || '—'}</td><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.categoria || '—'}</td><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.stock}</td><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.ubicacion || '—'}</td><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.errors.length ? <span style={{ color: '#ef4444' }}>❌ {r.errors.join('; ')}</span> : <span style={{ color: '#3fb950' }}>✅</span>}</td></tr>))}</tbody>
+                </table>
+              </div>
+            </>)}
+            {importValidation.equipos.length > 0 && (<>
+              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>💻 Equipos ({importValidation.equipos.length})</div>
+              <div style={{ overflowX: 'auto', maxHeight: '200px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '16px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                  <thead><tr>{['#', 'Tipo', 'Modelo', 'N/S', 'Sociedad', 'Estado'].map((h) => <th key={h} style={{ padding: '6px 8px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', position: 'sticky', top: 0, textAlign: 'left' }}>{h}</th>)}</tr></thead>
+                  <tbody>{importValidation.equipos.map((r) => (<tr key={r.row} style={{ background: r.errors.length ? 'rgba(239,68,68,.05)' : 'rgba(63,185,80,.03)' }}><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.row}</td><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.tipo || '—'}</td><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.modelo || '—'}</td><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.numSerie || '—'}</td><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.sociedad || '—'}</td><td style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r.errors.length ? <span style={{ color: '#ef4444' }}>❌ {r.errors.join('; ')}</span> : <span style={{ color: '#3fb950' }}>✅</span>}</td></tr>))}</tbody>
+                </table>
+              </div>
+            </>)}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button className="button button-secondary" onClick={resetImport}>Cancelar</button>
+              <button className="button button-success" onClick={handleImport} disabled={importValidation.equiposValid.length + importValidation.inventarioValid.length === 0} style={{ fontWeight: 700 }}>
+                Confirmar importación ({importValidation.equiposValid.length + importValidation.inventarioValid.length} registros)
+              </button>
+            </div>
+          </>)}
+          {importPhase === 'importing' && (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <div className="loading-spinner" style={{ marginBottom: '12px' }} />
+              <div style={{ fontWeight: 700, marginBottom: '10px' }}>Importando...</div>
+              <div style={{ background: 'var(--bg-primary)', borderRadius: '10px', height: '24px', overflow: 'hidden', border: '1px solid var(--border)', marginBottom: '8px' }}><div style={{ height: '100%', background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-purple))', borderRadius: '10px', transition: 'width .3s', width: iPct + '%' }} /></div>
+              <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{importProgress.label}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{importProgress.current} / {importProgress.total} ({iPct}%)</div>
+            </div>
+          )}
+          {importPhase === 'done' && importResult && (
+            <div>
+              <div style={{ display: 'flex', gap: '14px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                <div style={{ padding: '10px 20px', background: 'rgba(63,185,80,.1)', border: '1px solid rgba(63,185,80,.3)', borderRadius: '10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#3fb950' }}>{importResult.created}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Importados</div>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div style={{ flex: 1, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '10px', padding: '10px 14px', maxHeight: '120px', overflowY: 'auto' }}>
+                    <div style={{ fontWeight: 700, color: '#ef4444', fontSize: '12px', marginBottom: '6px' }}>⚠️ {importResult.errors.length} error(es):</div>
+                    {importResult.errors.map((err, i) => <div key={i} style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0' }}>{err}</div>)}
+                  </div>
+                )}
+              </div>
+              <button className="button button-primary" onClick={resetImport}>Cerrar</button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Toolbar */}
       <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -146,7 +319,11 @@ export default function InventoryView() {
           </div>
           <button className="button button-primary" style={{ padding: '12px 16px' }} onClick={() => startBarcodeScanner((code) => { setSearch(code); setViewMode('lista') })}>📷</button>
           <button className="button button-success" onClick={() => openModal('entrada')}>+ Producto</button>
-          <button className="button button-secondary" onClick={() => exportToCSV(state.inventory, 'inventario', showToast as any)}>⬇️</button>
+          <button className="button button-primary" style={{ padding: '12px 14px', fontSize: '13px' }} onClick={() => generateImportTemplate(state)} title="Descargar plantilla Excel vacía">📋 Plantilla</button>
+          <label className="button button-warning" style={{ cursor: 'pointer', padding: '12px 14px', fontSize: '13px' }} title="Importar desde Excel">
+            📥 Importar
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} style={{ display: 'none' }} />
+          </label>
           <div style={{ display: 'flex', gap: '3px', background: 'var(--bg-primary)', borderRadius: '8px', padding: '3px' }}>
             <button onClick={() => { setViewMode('zonas'); setSelectedZona(null); setSearch(''); setFilterEstado('all') }}
               style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '700', background: viewMode === 'zonas' ? 'var(--accent-purple)' : 'transparent', color: viewMode === 'zonas' ? 'white' : 'var(--text-secondary)' }}>

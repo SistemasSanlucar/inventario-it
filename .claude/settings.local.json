@@ -6,7 +6,10 @@
       "Bash(cat .github/workflows/*.yml)",
       "Bash(gh run:*)",
       "Bash(where gh:*)",
-      "WebFetch(domain:sistemassanlucar.github.io)"
+      "WebFetch(domain:sistemassanlucar.github.io)",
+      "Bash(curl -s \"https://sistemassanlucar.github.io/inventario-it/assets/index-DEqDSDFd.js\")",
+      "Bash(grep -oE \".{0,50}\\\\.csv.{0,50}\")",
+      "Bash(npm run:*)"
     ]
   }
 }

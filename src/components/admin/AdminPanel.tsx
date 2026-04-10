@@ -11,7 +11,6 @@ import { ErrorLog } from '../../services/ErrorLog'
 import { PAISES_LIST } from '../../config/constants'
 import { CHANGELOG, entryIcon } from '../../config/changelog'
 import type { CatalogoRawItem } from '../../types/equipment'
-import BulkImportSection from './BulkImportSection'
 
 // ── ErrorLogPanel ──
 function ErrorLogPanel() {
@@ -743,7 +742,6 @@ export default function AdminPanel() {
                   {sectionBtn('exportar', t.exportAudit, '📊')}
                   {sectionBtn('log', t.actionLog, '📋')}
                   {sectionBtn('errores', '🔴 Errores', '🐛')}
-                  {sectionBtn('importar', t.bulkImport, '📥')}
                   {sectionBtn('changelog', t.changelog, '📋')}
                 </div>
               )}
@@ -764,7 +762,6 @@ export default function AdminPanel() {
           {activeSection === 'exportar' && renderExportar()}
           {activeSection === 'errores' && <ErrorLogPanel />}
           {activeSection === 'log' && renderLog()}
-          {activeSection === 'importar' && <BulkImportSection />}
           {activeSection === 'changelog' && <ChangelogSection />}
         </div>
       </div>
