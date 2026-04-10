@@ -79,6 +79,7 @@ function setRange(ws: XLSX.WorkSheet, cols: number, rows: number) {
 // ── Template generation ──
 
 export function generateImportTemplate(state: AppState): void {
+  console.log('PLANTILLA EXCEL v2 — generando .xlsx vacío, NO csv')
   const wb = XLSX.utils.book_new()
 
   // Gather catalog values

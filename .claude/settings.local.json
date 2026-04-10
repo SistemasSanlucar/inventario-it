@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(cat .github/workflows/*.yml)",
+      "Bash(gh run:*)",
+      "Bash(where gh:*)",
+      "WebFetch(domain:sistemassanlucar.github.io)"
     ]
   }
 }
