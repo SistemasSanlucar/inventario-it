@@ -7,6 +7,7 @@ export interface AssignmentProduct {
   tipo?: string
   cantidad?: number
   esEquipo?: boolean
+  tier?: string
 }
 
 export interface Assignment {
