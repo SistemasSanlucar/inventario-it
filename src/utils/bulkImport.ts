@@ -102,7 +102,7 @@ export function generateImportTemplate(state: AppState): void {
   // Sheet 1: Inventario fungible
   // ────────────────────────────────────────────────
   const invHeaders = ['nombre', 'categoria', 'stock', 'stockMinimo', 'ubicacion', 'estado', 'tier']
-  const invExample = ['Cable HDMI 2m', tipos[0] || 'Cable', 10, 2, ubicaciones[0] || 'Almacén IT', 'Nuevo', 'Estándar']
+  const invExample = ['Ratones - Logitech M90', tipos[0] || 'Ratones', 10, 2, ubicaciones[0] || 'Puzol - Almacén', 'Nuevo', 'Estándar']
 
   const wsInv = XLSX.utils.aoa_to_sheet([invHeaders])
   // Write example row

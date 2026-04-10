@@ -297,20 +297,23 @@ export default function BulkImportSection() {
               </div>
 
               {/* Buttons row */}
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {/* Export current inventory CSV */}
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'stretch' }}>
+                {/* 1) Export current inventory as CSV — secondary, standalone */}
                 <button className="button button-secondary" onClick={handleExportCSV} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  📤 Exportar inventario (CSV)
+                  📤 Exportar datos (CSV)
                 </button>
 
-                {/* Download empty template */}
+                {/* Separator */}
+                <div style={{ width: '1px', background: 'var(--border)', margin: '0 4px' }} />
+
+                {/* 2) Download EMPTY .xlsx template for importing */}
                 <button className="button button-primary" onClick={() => generateImportTemplate(state)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  📋 {t.downloadTemplate}
+                  📋 Descargar plantilla Excel
                 </button>
 
-                {/* Import file */}
+                {/* 3) Upload filled template to import */}
                 <label className="button button-success" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  📥 {t.importExcel}
+                  📥 Importar Excel
                   <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} style={{ display: 'none' }} />
                 </label>
               </div>
