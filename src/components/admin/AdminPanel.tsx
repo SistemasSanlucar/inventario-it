@@ -79,7 +79,7 @@ function ChangelogSection() {
           </button>
           {expanded.has(ver.version) && (
             <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {ver.entries.map((entry, i) => (
+              {ver.changes.map((entry, i) => (
                 <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '14px', flexShrink: 0 }}>{entryIcon(entry.type)}</span>
                   <span style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{entry.text}</span>

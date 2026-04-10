@@ -83,6 +83,19 @@ export default function NavTabs() {
       >
         {t.admin}
       </NavLink>
+      <NavLink
+        to="/about"
+        className={({ isActive }) => 'tab-button ' + (isActive ? 'active' : '')}
+        style={({ isActive }) => ({
+          background: isActive ? 'var(--bg-tertiary)' : '',
+          borderColor: 'var(--border)',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          fontSize: '13px',
+        })}
+      >
+        {t.about}
+      </NavLink>
       <div className="nav-indicator" style={{ left: indicator.left, width: indicator.width }} />
     </nav>
   )

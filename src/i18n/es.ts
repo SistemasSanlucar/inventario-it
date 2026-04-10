@@ -68,4 +68,5 @@ export const es = {
   unlabeledAlert: 'equipo(s) con N/S sin etiqueta impresa',
   viewHistory: 'Ver historial', errors: 'Errores',
   phoneLines: '📱 Líneas',
+  about: 'ℹ️ Acerca de',
 } as const

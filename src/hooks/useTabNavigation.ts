@@ -10,6 +10,7 @@ const TAB_ROUTES: Record<string, string> = {
   historial: '/historial',
   lineas: '/lineas',
   admin: '/admin',
+  about: '/about',
 }
 
 const ROUTE_TABS: Record<string, string> = {
@@ -20,6 +21,7 @@ const ROUTE_TABS: Record<string, string> = {
   '/historial': 'historial',
   '/lineas': 'lineas',
   '/admin': 'admin',
+  '/about': 'about',
 }
 
 export function tabFromPath(pathname: string): string {

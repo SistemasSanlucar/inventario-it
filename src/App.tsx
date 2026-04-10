@@ -14,6 +14,7 @@ import AssignmentsView from './components/assignments/AssignmentsView'
 import HistoryView from './components/history/HistoryView'
 import LineasView from './components/lineas/LineasView'
 import AdminPanel from './components/admin/AdminPanel'
+import AboutView from './components/about/AboutView'
 import FormModal from './components/modals/FormModal'
 import ConfirmModal from './components/modals/ConfirmModal'
 import ErrorBoundary from './components/shared/ErrorBoundary'
@@ -160,6 +161,7 @@ function AppContent() {
           <Route path="/historial" element={<HistoryView />} />
           <Route path="/lineas" element={<LineasView />} />
           <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/about" element={<AboutView />} />
           <Route path="*" element={<Dashboard />} />
         </Routes>
       </ErrorBoundary>

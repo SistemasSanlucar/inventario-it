@@ -8,7 +8,7 @@ interface Props {
 
 export default function ChangelogModal({ onClose }: Props) {
   const t = T()
-  const current = CHANGELOG.find((v) => v.version === CONFIG.version)
+  const current = CHANGELOG.find((v) => v.version === CONFIG.version) || CHANGELOG[0]
   if (!current) return null
 
   const handleClose = () => {
@@ -30,7 +30,7 @@ export default function ChangelogModal({ onClose }: Props) {
         <div className="modal-body" style={{ padding: '24px 32px' }}>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>{current.date}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {current.entries.map((entry, i) => (
+            {current.changes.map((entry, i) => (
               <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: '16px', flexShrink: 0 }}>{entryIcon(entry.type)}</span>
                 <span style={{ fontSize: '14px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{entry.text}</span>
