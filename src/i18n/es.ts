@@ -67,4 +67,5 @@ export const es = {
   rowsWithErrors: 'registros con errores', importing: 'Importando...',
   unlabeledAlert: 'equipo(s) con N/S sin etiqueta impresa',
   viewHistory: 'Ver historial', errors: 'Errores',
+  phoneLines: '📱 Líneas',
 } as const

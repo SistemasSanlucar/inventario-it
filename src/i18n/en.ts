@@ -67,4 +67,5 @@ export const en = {
   rowsWithErrors: 'rows with errors', importing: 'Importing...',
   unlabeledAlert: 'equipment with S/N but no printed label',
   viewHistory: 'View history', errors: 'Errors',
+  phoneLines: '📱 Lines',
 } as const

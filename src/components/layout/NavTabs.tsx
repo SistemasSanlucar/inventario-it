@@ -9,6 +9,7 @@ const TABS = [
   { key: 'equipos', path: '/equipos' },
   { key: 'asignaciones', path: '/asignaciones' },
   { key: 'historial', path: '/historial' },
+  { key: 'lineas', path: '/lineas' },
 ] as const
 
 export default function NavTabs() {
@@ -24,6 +25,7 @@ export default function NavTabs() {
     equipos: t.equipment,
     asignaciones: t.assignments,
     historial: t.history,
+    lineas: t.phoneLines,
   }
 
   const pendientesCount = (state.activos || []).filter((a) => a.estado === 'Pendiente').length

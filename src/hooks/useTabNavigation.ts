@@ -8,6 +8,7 @@ const TAB_ROUTES: Record<string, string> = {
   equipos: '/equipos',
   asignaciones: '/asignaciones',
   historial: '/historial',
+  lineas: '/lineas',
   admin: '/admin',
 }
 
@@ -17,6 +18,7 @@ const ROUTE_TABS: Record<string, string> = {
   '/equipos': 'equipos',
   '/asignaciones': 'asignaciones',
   '/historial': 'historial',
+  '/lineas': 'lineas',
   '/admin': 'admin',
 }
 

@@ -12,6 +12,7 @@ import InventoryView from './components/inventory/InventoryView'
 import EquiposView from './components/equipos/EquiposView'
 import AssignmentsView from './components/assignments/AssignmentsView'
 import HistoryView from './components/history/HistoryView'
+import LineasView from './components/lineas/LineasView'
 import AdminPanel from './components/admin/AdminPanel'
 import FormModal from './components/modals/FormModal'
 import ConfirmModal from './components/modals/ConfirmModal'
@@ -157,6 +158,7 @@ function AppContent() {
           <Route path="/equipos" element={<EquiposView />} />
           <Route path="/asignaciones" element={<AssignmentsView />} />
           <Route path="/historial" element={<HistoryView />} />
+          <Route path="/lineas" element={<LineasView />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="*" element={<Dashboard />} />
         </Routes>
