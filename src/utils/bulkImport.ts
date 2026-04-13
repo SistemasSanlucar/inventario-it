@@ -181,7 +181,7 @@ export function generateImportTemplate(state: AppState): void {
     [''],
     ['La plantilla ya viene PRE-RELLENADA con todos los productos del catalogo.'],
     ['Solo tienes que rellenar las CELDAS EN AMARILLO.'],
-    ['No borres filas — si un producto no aplica, deja el stock en 0 y se ignorara al importar.'],
+    ['Si un producto no aplica, BORRA esa fila completa para que no se importe.'],
     [''],
     ['REGLAS GENERALES:'],
     ['- NO modifiques los nombres de las columnas (fila 1 de cada hoja).'],
@@ -193,7 +193,7 @@ export function generateImportTemplate(state: AppState): void {
     ['HOJA "Inventario fungible":'],
     ['- Cada fila es un producto del catalogo (Tipo - Modelo).'],
     ['- La columna STOCK (en amarillo) es lo unico obligatorio: pon las unidades recibidas.'],
-    ['- Si dejas stock en 0, esa fila no se importara.'],
+    ['- Todas las filas con datos se importaran (incluidas las que tengan stock 0).'],
     ['- categoria, ubicacion, estado y tier se pueden cambiar con los desplegables.'],
     ['- El codigo de barras se genera automaticamente al importar.'],
     [''],
@@ -316,12 +316,11 @@ export function validateImportData(
       const estado = String(r['estado'] || r['Estado'] || 'Nuevo').trim()
       const tier = String(r['tier'] || r['Tier'] || 'Estándar').trim()
 
-      // Skip completely empty rows or rows with stock = 0 (pre-filled but not needed)
+      // Skip completely empty rows
       if (!nombre && !categoria && stockRaw === '' && !ubicacion) return
-      const stock = Number(stockRaw)
-      if (stock === 0 && nombre && categoria) return // pre-filled row, user left stock at 0 → skip
 
       const errors: string[] = []
+      const stock = Number(stockRaw)
       const stockMinimo = stockMinRaw === '' || stockMinRaw === undefined ? 2 : Number(stockMinRaw)
 
       if (!nombre) errors.push('Nombre obligatorio')
