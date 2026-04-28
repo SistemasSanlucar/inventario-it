@@ -1,5 +1,5 @@
 export const es = {
-  appTitle: 'SSSistema de Inventario IT',
+  appTitle: 'Sistema de Inventario IT',
   login: 'Iniciar Sesión con Microsoft', loginIng: 'Iniciando...',
   loginDesc: 'Inicia sesión con tu cuenta corporativa de Microsoft 365 para acceder al sistema de gestión de inventario.',
   loginNote: 'Usa tu cuenta @sanlucar.com',
