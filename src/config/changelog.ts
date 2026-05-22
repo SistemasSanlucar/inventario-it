@@ -23,6 +23,16 @@ export function entryIcon(type: ChangeType): string {
 
 export const CHANGELOG: ChangelogVersion[] = [
   {
+    version: '3.6.0',
+    date: '2026-04-10',
+    changes: [
+      { type: 'feature', text: 'Manual de usuario completo accesible desde Acerca de' },
+      { type: 'feature', text: 'Casos de uso paso a paso para tareas habituales (recepcion, asignacion, importacion, etc.)' },
+      { type: 'improvement', text: 'Validacion de importacion no ignora filas con stock=0' },
+      { type: 'bug', text: 'Corregido typo en titulo de la app (SSSistema → Sistema)' },
+    ],
+  },
+  {
     version: '3.5.0',
     date: '2026-04-10',
     changes: [

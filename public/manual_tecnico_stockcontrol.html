@@ -3,22 +3,723 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Tecnico — StockControl IT</title>
+<title>Manual de Usuario — StockControl IT</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-body { font-family: 'Inter', system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #0a0e14; color: #e6edf3; line-height: 1.7; }
-h1 { color: #58a6ff; border-bottom: 2px solid #30363d; padding-bottom: 12px; }
-h2 { color: #a855f7; margin-top: 32px; }
-code { background: #1e252f; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
-a { color: #58a6ff; }
-.placeholder { text-align: center; padding: 60px 20px; background: #151a23; border-radius: 16px; border: 1px dashed #30363d; margin: 40px 0; }
+:root {
+  --bg-primary: #0a0e14;
+  --bg-secondary: #151a23;
+  --bg-tertiary: #1e252f;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-orange: #f97316;
+  --accent-red: #ef4444;
+  --accent-purple: #a855f7;
+  --accent-yellow: #fbbf24;
+  --border: #30363d;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg-primary); color: var(--text-primary); font-family: 'Inter', system-ui, sans-serif; line-height: 1.7; font-size: 15px; }
+.layout { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+/* ── Sidebar ── */
+nav.toc {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  padding: 28px 20px;
+  position: sticky; top: 0; height: 100vh;
+  overflow-y: auto;
+}
+nav.toc h1 { font-size: 18px; margin: 0 0 4px; color: var(--accent-blue); }
+nav.toc .ver { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-secondary); margin-bottom: 24px; display: block; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { margin: 0; }
+nav.toc a { display: block; padding: 7px 12px; color: var(--text-secondary); text-decoration: none; font-size: 13px; border-radius: 6px; border-left: 2px solid transparent; transition: all .15s; }
+nav.toc a:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+nav.toc a.section-header { font-weight: 700; color: var(--text-primary); margin-top: 14px; text-transform: uppercase; font-size: 11px; letter-spacing: .8px; padding: 8px 12px 4px; cursor: default; }
+nav.toc a.section-header:hover { background: none; }
+nav.toc a.sub { padding-left: 24px; font-size: 12.5px; }
+/* ── Content ── */
+main { padding: 48px 56px 100px; max-width: 920px; }
+h1.title { font-size: 36px; color: var(--accent-blue); margin: 0 0 8px; font-weight: 800; }
+h1.title + .subtitle { color: var(--text-secondary); margin-bottom: 40px; font-size: 16px; }
+h2 { font-size: 26px; margin: 56px 0 16px; color: var(--accent-purple); border-bottom: 1px solid var(--border); padding-bottom: 10px; font-weight: 700; }
+h3 { font-size: 19px; margin: 32px 0 12px; color: var(--accent-blue); font-weight: 700; }
+h4 { font-size: 15px; margin: 20px 0 8px; color: var(--text-primary); font-weight: 700; }
+p { margin: 10px 0; }
+strong { color: var(--text-primary); font-weight: 700; }
+code { background: var(--bg-tertiary); padding: 2px 7px; border-radius: 5px; font-family: 'IBM Plex Mono', monospace; font-size: 0.88em; color: var(--accent-orange); }
+ul, ol { padding-left: 22px; }
+li { margin: 6px 0; }
+.callout { background: var(--bg-secondary); border-left: 3px solid var(--accent-blue); border-radius: 8px; padding: 14px 18px; margin: 20px 0; }
+.callout.tip { border-left-color: var(--accent-green); }
+.callout.warning { border-left-color: var(--accent-orange); }
+.callout.danger { border-left-color: var(--accent-red); }
+.callout .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; background: rgba(88,166,255,.15); color: var(--accent-blue); }
+.callout.tip .tag { background: rgba(63,185,80,.15); color: var(--accent-green); }
+.callout.warning .tag { background: rgba(249,115,22,.15); color: var(--accent-orange); }
+.callout.danger .tag { background: rgba(239,68,68,.15); color: var(--accent-red); }
+.case-study { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px; margin: 28px 0; }
+.case-study .case-tag { display: inline-block; padding: 4px 12px; background: rgba(168,85,247,.15); color: var(--accent-purple); border-radius: 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; }
+.case-study h3 { margin-top: 0; color: var(--text-primary); }
+.steps { counter-reset: step; list-style: none; padding-left: 0; }
+.steps > li { counter-increment: step; position: relative; padding-left: 44px; margin-bottom: 14px; }
+.steps > li::before {
+  content: counter(step);
+  position: absolute; left: 0; top: 0;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  color: white;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--bg-tertiary); font-weight: 700; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; letter-spacing: .5px; }
+tr:hover { background: var(--bg-secondary); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.badge.blue { background: rgba(88,166,255,.15); color: var(--accent-blue); }
+.badge.green { background: rgba(63,185,80,.15); color: var(--accent-green); }
+.badge.orange { background: rgba(249,115,22,.15); color: var(--accent-orange); }
+.badge.red { background: rgba(239,68,68,.15); color: var(--accent-red); }
+.badge.purple { background: rgba(168,85,247,.15); color: var(--accent-purple); }
+.badge.yellow { background: rgba(251,191,36,.15); color: var(--accent-yellow); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 36px 0; }
+.module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 16px 0; }
+.module-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.module-card .icon { font-size: 28px; margin-bottom: 8px; }
+.module-card .name { font-weight: 700; margin-bottom: 4px; }
+.module-card .desc { font-size: 13px; color: var(--text-secondary); }
+.kbd { display: inline-block; background: var(--bg-tertiary); border: 1px solid var(--border); border-bottom: 2px solid var(--border); border-radius: 4px; padding: 2px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+.footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-secondary); }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; height: auto; }
+  main { padding: 32px 24px 80px; }
+}
 </style>
 </head>
 <body>
-<h1>Manual Tecnico — StockControl IT</h1>
-<div class="placeholder">
-<p style="font-size: 48px; margin-bottom: 16px;">📖</p>
-<p style="font-size: 18px; font-weight: 700;">Manual en construccion</p>
-<p style="color: #8b949e;">Este documento se completara con la guia de uso para tecnicos IT.</p>
+<div class="layout">
+
+<nav class="toc">
+  <h1>📖 Manual de Usuario</h1>
+  <span class="ver">StockControl IT</span>
+  <ul>
+    <li><a class="section-header">Empezar</a></li>
+    <li><a href="#introduccion">1. Introducción</a></li>
+    <li><a href="#primer-acceso">2. Primer acceso</a></li>
+    <li><a href="#estructura">3. Estructura de la app</a></li>
+
+    <li><a class="section-header">Módulos</a></li>
+    <li><a href="#dashboard" class="sub">Dashboard</a></li>
+    <li><a href="#inventario" class="sub">Inventario fungible</a></li>
+    <li><a href="#equipos" class="sub">Equipos</a></li>
+    <li><a href="#asignaciones" class="sub">Asignaciones</a></li>
+    <li><a href="#historial" class="sub">Historial</a></li>
+    <li><a href="#lineas" class="sub">Líneas móviles</a></li>
+    <li><a href="#admin" class="sub">Panel Admin</a></li>
+
+    <li><a class="section-header">Casos de uso</a></li>
+    <li><a href="#caso-recepcion" class="sub">Recepción de lote</a></li>
+    <li><a href="#caso-asignar" class="sub">Asignar a empleado</a></li>
+    <li><a href="#caso-prestamo" class="sub">Préstamo temporal</a></li>
+    <li><a href="#caso-baja" class="sub">Baja de empleado</a></li>
+    <li><a href="#caso-importacion" class="sub">Importación masiva</a></li>
+    <li><a href="#caso-incidencia" class="sub">Incidencia / Reparación</a></li>
+    <li><a href="#caso-linea" class="sub">Editar línea móvil</a></li>
+    <li><a href="#caso-busqueda" class="sub">Búsqueda y escáner</a></li>
+
+    <li><a class="section-header">Referencia</a></li>
+    <li><a href="#glosario">Glosario</a></li>
+    <li><a href="#faq">FAQ</a></li>
+    <li><a href="#mantenimiento">Mantenimiento del manual</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<h1 class="title">Manual de Usuario</h1>
+<p class="subtitle">StockControl IT — Sistema de gestión de inventario informático para Sanlucar Fruit S.L.U.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     1. INTRODUCCIÓN
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="introduccion">1. Introducción</h2>
+<p><strong>StockControl IT</strong> es la aplicación oficial del departamento IT para gestionar todo el material informático de la empresa: ordenadores, monitores, móviles, cables, ratones, líneas telefónicas, asignaciones a empleados, préstamos, incidencias e historial completo de movimientos.</p>
+
+<p>La app se conecta a SharePoint Online via Microsoft Graph API. Los datos no se guardan en ningún sitio fuera de Sanlucar — están en tu propio tenant de Microsoft 365.</p>
+
+<h3>¿Para quién es esta herramienta?</h3>
+<ul>
+  <li><strong>Técnicos IT</strong>: gestionan el día a día — entradas, salidas, asignaciones, devoluciones</li>
+  <li><strong>Administradores IT</strong>: además, gestionan catálogo, ubicaciones, sociedades, técnicos, ajustes y exportaciones</li>
+  <li><strong>Becarios IT</strong>: realizan tareas operativas como recepción de lotes, etiquetado e importación masiva</li>
+</ul>
+
+<div class="callout tip">
+  <span class="tag">💡 Tip</span>
+  <p>La app está optimizada para <strong>iPad en horizontal</strong> con lector Bluetooth y Apple Pencil. También funciona perfectamente en PC.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     2. PRIMER ACCESO
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="primer-acceso">2. Primer acceso</h2>
+
+<h3>Login con Microsoft 365</h3>
+<ol class="steps">
+  <li>Abre la URL de la aplicación.</li>
+  <li>Haz clic en <span class="badge blue">Iniciar Sesión con Microsoft</span>.</li>
+  <li>Usa tu cuenta corporativa <code>@sanlucar.com</code>.</li>
+  <li>La app verifica que tu usuario esté autorizado (técnico o admin).</li>
+</ol>
+
+<h3>Roles y permisos</h3>
+<table>
+  <thead>
+    <tr><th>Rol</th><th>Qué puede hacer</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><span class="badge purple">🛡️ Admin</span></td><td>Todo — gestionar catálogo, ubicaciones, técnicos, exportar, ver datos sensibles de líneas (IMEI/PIN)</td></tr>
+    <tr><td><span class="badge blue">🔧 Técnico</span></td><td>Operativa diaria — inventario, equipos, asignaciones, devoluciones, historial. No accede a configuración</td></tr>
+    <tr><td><span class="badge red">❌ Sin acceso</span></td><td>Verá un mensaje "Acceso Denegado" — solicitar alta a IT</td></tr>
+  </tbody>
+</table>
+
+<div class="callout warning">
+  <span class="tag">⚠️ Importante</span>
+  <p>Si te aparece <strong>Acceso Denegado</strong> aunque seas del IT, contacta con un administrador para que te añada en <strong>Admin → Usuarios → Técnicos/Administradores</strong>.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     3. ESTRUCTURA DE LA APP
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="estructura">3. Estructura de la aplicación</h2>
+
+<p>La app se organiza en pestañas en la barra superior. Cada pestaña es un módulo independiente:</p>
+
+<div class="module-grid">
+  <div class="module-card"><div class="icon">📊</div><div class="name">Dashboard</div><div class="desc">Resumen general, KPIs y alertas</div></div>
+  <div class="module-card"><div class="icon">📦</div><div class="name">Inventario</div><div class="desc">Productos fungibles con stock (cables, ratones, etc.)</div></div>
+  <div class="module-card"><div class="icon">💻</div><div class="name">Equipos</div><div class="desc">Activos etiquetados (portátiles, monitores, móviles)</div></div>
+  <div class="module-card"><div class="icon">📋</div><div class="name">Asignaciones</div><div class="desc">Material entregado a empleados</div></div>
+  <div class="module-card"><div class="icon">📜</div><div class="name">Historial</div><div class="desc">Log completo de movimientos</div></div>
+  <div class="module-card"><div class="icon">📱</div><div class="name">Líneas</div><div class="desc">Líneas móviles corporativas</div></div>
+  <div class="module-card"><div class="icon">🛠️</div><div class="name">Admin</div><div class="desc">Catálogo, ubicaciones, técnicos, ajustes</div></div>
+  <div class="module-card"><div class="icon">ℹ️</div><div class="name">Acerca de</div><div class="desc">Manual, versión y novedades</div></div>
+</div>
+
+<h3>Elementos comunes de la cabecera</h3>
+<ul>
+  <li><strong>Logo + título</strong>: click para ir al Dashboard</li>
+  <li><strong>Buscador global</strong>: busca en inventario, equipos y asignaciones a la vez. También acepta código de barras o ID escaneado</li>
+  <li><strong>Botón 📷</strong>: activa el escáner de cámara para QR/barcode</li>
+  <li><strong>Stats</strong>: productos totales, unidades y stock bajo en tiempo real</li>
+  <li><strong>Sync 🔄</strong>: refresca los datos de SharePoint manualmente</li>
+  <li><strong>Idioma</strong>: ES / EN</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     DASHBOARD
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="dashboard">📊 Dashboard</h2>
+<p>La pantalla de bienvenida. Muestra el estado general del inventario de un vistazo.</p>
+
+<h3>Qué encontrarás aquí</h3>
+<ul>
+  <li><strong>Estado General</strong>: indicador Óptimo / Atención / Crítico basado en un score de salud</li>
+  <li><strong>KPI cards</strong>: productos, unidades, equipos en almacén, asignados, pendientes, etc.</li>
+  <li><strong>Alertas activas</strong>: sin stock, stock bajo, equipos sin N/S, préstamos vencidos, equipos extraviados, sin etiqueta impresa</li>
+  <li><strong>Gráfico de actividad</strong>: últimos 30 días de entradas/salidas</li>
+  <li><strong>Heatmap</strong>: actividad por día estilo GitHub</li>
+  <li><strong>Top técnicos del mes</strong>: ranking de quién ha movido más material</li>
+  <li><strong>Garantías próximas</strong>: equipos que vencen en los próximos 90 días</li>
+  <li><strong>Stock crítico</strong>: productos a punto de agotarse</li>
+</ul>
+
+<div class="callout tip">
+  <span class="tag">💡 Tip</span>
+  <p>Cada alerta y KPI es clicable — te lleva directamente a la pantalla filtrada con los elementos correspondientes.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     INVENTARIO
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="inventario">📦 Inventario fungible</h2>
+<p>Aquí se gestionan los <strong>productos fungibles</strong>: cables, ratones, teclados, adaptadores, cargadores, etc. Todo aquello que tiene stock pero <strong>no lleva número de etiqueta individual</strong>.</p>
+
+<h3>Dos vistas disponibles</h3>
+<ul>
+  <li><span class="badge purple">🗄️ Zonas</span> — agrupa productos por ubicación física (armarios, almacenes)</li>
+  <li><span class="badge blue">☰ Lista</span> — todos los productos en cuadrícula, con búsqueda y filtros</li>
+</ul>
+
+<h3>Acciones por producto</h3>
+<table>
+  <thead><tr><th>Icono</th><th>Acción</th></tr></thead>
+  <tbody>
+    <tr><td>📤</td><td><strong>Salida</strong>: descontar stock (uso interno, baja)</td></tr>
+    <tr><td>📥</td><td><strong>Entrada</strong>: sumar stock (recepción)</td></tr>
+    <tr><td>✏️</td><td><strong>Editar</strong>: nombre, categoría, ubicación, stock mínimo, tier</td></tr>
+    <tr><td>🗑️</td><td><strong>Eliminar</strong> (con confirmación)</td></tr>
+  </tbody>
+</table>
+
+<h3>Botones de la barra superior</h3>
+<ul>
+  <li><span class="badge green">+ Producto</span> — añadir un producto nuevo manualmente</li>
+  <li><span class="badge blue">📋 Plantilla</span> — descarga un Excel pre-rellenado con todo el catálogo para hacer importación masiva</li>
+  <li><span class="badge orange">📥 Importar</span> — sube un Excel para crear muchos productos de golpe (ver <a href="#caso-importacion">Caso de uso</a>)</li>
+</ul>
+
+<h3>Conceptos importantes</h3>
+<ul>
+  <li><strong>Tier</strong>: <span class="badge blue">Estándar</span> (productos comunes) / <span class="badge purple">⭐ Premium</span> (productos para perfiles VIP/directivos)</li>
+  <li><strong>Stock mínimo</strong>: umbral por debajo del cual aparece la alerta "Stock bajo"</li>
+  <li><strong>Código de barras</strong>: se genera automáticamente al crear el producto</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     EQUIPOS
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="equipos">💻 Equipos</h2>
+<p>Aquí se gestionan los <strong>activos identificables individualmente</strong>: portátiles, monitores, móviles, tablets… todo lo que lleva una <strong>etiqueta única (ID Etiqueta)</strong> y un número de serie.</p>
+
+<h3>Estados de un equipo</h3>
+<table>
+  <thead><tr><th>Estado</th><th>Significado</th></tr></thead>
+  <tbody>
+    <tr><td><span class="badge orange">⚠️ Pendiente</span></td><td>Equipo recibido pero sin N/S registrado todavía</td></tr>
+    <tr><td><span class="badge green">En Almacén</span></td><td>Disponible para asignar</td></tr>
+    <tr><td><span class="badge blue">Asignado</span></td><td>Entregado a un empleado</td></tr>
+    <tr><td><span class="badge yellow">En Tránsito</span></td><td>Movimiento entre sedes</td></tr>
+    <tr><td><span class="badge orange">En Reparación</span></td><td>Enviado al SAT o taller</td></tr>
+    <tr><td><span class="badge red">Extraviado</span></td><td>No se encuentra</td></tr>
+    <tr><td><span class="badge red">Robado</span></td><td>Sustracción declarada</td></tr>
+    <tr><td><span class="badge red">Baja</span></td><td>Retirado definitivamente</td></tr>
+  </tbody>
+</table>
+
+<h3>El ID Etiqueta</h3>
+<p>Cada equipo tiene un identificador único con el formato <code>SOC-AA-NNNNN</code>:</p>
+<ul>
+  <li><code>SLF-26-00042</code> = Sanlucar Fruit, año 2026, equipo número 42</li>
+  <li>Se genera <strong>automáticamente</strong> al crear el equipo y es correlativo por sociedad</li>
+  <li>La etiqueta física se imprime con la DYMO y queda pegada en el equipo</li>
+</ul>
+
+<h3>Funcionalidades clave</h3>
+<ul>
+  <li><strong>Recepción de lote</strong>: registra varios equipos del mismo modelo a la vez</li>
+  <li><strong>Pendientes N/S</strong>: lista de equipos a los que falta registrar el número de serie (modo pegar-lista soporta múltiples N/S separados por saltos de línea)</li>
+  <li><strong>Modo escáner</strong>: con la cámara o lector Bluetooth, escanea etiquetas QR para acceder al instante a la ficha</li>
+  <li><strong>Ficha de equipo</strong>: timeline completo, accesorios, fechas de compra/garantía, sociedad, ubicación</li>
+  <li><strong>Imprimir etiqueta</strong>: PDF en formato 54×25mm o impresión directa con DYMO</li>
+  <li><strong>Cambiar estado</strong>: con motivo y registro automático en historial</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ASIGNACIONES
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="asignaciones">📋 Asignaciones</h2>
+<p>Registro de qué material tiene cada empleado. Hay dos tipos:</p>
+
+<ul>
+  <li><span class="badge blue">📋 Asignación</span> — entrega permanente al empleado (forma parte de su puesto)</li>
+  <li><span class="badge yellow">⏱ Préstamo</span> — entrega temporal con <strong>fecha de devolución</strong> obligatoria</li>
+</ul>
+
+<h3>Cómo se hace una asignación</h3>
+<ol class="steps">
+  <li>Pulsa <span class="badge green">+ Asignar</span> o <span class="badge yellow">⏱️ Préstamo</span></li>
+  <li>Busca al empleado por nombre — el sistema consulta Active Directory</li>
+  <li>Añade material: equipos individuales del almacén y/o productos fungibles</li>
+  <li>El empleado firma digitalmente (Apple Pencil o ratón)</li>
+  <li>Se genera automáticamente el <strong>PDF del Acta</strong> con QR de verificación</li>
+</ol>
+
+<h3>Acciones disponibles</h3>
+<table>
+  <thead><tr><th>Icono</th><th>Acción</th></tr></thead>
+  <tbody>
+    <tr><td>📄</td><td>Ver detalle completo de la asignación</td></tr>
+    <tr><td>📥</td><td>Descargar / reimprimir el PDF del Acta</td></tr>
+    <tr><td>📜</td><td>Ver el historial filtrado de ese empleado</td></tr>
+    <tr><td>↩️</td><td>Devolver material (total o parcial)</td></tr>
+    <tr><td>🗑️</td><td>Eliminar (solo admin, con confirmación)</td></tr>
+  </tbody>
+</table>
+
+<div class="callout warning">
+  <span class="tag">⚠️ Préstamos vencidos</span>
+  <p>Cuando un préstamo pasa de su fecha de devolución, aparece marcado en rojo con la etiqueta <strong>VENCIDO</strong> y se cuenta en la alerta del Dashboard.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     HISTORIAL
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="historial">📜 Historial</h2>
+<p>El log completo de todos los movimientos de la app. Útil para auditoría y para investigar qué pasó con un equipo o producto.</p>
+
+<h3>Tipos de movimiento</h3>
+<ul>
+  <li><span class="badge green">Entrada</span> — recepción de stock</li>
+  <li><span class="badge blue">Salida</span> — descuento manual de stock</li>
+  <li><span class="badge purple">Asignacion</span> — entrega a empleado</li>
+  <li><span class="badge yellow">Prestamo</span> — entrega temporal</li>
+  <li><span class="badge orange">Devolucion</span> — material devuelto al almacén</li>
+</ul>
+
+<h3>Filtros disponibles</h3>
+<ul>
+  <li>Búsqueda libre por producto, usuario o ticket</li>
+  <li>Filtro por tipo de movimiento</li>
+  <li>Filtro por rango de fechas</li>
+  <li>Ordenable por cualquier columna</li>
+  <li>Exportable a CSV</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     LÍNEAS
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="lineas">📱 Líneas móviles</h2>
+<p>Gestión de las líneas telefónicas corporativas (Movistar). Los datos se leen y editan directamente del Excel maestro de líneas en SharePoint.</p>
+
+<h3>KPIs en cabecera</h3>
+<ul>
+  <li>Total de líneas activas</li>
+  <li>Desglose por tarifa: <span class="badge green">Esencial (3GB)</span> · <span class="badge blue">Estándar (5GB)</span> · <span class="badge purple">Plus (12GB)</span></li>
+  <li>Contador de líneas <span class="badge yellow">VIP</span> (directivos)</li>
+</ul>
+
+<h3>Vista de tabla</h3>
+<p>Columnas: Número, Extensión, Usuario, Tarifa, Perfil, Observaciones. Soporta búsqueda libre, filtros por tarifa y perfil, y paginación de 50 en 50.</p>
+
+<h3>Editar una línea (admin)</h3>
+<p>Click en cualquier fila abre el detalle. Los campos editables son <strong>Usuario, Tarifa, Perfil y Observaciones</strong>. Al guardar, los cambios se escriben directamente en la celda del Excel.</p>
+
+<div class="callout danger">
+  <span class="tag">🔒 Datos sensibles</span>
+  <p>IMEI, PIN, SIM 2ª y PUK están <strong>ocultos por defecto</strong>. Solo los administradores pueden mostrarlos con el botón 👁 Mostrar.</p>
+</div>
+
+<h3>Pestaña VIP</h3>
+<p>Líneas de directivos en una vista diferenciada con marco dorado. Misma funcionalidad pero datos separados (hoja "LINEAS VIP" del Excel).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     PANEL ADMIN
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="admin">🛠️ Panel Admin</h2>
+<p>Aquí se configura todo lo que da soporte al resto de la app. Solo accesible para administradores. Está organizado en 4 grupos en el menú lateral:</p>
+
+<h3>📍 Infraestructura</h3>
+<ul>
+  <li><strong>Ubicaciones</strong>: almacenes, oficinas, armarios. Soporta jerarquía con separador <code>" - "</code> (ej: <code>Puzol - Almacén IT</code>)</li>
+  <li><strong>Sociedades</strong>: Sanlucar Fruit, Sanlucar Portugal, etc. Cada sociedad tiene un <strong>código</strong> que se usa para los IDs de etiqueta (SLF, SLP…)</li>
+</ul>
+
+<h3>📦 Catálogo y Stock</h3>
+<ul>
+  <li><strong>Proveedores</strong>: PC Componentes, El Corte Inglés, etc. Solo informativo</li>
+  <li><strong>Catálogo</strong>: tipos de equipo (Portátil, Monitor, Móvil…) y sus modelos. Cada tipo se marca con la opción <code>llevaEtiqueta</code> (sí/no) que determina si va a Equipos o a Inventario</li>
+  <li><strong>Packs</strong>: combinaciones predefinidas de material (ej: "Pack Usuario Estándar" = portátil + ratón + cable HDMI + cargador). Se carga de golpe al asignar a un nuevo empleado</li>
+</ul>
+
+<h3>👥 Usuarios</h3>
+<ul>
+  <li><strong>Técnicos</strong>: gestiona quiénes pueden usar la app con rol técnico. Se buscan directamente en Active Directory</li>
+  <li><strong>Administradores</strong>: gestiona los admins. No se pueden eliminar — solo desactivar para revocar acceso</li>
+</ul>
+
+<h3>⚙️ Sistema</h3>
+<ul>
+  <li><strong>Ajustes</strong>: stock mínimo por defecto, configuración de impresora DYMO</li>
+  <li><strong>Exportar Auditoría</strong>: genera un Excel con 5 pestañas (Equipos, Inventario, Historial, Asignaciones, Resumen) filtrable por sociedad y fechas</li>
+  <li><strong>Log de Acciones</strong>: trazabilidad de cambios</li>
+  <li><strong>Errores</strong>: log técnico que se reinicia al recargar la página</li>
+  <li><strong>Changelog</strong>: historial de versiones de la app</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     CASOS DE USO
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="casos-uso">💼 Casos de uso prácticos</h2>
+<p>Workflows paso a paso para las tareas más habituales.</p>
+
+<!-- ── CASO 1: Recepción ── -->
+<div class="case-study" id="caso-recepcion">
+  <span class="case-tag">Caso 1</span>
+  <h3>📥 Recepción de un lote de portátiles</h3>
+  <p><strong>Situación:</strong> Llegan 10 portátiles HP EliteBook nuevos del proveedor.</p>
+  <ol class="steps">
+    <li>Ve a la pestaña <strong>Equipos</strong>.</li>
+    <li>Pulsa <span class="badge green">+ Recepción de lote</span>.</li>
+    <li>Selecciona <strong>Tipo</strong>: Portátil · <strong>Modelo</strong>: HP EliteBook 840 G10.</li>
+    <li>Selecciona <strong>Sociedad</strong> (afecta al prefijo del ID Etiqueta) y <strong>Ubicación</strong> de destino.</li>
+    <li>Indica <strong>Proveedor</strong>, <strong>Nº Albarán</strong> y <strong>Fecha de compra</strong>.</li>
+    <li>Pon <strong>Cantidad: 10</strong>. Se crearán 10 equipos en estado <span class="badge orange">Pendiente</span> con IDs correlativos.</li>
+    <li>Vuelve a <strong>Equipos → Pendientes N/S</strong> y registra los números de serie uno a uno (o pega una lista de 10 N/S a la vez separados por saltos de línea).</li>
+    <li>Imprime las etiquetas con la DYMO (botón 🖨️ en cada ficha) y pégalas en los equipos.</li>
+    <li>Al registrar el N/S, el estado cambia automáticamente a <span class="badge green">En Almacén</span>.</li>
+  </ol>
+  <div class="callout tip">
+    <span class="tag">💡 Atajo</span>
+    <p>Si vienen muchos equipos del mismo tipo, usa <a href="#caso-importacion">Importación masiva</a> con la plantilla Excel — es más rápido para 20+ equipos.</p>
+  </div>
+</div>
+
+<!-- ── CASO 2: Asignar ── -->
+<div class="case-study" id="caso-asignar">
+  <span class="case-tag">Caso 2</span>
+  <h3>👤 Asignar material a un empleado nuevo</h3>
+  <p><strong>Situación:</strong> Se incorpora Juan Pérez como técnico comercial. Hay que entregarle portátil + ratón + cable HDMI + cargador.</p>
+  <ol class="steps">
+    <li>Ve a <strong>Asignaciones</strong> y pulsa <span class="badge green">+ Asignar</span>.</li>
+    <li>Busca al empleado por nombre — aparece automáticamente desde Active Directory con departamento, puesto y email.</li>
+    <li>Opcional: pulsa <strong>Cargar pack</strong> → <span class="badge blue">Usuario Estándar</span> para precargar la lista de material habitual.</li>
+    <li>Añade los equipos (busca por ID Etiqueta) y los productos fungibles (busca por nombre o escanea barcode).</li>
+    <li>Pasa el iPad al empleado para que firme con el Apple Pencil. La firma es <strong>obligatoria</strong>.</li>
+    <li>Pulsa <strong>Guardar</strong>. Se genera el PDF del Acta automáticamente.</li>
+    <li>Manda el PDF por email o imprímelo — el empleado lo necesita como justificante.</li>
+  </ol>
+  <p><strong>Qué pasa por detrás:</strong></p>
+  <ul>
+    <li>Los equipos cambian de estado <span class="badge green">Almacén</span> → <span class="badge blue">Asignado</span></li>
+    <li>El stock de los fungibles se descuenta automáticamente</li>
+    <li>Se crea una entrada en el historial por cada producto</li>
+    <li>El acta queda guardada en la lista de Asignaciones para consultar después</li>
+  </ul>
+</div>
+
+<!-- ── CASO 3: Préstamo ── -->
+<div class="case-study" id="caso-prestamo">
+  <span class="case-tag">Caso 3</span>
+  <h3>⏱️ Préstamo temporal de un equipo</h3>
+  <p><strong>Situación:</strong> Una empleada se va dos semanas a una feria y necesita un portátil prestado.</p>
+  <ol class="steps">
+    <li>Asignaciones → <span class="badge yellow">⏱️ Préstamo</span></li>
+    <li>Mismo flujo que una asignación normal pero indicando <strong>fecha de devolución</strong>.</li>
+    <li>Firma del empleado obligatoria.</li>
+    <li>El equipo aparece marcado como <strong>Préstamo</strong> en la lista de asignaciones.</li>
+    <li>Si pasa la fecha y no se ha devuelto → se marca como <span class="badge red">VENCIDO</span> y aparece en alertas del Dashboard.</li>
+  </ol>
+  <h4>Cuando vuelve el material:</h4>
+  <ol class="steps">
+    <li>Localiza la asignación (búsqueda por nombre o desde la lista).</li>
+    <li>Pulsa <span class="badge orange">↩️ Devolver</span>.</li>
+    <li>Marca qué equipos vuelven (puede ser devolución parcial).</li>
+    <li>El equipo vuelve a estado <span class="badge green">En Almacén</span> y el préstamo se cierra (o queda <span class="badge yellow">Parcial</span> si quedan cosas pendientes).</li>
+  </ol>
+</div>
+
+<!-- ── CASO 4: Baja empleado ── -->
+<div class="case-study" id="caso-baja">
+  <span class="case-tag">Caso 4</span>
+  <h3>👋 Baja de empleado</h3>
+  <p><strong>Situación:</strong> Un empleado se va de la empresa. Hay que recuperar todo su material.</p>
+  <ol class="steps">
+    <li>Ve a <strong>Asignaciones</strong> y busca al empleado.</li>
+    <li>Pulsa <span class="badge red">👋 Baja de Empleado</span>.</li>
+    <li>El sistema lista <strong>todo el material asignado y prestado</strong> de esa persona.</li>
+    <li>Confirma qué se devuelve (lo normal: todo).</li>
+    <li>Los equipos vuelven al almacén; los fungibles se descuentan o reincorporan según política.</li>
+    <li>Se registran las devoluciones en el historial.</li>
+  </ol>
+</div>
+
+<!-- ── CASO 5: Importación masiva ── -->
+<div class="case-study" id="caso-importacion">
+  <span class="case-tag">Caso 5</span>
+  <h3>📋 Importación masiva desde Excel</h3>
+  <p><strong>Situación:</strong> Llega un pedido grande (50 ratones, 30 cables HDMI, 20 portátiles).</p>
+  <h4>Paso A: Descargar plantilla</h4>
+  <ol class="steps">
+    <li>Ve a <strong>Inventario</strong>.</li>
+    <li>Pulsa <span class="badge blue">📋 Plantilla</span>. Se descarga <code>Plantilla_Importacion_IT.xlsx</code>.</li>
+    <li>Ábrelo. Tiene 4 hojas:
+      <ul>
+        <li><strong>Inventario fungible</strong> — todos los productos del catálogo pre-rellenados con stock 0</li>
+        <li><strong>Equipos</strong> — todos los modelos que llevan etiqueta pre-rellenados</li>
+        <li><strong>Instrucciones</strong> — guía rápida</li>
+        <li><strong>Listas</strong> — referencia de valores válidos (no tocar)</li>
+      </ul>
+    </li>
+  </ol>
+  <h4>Paso B: Rellenar</h4>
+  <ul>
+    <li><strong>Inventario</strong>: rellena la columna <strong>stock</strong> (en amarillo) con las unidades recibidas para cada producto.</li>
+    <li><strong>Equipos</strong>: rellena la columna <strong>numSerie</strong> (en amarillo) con los N/S de cada equipo recibido. Una fila por equipo.</li>
+    <li>Los desplegables te ayudan a no equivocarte con categorías, sociedades, ubicaciones, etc.</li>
+  </ul>
+  <h4>Paso C: Importar</h4>
+  <ol class="steps">
+    <li>Pulsa <span class="badge orange">📥 Importar</span>.</li>
+    <li>Selecciona el fichero rellenado.</li>
+    <li>Verás una <strong>vista previa</strong> con cada fila en verde (✅ válida) o roja (❌ con descripción del error).</li>
+    <li>Si todo está bien, pulsa <span class="badge green">Confirmar importación</span>.</li>
+    <li>Aparece una barra de progreso: <em>"Creando producto 12 de 47..."</em></li>
+    <li>Al terminar se muestra el resumen final con los registros creados y los errores de cada fila (si hubo).</li>
+  </ol>
+  <div class="callout warning">
+    <span class="tag">⚠️ Importante</span>
+    <p>Las filas con error se excluyen pero el resto se importa igualmente. No te bloquean nada.</p>
+  </div>
+</div>
+
+<!-- ── CASO 6: Incidencia ── -->
+<div class="case-study" id="caso-incidencia">
+  <span class="case-tag">Caso 6</span>
+  <h3>🔧 Reportar una incidencia / Enviar a reparación</h3>
+  <p><strong>Situación:</strong> A un empleado se le rompe la pantalla del portátil.</p>
+  <ol class="steps">
+    <li>Equipos → busca el ID Etiqueta del portátil o escanea el QR.</li>
+    <li>Abre la ficha del equipo.</li>
+    <li>Pulsa <span class="badge orange">🔄 Cambiar estado</span> → <strong>En Reparación</strong>.</li>
+    <li>Indica el <strong>motivo</strong> de la incidencia (pantalla rota, batería defectuosa, etc.).</li>
+    <li>El equipo cambia de estado y queda registrado en el historial.</li>
+    <li>Cuando vuelva del SAT: cambiar estado de nuevo a <span class="badge green">En Almacén</span>.</li>
+  </ol>
+  <p>Si el equipo no se puede recuperar:</p>
+  <ul>
+    <li><span class="badge red">Baja</span> — retirada definitiva (al final de su vida útil)</li>
+    <li><span class="badge red">Extraviado</span> — no se encuentra</li>
+    <li><span class="badge red">Robado</span> — sustracción declarada</li>
+  </ul>
+</div>
+
+<!-- ── CASO 7: Línea ── -->
+<div class="case-study" id="caso-linea">
+  <span class="case-tag">Caso 7</span>
+  <h3>📱 Cambiar la tarifa de una línea móvil</h3>
+  <p><strong>Situación:</strong> Un comercial necesita más datos. Le subimos de Estándar a Plus.</p>
+  <ol class="steps">
+    <li>Ve a <strong>Líneas</strong>.</li>
+    <li>Busca al usuario por nombre o número.</li>
+    <li>Click en su fila → se abre el detalle.</li>
+    <li>Pulsa <span class="badge blue">✏️ Editar</span>.</li>
+    <li>Cambia <strong>Tarifa</strong> de Estándar a Plus en el desplegable.</li>
+    <li>Pulsa <strong>Guardar</strong>. La celda del Excel de líneas se actualiza al instante.</li>
+  </ol>
+  <p><strong>Cambios habituales:</strong></p>
+  <ul>
+    <li><strong>Usuario</strong>: cuando una línea cambia de manos</li>
+    <li><strong>Tarifa</strong>: ajuste de plan de datos</li>
+    <li><strong>Perfil</strong>: cambio de tipo (Nacional, Empleados, Viajeros…)</li>
+    <li><strong>Observaciones</strong>: notas relevantes</li>
+  </ul>
+</div>
+
+<!-- ── CASO 8: Búsqueda ── -->
+<div class="case-study" id="caso-busqueda">
+  <span class="case-tag">Caso 8</span>
+  <h3>🔍 Encontrar algo rápidamente</h3>
+
+  <h4>Búsqueda global (cabecera)</h4>
+  <p>Escribe cualquier cosa en el buscador de la cabecera y aparecerán resultados de:</p>
+  <ul>
+    <li>Productos del inventario (por nombre o código de barras)</li>
+    <li>Equipos (por ID Etiqueta, N/S o modelo)</li>
+    <li>Asignaciones (por nombre o email del empleado)</li>
+  </ul>
+  <p>Click en cualquier resultado te lleva directamente a la pantalla correspondiente.</p>
+
+  <h4>Con cámara o lector Bluetooth</h4>
+  <ol class="steps">
+    <li>Pulsa el botón <span class="badge blue">📷</span> de la cabecera.</li>
+    <li>Apunta al QR o barcode.</li>
+    <li>Te lleva directamente a la ficha si reconoce el ID.</li>
+  </ol>
+
+  <h4>Modo escáner masivo (en Equipos)</h4>
+  <p>Útil para inventariar varios equipos seguidos: el lector Bluetooth dispara escaneo tras escaneo y la app guarda un log con marca de tiempo de cada uno.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     GLOSARIO
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="glosario">📚 Glosario</h2>
+<table>
+  <thead><tr><th>Término</th><th>Significado</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Activo</strong></td><td>Equipo identificado individualmente con su ID Etiqueta (portátiles, móviles, monitores)</td></tr>
+    <tr><td><strong>Fungible</strong></td><td>Producto consumible con stock (cables, ratones, adaptadores)</td></tr>
+    <tr><td><strong>ID Etiqueta</strong></td><td>Identificador único de un activo, formato <code>SOC-AA-NNNNN</code></td></tr>
+    <tr><td><strong>N/S</strong></td><td>Número de serie del fabricante</td></tr>
+    <tr><td><strong>Catálogo</strong></td><td>Lista de tipos y modelos de equipo permitidos</td></tr>
+    <tr><td><strong>Sociedad</strong></td><td>Empresa del grupo (cada una con su código)</td></tr>
+    <tr><td><strong>Tier</strong></td><td>Categoría del producto: Estándar (común) o Premium (VIP)</td></tr>
+    <tr><td><strong>Pack</strong></td><td>Combinación predefinida de material para asignar de una vez</td></tr>
+    <tr><td><strong>Acta</strong></td><td>PDF firmado por el empleado al recibir material</td></tr>
+    <tr><td><strong>VIP</strong></td><td>Líneas/material asignados a directivos, con tratamiento diferenciado</td></tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     FAQ
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="faq">❓ Preguntas frecuentes</h2>
+
+<h4>¿Por qué no veo la pestaña Admin?</h4>
+<p>Solo los administradores la ven. Si necesitas acceso, pídelo a un admin actual.</p>
+
+<h4>¿Puedo cambiar el ID Etiqueta de un equipo?</h4>
+<p>No. El ID es correlativo y se genera automáticamente. Si está mal hay que dar de baja el equipo y crear uno nuevo.</p>
+
+<h4>El empleado dice que no le funciona algo del Acta firmada</h4>
+<p>El PDF se puede reimprimir desde la asignación con el botón 📥. La firma queda guardada en SharePoint en la propia asignación.</p>
+
+<h4>¿Qué pasa si me equivoco al asignar?</h4>
+<p>Devolución parcial: el empleado solo "firma virtualmente" lo que sí quería. El resto vuelve al almacén al instante.</p>
+
+<h4>El stock no me coincide con lo que veo físicamente</h4>
+<p>Edita el producto (✏️) y ajusta el stock manualmente. Anótalo en observaciones para trazabilidad.</p>
+
+<h4>Quiero cambiar el modelo "HP EliteBook 840" porque he metido un typo</h4>
+<p>Ve a <strong>Admin → Catálogo</strong>, borra el modelo viejo y crea el nuevo bien escrito. Cuidado: si hay equipos creados con el modelo viejo, mantén ambos hasta que esos equipos se den de baja.</p>
+
+<h4>¿Se sincronizan los datos automáticamente?</h4>
+<p>Sí, pero hay una caché de 5 minutos. Si necesitas datos frescos al momento, pulsa <strong>🔄 Sync</strong> en la cabecera.</p>
+
+<h4>La app va lenta</h4>
+<p>Comprueba conexión a internet. Si persiste, pulsa <kbd>Ctrl+Shift+R</kbd> para recargar sin caché.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MANTENIMIENTO
+═══════════════════════════════════════════════════════════════ -->
+<h2 id="mantenimiento">🔧 Mantenimiento del manual</h2>
+<div class="callout">
+  <span class="tag">Para el equipo de desarrollo</span>
+  <p>Este manual está en <code>public/manual_tecnico_stockcontrol.html</code> del repositorio. Es un fichero HTML autocontenido (estilos inline, sin dependencias). Vite lo copia automáticamente a <code>dist/</code> en cada build.</p>
+</div>
+
+<h3>Cómo actualizarlo cuando se cambia la app</h3>
+<ul>
+  <li><strong>Nueva pestaña o módulo</strong> → añadir sección en "Módulos" + entrada en el TOC</li>
+  <li><strong>Nuevo botón o funcionalidad</strong> → actualizar la sección del módulo correspondiente</li>
+  <li><strong>Nuevo workflow habitual</strong> → añadir un nuevo "Caso de uso"</li>
+  <li><strong>Cambio de terminología</strong> → actualizar el Glosario</li>
+  <li><strong>Cuando se publica una versión</strong> → el changelog en Acerca de se actualiza solo desde <code>src/config/changelog.ts</code></li>
+</ul>
+
+<p>El estilo coincide con el dark theme de la app (mismas variables CSS). Para añadir secciones nuevas, copia un bloque existente y ajusta el contenido — los componentes reutilizables son:</p>
+<ul>
+  <li><code>&lt;div class="callout"&gt;</code> — caja informativa (variantes <code>.tip</code>, <code>.warning</code>, <code>.danger</code>)</li>
+  <li><code>&lt;div class="case-study"&gt;</code> — caja de caso de uso</li>
+  <li><code>&lt;ol class="steps"&gt;</code> — pasos numerados con círculo azul</li>
+  <li><code>&lt;span class="badge blue/green/orange/red/purple/yellow"&gt;</code> — etiquetas de colores</li>
+</ul>
+
+<div class="footer">
+  <p>StockControl IT — Departamento IT, Sanlucar Fruit S.L.U.<br>
+  Para sugerencias sobre este manual o la app: contacta con el equipo IT.</p>
+</div>
+
+</main>
 </div>
 </body>
 </html>
