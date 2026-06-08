@@ -9,7 +9,10 @@
       "WebFetch(domain:sistemassanlucar.github.io)",
       "Bash(curl -s \"https://sistemassanlucar.github.io/inventario-it/assets/index-DEqDSDFd.js\")",
       "Bash(grep -oE \".{0,50}\\\\.csv.{0,50}\")",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(curl -s \"https://sistemassanlucar.github.io/inventario-it/\")",
+      "Bash(curl -sI \"https://sistemassanlucar.github.io/inventario-it/\")",
+      "Bash(curl -v \"https://sistemassanlucar.github.io/inventario-it/index.html\" -o /tmp/page.html)"
     ]
   }
 }
