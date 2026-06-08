@@ -60,40 +60,52 @@ export async function exportEtiquetaPDF(
         console.error('QR error:', e)
       }
 
-      // Vertical separator
-      doc.setDrawColor(200, 200, 200)
+      // Vertical separator (black, thicker for DYMO thermal printing)
+      doc.setDrawColor(0, 0, 0)
+      doc.setLineWidth(0.3)
       doc.line(25, 2, 25, H - 2)
 
-      // Text zone
+      // Text zone — ALL black + bold for maximum legibility on DYMO thermal
       const xT = 26.5
       const maxW = 26
-      doc.setFontSize(4.5)
-      doc.setFont(undefined as any, 'normal')
-      doc.setTextColor(150, 150, 150)
+      doc.setTextColor(0, 0, 0)
+
+      // Header banner with black background for contrast
+      doc.setFillColor(0, 0, 0)
+      doc.rect(25.5, 1.5, 27.5, 4, 'F')
+      doc.setFontSize(5)
+      doc.setFont(undefined as any, 'bold')
+      doc.setTextColor(255, 255, 255)
       doc.text('SANLUCAR FRUIT · IT', xT, 4.5)
 
-      doc.setFontSize(7.5)
-      doc.setFont(undefined as any, 'bold')
+      // ID Etiqueta — biggest, bold, pure black
       doc.setTextColor(0, 0, 0)
-      doc.text(safePdfText(activo.idEtiqueta), xT, 10, { maxWidth: maxW })
-
-      doc.setFontSize(6)
+      doc.setFontSize(9)
       doc.setFont(undefined as any, 'bold')
-      doc.setTextColor(40, 40, 40)
-      doc.text(safePdfText(activo.tipo), xT, 15.5, { maxWidth: maxW })
+      doc.text(safePdfText(activo.idEtiqueta), xT, 11, { maxWidth: maxW })
 
+      // Horizontal separator under ID
+      doc.setDrawColor(0, 0, 0)
+      doc.setLineWidth(0.2)
+      doc.line(xT, 12.5, xT + maxW, 12.5)
+
+      // Tipo — bold black
+      doc.setFontSize(7)
+      doc.setFont(undefined as any, 'bold')
+      doc.text(safePdfText(activo.tipo), xT, 16.5, { maxWidth: maxW })
+
+      // Modelo — bold black
       if (activo.modelo) {
-        doc.setFontSize(5.5)
-        doc.setFont(undefined as any, 'normal')
-        doc.setTextColor(80, 80, 80)
-        doc.text(safePdfText(activo.modelo), xT, 19.5, { maxWidth: maxW })
+        doc.setFontSize(6)
+        doc.setFont(undefined as any, 'bold')
+        doc.text(safePdfText(activo.modelo), xT, 20, { maxWidth: maxW })
       }
 
+      // N/S — bold black
       if (activo.numSerie) {
-        doc.setFontSize(5)
-        doc.setFont(undefined as any, 'normal')
-        doc.setTextColor(120, 120, 120)
-        doc.text('N/S: ' + safePdfText(activo.numSerie), xT, 23, { maxWidth: maxW })
+        doc.setFontSize(5.5)
+        doc.setFont(undefined as any, 'bold')
+        doc.text('N/S: ' + safePdfText(activo.numSerie), xT, 23.5, { maxWidth: maxW })
       }
     }
 
