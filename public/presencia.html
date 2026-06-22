@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Presencia IT — SanLucar</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<style>
+:root {
+  --bg:       #0D1117;
+  --surface:  #161B22;
+  --elevated: #21262D;
+  --border:   #30363D;
+  --text:     #E6EDF3;
+  --muted:    #7D8590;
+  --accent:   #E8A838;
+
+  --st-oficina:    #3FB950;
+  --st-remoto:     #58A6FF;
+  --st-vacaciones: #E8A838;
+  --st-viaje:      #BC8CFF;
+  --st-baja:       #F85149;
+  --st-maternidad: #FF7EB3;
+  --st-agro:       #2D333B;
+  --st-libre:      #30363D;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(232,168,56,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,168,56,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+/* ── Login ── */
+#login-screen {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 32px; z-index: 10;
+}
+.login-logo { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.login-logo .mark {
+  width: 64px; height: 64px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center; font-size: 28px;
+}
+.login-logo h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+.login-logo h1 span { color: var(--accent); }
+.login-logo p { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+
+.btn-login {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.9rem; font-weight: 500; padding: 12px 28px;
+  border-radius: 8px; cursor: pointer; transition: all 0.15s;
+}
+.btn-login:hover { border-color: var(--accent); background: rgba(232,168,56,0.08); }
+
+/* ── App ── */
+#app { display: none; position: relative; z-index: 1; min-height: 100vh; }
+
+/* ── Header ── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 32px; border-bottom: 1px solid var(--border);
+  background: rgba(13,17,23,0.85); backdrop-filter: blur(12px);
+  position: sticky; top: 0; z-index: 5;
+}
+.header-left { display: flex; flex-direction: column; gap: 2px; }
+.header-left h1 { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
+.header-left h1 span { color: var(--accent); }
+.header-date { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.header-right { display: flex; align-items: center; gap: 16px; }
+.user-info { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--muted); }
+.user-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--elevated); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.6rem; font-weight: 700; color: var(--accent);
+}
+.btn-small {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  font-family: 'Space Grotesk', sans-serif; font-size: 0.7rem;
+  padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: all 0.15s;
+}
+.btn-small:hover { border-color: var(--text); color: var(--text); }
+
+/* ── Stats ── */
+.stats-bar { display: flex; gap: 1px; padding: 24px 32px 0; }
+.stat-pill {
+  flex: 1; display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 10px 16px;
+}
+.stat-pill:first-child { border-radius: 8px 0 0 8px; }
+.stat-pill:last-child  { border-radius: 0 8px 8px 0; }
+.stat-pip { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.stat-val { font-size: 1.2rem; font-weight: 700; line-height: 1; }
+.stat-lbl { font-size: 0.58rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 2px; }
+
+/* ── Map ── */
+.map-section { padding: 28px 32px 40px; }
+.map-title {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.58rem;
+  text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
+  margin-bottom: 24px; display: flex; align-items: center; gap: 10px;
+}
+.map-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+.map-canvas { display: flex; flex-direction: column; align-items: center; gap: 56px; }
+
+.island { display: flex; flex-direction: column; align-items: flex-start; }
+.island-tag {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.55rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+}
+
+/* Island 1 */
+.island-1-inner { display: flex; flex-direction: column; }
+.desk-row { display: flex; gap: 8px; }
+
+/* Island 2 (rotated) */
+.island-2-inner { display: flex; flex-direction: row; align-items: stretch; }
+.desk-col { display: flex; flex-direction: column; gap: 8px; }
+
+/* Gaps */
+.gap-h {
+  height: 14px; width: 100%;
+  display: flex; align-items: center; justify-content: center;
+}
+.gap-h::before {
+  content: ''; width: 90%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+}
+.gap-v {
+  width: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.gap-v::before {
+  content: ''; height: 80%; width: 1px;
+  background: linear-gradient(180deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+}
+
+/* ── Desk card ── */
+.desk {
+  width: 100px; background: var(--elevated);
+  border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 10px 9px 9px; cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  position: relative; overflow: hidden;
+}
+.desk::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  border-radius: 10px 10px 0 0;
+  background: var(--desk-color, var(--st-libre)); transition: background 0.2s;
+}
+.desk:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.5); border-color: var(--desk-color, var(--border)); }
+
+.desk.is-oficina::after {
+  content: ''; position: absolute; top: 8px; right: 8px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--st-oficina); animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
+
+.desk.is-agro   { opacity: 0.3; cursor: default; pointer-events: none; }
+.desk.is-vacio  { opacity: 0.15; cursor: default; pointer-events: none; border-style: dashed; }
+.desk-cab { width: 100px; margin-left: 8px; align-self: stretch; }
+
+.desk-num  { font-family: 'JetBrains Mono', monospace; font-size: 0.5rem; color: var(--muted); letter-spacing: 0.08em; margin-bottom: 7px; }
+.desk-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 700; margin-bottom: 7px;
+  background: rgba(255,255,255,0.05); flex-shrink: 0;
+}
+.desk-name { font-size: 0.6rem; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desk-status-row { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
+.desk-pip { width: 5px; height: 5px; border-radius: 50%; background: var(--desk-color, var(--st-libre)); flex-shrink: 0; }
+.desk-status-lbl { font-size: 0.5rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Legend ── */
+.legend {
+  display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;
+  margin: 0 32px; padding: 20px 0 40px; border-top: 1px solid var(--border);
+}
+.leg-item { display: flex; align-items: center; gap: 6px; font-size: 0.65rem; color: var(--muted); }
+.leg-dot  { width: 8px; height: 8px; border-radius: 50%; }
+
+/* ── States ── */
+.state-msg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 300px; color: var(--muted); font-size: 0.8rem; }
+.spinner { width: 32px; height: 32px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Tooltip ── */
+.tooltip {
+  display: none; position: fixed;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px; min-width: 180px;
+  z-index: 50; pointer-events: none; box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+}
+.tooltip.show { display: block; }
+.tooltip-name { font-weight: 600; font-size: 0.85rem; margin-bottom: 3px; }
+.tooltip-desk { font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; color: var(--muted); margin-bottom: 10px; }
+.tooltip-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+  <div class="login-logo">
+    <div class="mark">🍊</div>
+    <h1>Presencia <span>IT</span></h1>
+    <p>SanLucar Fruit · Sistemas &amp; Infraestructura</p>
+  </div>
+  <button class="btn-login" id="btn-login">
+    <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
+      <path d="M10 0H0v10h10V0z" fill="#F25022"/>
+      <path d="M21 0H11v10h10V0z" fill="#7FBA00"/>
+      <path d="M10 11H0v10h10V11z" fill="#00A4EF"/>
+      <path d="M21 11H11v10h10V11z" fill="#FFB900"/>
+    </svg>
+    Iniciar sesión con Microsoft
+  </button>
+</div>
+
+<!-- ── APP ── -->
+<div id="app">
+  <header>
+    <div class="header-left">
+      <h1>Mapa de <span>Presencia</span></h1>
+      <div class="header-date" id="hdr-date"></div>
+    </div>
+    <div class="header-right">
+      <div class="user-info">
+        <div class="user-avatar" id="user-ini">--</div>
+        <span id="user-name">–</span>
+      </div>
+      <button class="btn-small" id="btn-refresh">↺ Actualizar</button>
+      <button class="btn-small" id="btn-logout">Salir</button>
+    </div>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-pill"><div class="stat-pip" style="background:var(--st-oficina)"></div><div><div class="stat-val" id="cnt-oficina">–</div><div class="stat-lbl">Oficina</div></div></div>
+    <div class="stat-pill"><div class="stat-pip" style="background:var(--st-remoto)"></div><div><div class="stat-val" id="cnt-remoto">–</div><div class="stat-lbl">Remoto</div></div></div>
+    <div class="stat-pill"><div class="stat-pip" style="background:var(--st-vacaciones)"></div><div><div class="stat-val" id="cnt-vacaciones">–</div><div class="stat-lbl">Vacaciones</div></div></div>
+    <div class="stat-pill"><div class="stat-pip" style="background:var(--st-viaje)"></div><div><div class="stat-val" id="cnt-viaje">–</div><div class="stat-lbl">Viaje</div></div></div>
+    <div class="stat-pill"><div class="stat-pip" style="background:var(--st-libre)"></div><div><div class="stat-val" id="cnt-libre">–</div><div class="stat-lbl">Sin definir</div></div></div>
+  </div>
+
+  <div class="map-section">
+    <div class="map-title">Planta IT — Vista superior</div>
+    <div id="map-body"><div class="state-msg"><div class="spinner"></div><span>Cargando presencia…</span></div></div>
+  </div>
+
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--st-oficina)"></div>En oficina</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--st-remoto)"></div>Teletrabajo</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--st-vacaciones)"></div>Vacaciones</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--st-viaje)"></div>Viaje</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--st-baja)"></div>Baja</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--st-libre)"></div>Sin definir</div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-name" id="tt-name"></div>
+  <div class="tooltip-desk" id="tt-desk"></div>
+  <div class="tooltip-badge" id="tt-badge"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  CONFIG — solo tocar si cambia infraestructura
+// ══════════════════════════════════════════════════
+const CFG = {
+  clientId:  "80ba264e-e1fc-4749-bf00-2c25b93b4ee5",
+  tenantId:  "f37778d8-59b2-4e5e-a56b-08eb8ad3c13a",
+  sitePath:  "sanlucarfruit.sharepoint.com:/sites/InformationSystems:",
+  filePath:  "07. IT Organization/26 Calendario Presencia y Vacaciones 2026.xlsm",
+  tableName: "TablaPresencia",
+};
+
+// ══════════════════════════════════════════════════
+//  LAYOUT FÍSICO — solo tocar si cambia el mobiliario
+//  Desks marcados como AGRO o VACÍO no necesitan
+//  estar en el Excel.
+// ══════════════════════════════════════════════════
+const LAYOUT = {
+  isla1: {
+    top:    [8, 7, 6, 5],   // fila de atrás (cara abajo)
+    bottom: [1, 2, 3, 4],   // fila de delante (cara arriba)
+  },
+  isla2: {
+    leftCol:  [12, 9],      // columna izquierda
+    rightCol: [11, 10],     // columna derecha
+    cabecera: 13,           // puesto perpendicular (derecha)
+  },
+};
+const AGRO_DESKS  = new Set([7, 8]);  // fuera de alcance
+const EMPTY_DESKS = new Set([13]);    // sin asignar
+
+// ══════════════════════════════════════════════════
+//  ESTADOS
+// ══════════════════════════════════════════════════
+const ESTADOS = {
+  "P":   { label: "En oficina",   color: "var(--st-oficina)",    cls: "is-oficina"    },
+  "R":   { label: "Teletrabajo",  color: "var(--st-remoto)",     cls: "is-remoto"     },
+  "V":   { label: "Viaje",        color: "var(--st-viaje)",      cls: "is-viaje"      },
+  "1":   { label: "Vacaciones",   color: "var(--st-vacaciones)", cls: "is-vacaciones" },
+  "0.5": { label: "Medio día",    color: "var(--st-vacaciones)", cls: "is-vacaciones" },
+  "BA":  { label: "Baja",         color: "var(--st-baja)",       cls: "is-baja"       },
+  "MA":  { label: "Maternidad",   color: "var(--st-maternidad)", cls: "is-maternidad" },
+};
+const ESTADO_DEFAULT = { label: "Sin definir", color: "var(--st-libre)", cls: "is-libre" };
+
+function parseEstado(val) {
+  if (val === null || val === undefined || val === "" || val === 0) return ESTADO_DEFAULT;
+  return ESTADOS[String(val).trim().toUpperCase()] ||
+         ESTADOS[String(val).trim()] ||
+         ESTADO_DEFAULT;
+}
+
+// ══════════════════════════════════════════════════
+//  MSAL
+// ══════════════════════════════════════════════════
+const msalApp = new msal.PublicClientApplication({
+  auth: {
+    clientId: CFG.clientId,
+    authority: `https://login.microsoftonline.com/${CFG.tenantId}`,
+    redirectUri: window.location.href.split('?')[0].split('#')[0],
+  },
+  cache: { cacheLocation: "sessionStorage" },
+});
+const SCOPES = [
+  "https://graph.microsoft.com/Sites.ReadWrite.All",
+  "https://graph.microsoft.com/User.Read",
+];
+
+async function getToken() {
+  const accounts = msalApp.getAllAccounts();
+  if (!accounts.length) throw new Error("No hay sesión activa");
+  try {
+    const r = await msalApp.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+    return r.accessToken;
+  } catch {
+    const r = await msalApp.acquireTokenPopup({ scopes: SCOPES });
+    return r.accessToken;
+  }
+}
+
+async function login() {
+  await msalApp.loginPopup({ scopes: SCOPES });
+  initApp();
+}
+async function logout() {
+  await msalApp.logoutPopup();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// ══════════════════════════════════════════════════
+//  GRAPH API — lee TablaPresencia del Excel
+// ══════════════════════════════════════════════════
+async function fetchDesks(token) {
+  // Resolver site ID
+  const siteRes = await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${CFG.sitePath}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!siteRes.ok) throw new Error(`Site error ${siteRes.status}`);
+  const site = await siteRes.json();
+
+  // Leer tabla
+  const tblRes = await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${site.id}/drive/root:/${encodeURIComponent(CFG.filePath)}:/workbook/tables/${CFG.tableName}/rows`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!tblRes.ok) throw new Error(`Tabla error ${tblRes.status}`);
+  const data = await tblRes.json();
+
+  // Construir mapa: puesto → { nombre, iniciales, estado }
+  // Columnas esperadas: [Nombre, Estado, Puesto, Iniciales]
+  const desks = {};
+  for (const row of data.value) {
+    const [nombre, estadoRaw, puesto, iniciales] = row.values[0];
+    if (!puesto) continue;
+    desks[Number(puesto)] = {
+      nombre:    String(nombre || '').trim(),
+      iniciales: String(iniciales || '??').trim(),
+      estado:    parseEstado(estadoRaw),
+    };
+  }
+  return desks;
+}
+
+// ══════════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════════
+function deskCard(num, desks, extraCls = '') {
+  const isAgro  = AGRO_DESKS.has(num);
+  const isEmpty = EMPTY_DESKS.has(num);
+  const id = `P${String(num).padStart(2,'0')}`;
+
+  if (isEmpty) {
+    return `<div class="desk is-vacio ${extraCls}" style="--desk-color:var(--st-libre)">
+      <div class="desk-num">${id}</div>
+    </div>`;
+  }
+
+  if (isAgro) {
+    return `<div class="desk is-agro ${extraCls}" style="--desk-color:var(--st-agro)">
+      <div class="desk-num">${id}</div>
+      <div class="desk-avatar" style="background:rgba(255,255,255,0.03);color:var(--muted)">–</div>
+      <div class="desk-name" style="color:var(--muted)">Agro</div>
+      <div class="desk-status-row"><div class="desk-pip" style="background:var(--st-agro)"></div><div class="desk-status-lbl">fuera de alcance</div></div>
+    </div>`;
+  }
+
+  const d = desks[num];
+  if (!d) {
+    // Puesto definido en layout pero no en Excel aún
+    return `<div class="desk is-vacio ${extraCls}" style="--desk-color:var(--st-libre)">
+      <div class="desk-num">${id}</div>
+      <div class="desk-avatar" style="background:rgba(255,255,255,0.03);color:var(--muted)">?</div>
+      <div class="desk-name" style="color:var(--muted)">Sin datos</div>
+    </div>`;
+  }
+
+  const { nombre, iniciales, estado } = d;
+  return `<div class="desk ${estado.cls} ${extraCls}"
+      style="--desk-color:${estado.color}"
+      data-num="${num}" data-nombre="${nombre}" data-estado="${estado.label}"
+      onmouseenter="showTip(event,this)" onmouseleave="hideTip()">
+    <div class="desk-num">${id}</div>
+    <div class="desk-avatar" style="background:${estado.color}22;color:${estado.color}">${iniciales}</div>
+    <div class="desk-name">${nombre}</div>
+    <div class="desk-status-row">
+      <div class="desk-pip"></div>
+      <div class="desk-status-lbl">${estado.label}</div>
+    </div>
+  </div>`;
+}
+
+function renderMap(desks) {
+  const L = LAYOUT;
+  const isla2 = `
+    <div class="island" style="align-items:center">
+      <div class="island-tag">Isla 2</div>
+      <div class="island-2-inner">
+        <div class="desk-col">
+          ${deskCard(L.isla2.leftCol[0], desks)}
+          ${deskCard(L.isla2.leftCol[1], desks)}
+        </div>
+        <div class="gap-v"></div>
+        <div class="desk-col">
+          ${deskCard(L.isla2.rightCol[0], desks)}
+          ${deskCard(L.isla2.rightCol[1], desks)}
+        </div>
+        <div class="desk-cab">${deskCard(L.isla2.cabecera, desks)}</div>
+      </div>
+    </div>`;
+
+  const isla1 = `
+    <div class="island" style="align-items:center">
+      <div class="island-tag">Isla 1</div>
+      <div class="island-1-inner">
+        <div class="desk-row">
+          ${L.isla1.top.map(n => deskCard(n, desks)).join('')}
+        </div>
+        <div class="gap-h"></div>
+        <div class="desk-row">
+          ${L.isla1.bottom.map(n => deskCard(n, desks)).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('map-body').innerHTML =
+    `<div class="map-canvas">${isla2}${isla1}</div>`;
+
+  // Stats — solo puestos con persona asignada (ni agro ni vacíos)
+  const counts = { 'is-oficina':0, 'is-remoto':0, 'is-vacaciones':0, 'is-viaje':0, other:0 };
+  Object.values(desks).forEach(d => {
+    if (counts[d.estado.cls] !== undefined) counts[d.estado.cls]++;
+    else counts.other++;
+  });
+  document.getElementById('cnt-oficina').textContent    = counts['is-oficina'];
+  document.getElementById('cnt-remoto').textContent     = counts['is-remoto'];
+  document.getElementById('cnt-vacaciones').textContent = counts['is-vacaciones'];
+  document.getElementById('cnt-viaje').textContent      = counts['is-viaje'];
+  document.getElementById('cnt-libre').textContent      = counts.other;
+}
+
+// ══════════════════════════════════════════════════
+//  TOOLTIP
+// ══════════════════════════════════════════════════
+function showTip(ev, el) {
+  const tip = document.getElementById('tooltip');
+  document.getElementById('tt-name').textContent = el.dataset.nombre;
+  document.getElementById('tt-desk').textContent = `Puesto P${String(el.dataset.num).padStart(2,'0')}`;
+  const badge = document.getElementById('tt-badge');
+  const color = getComputedStyle(el).getPropertyValue('--desk-color').trim();
+  badge.textContent = el.dataset.estado;
+  badge.style.cssText = `background:${color}22;color:${color};border:1px solid ${color}55`;
+  const r = el.getBoundingClientRect();
+  tip.style.left = (r.right + 10) + 'px';
+  tip.style.top  = r.top + 'px';
+  tip.classList.add('show');
+}
+function hideTip() { document.getElementById('tooltip').classList.remove('show'); }
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+async function initApp() {
+  const accounts = msalApp.getAllAccounts();
+  if (!accounts.length) return;
+
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  // Fecha
+  document.getElementById('hdr-date').textContent =
+    new Date().toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  // Usuario
+  const acc = accounts[0];
+  const parts = (acc.name || acc.username || '').split(' ');
+  document.getElementById('user-ini').textContent  = parts.map(p=>p[0]).join('').substring(0,2).toUpperCase() || '?';
+  document.getElementById('user-name').textContent = acc.name || acc.username;
+
+  // Cargar mapa
+  await loadMap();
+}
+
+async function loadMap() {
+  document.getElementById('map-body').innerHTML =
+    '<div class="state-msg"><div class="spinner"></div><span>Cargando presencia…</span></div>';
+  try {
+    const token = await getToken();
+    const desks = await fetchDesks(token);
+    renderMap(desks);
+  } catch (err) {
+    document.getElementById('map-body').innerHTML =
+      `<div class="state-msg">⚠️ ${err.message}<br><button class="btn-small" onclick="loadMap()" style="margin-top:12px">Reintentar</button></div>`;
+    console.error(err);
+  }
+}
+
+document.getElementById('btn-login').addEventListener('click', login);
+document.getElementById('btn-logout').addEventListener('click', logout);
+document.getElementById('btn-refresh').addEventListener('click', loadMap);
+
+msalApp.handleRedirectPromise().then(initApp);
+</script>
+</body>
+</html>
