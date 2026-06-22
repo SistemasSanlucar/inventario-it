@@ -346,7 +346,7 @@ const msalApp = new msal.PublicClientApplication({
     authority: `https://login.microsoftonline.com/${CFG.tenantId}`,
     redirectUri: window.location.href.split('?')[0].split('#')[0],
   },
-  cache: { cacheLocation: "sessionStorage" },
+  cache: { cacheLocation: "localStorage" },
 });
 const SCOPES = [
   "https://graph.microsoft.com/Sites.ReadWrite.All",
@@ -360,19 +360,16 @@ async function getToken() {
     const r = await msalApp.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
     return r.accessToken;
   } catch {
-    const r = await msalApp.acquireTokenPopup({ scopes: SCOPES });
-    return r.accessToken;
+    await msalApp.acquireTokenRedirect({ scopes: SCOPES });
+    return null;
   }
 }
 
 async function login() {
-  await msalApp.loginPopup({ scopes: SCOPES });
-  initApp();
+  await msalApp.loginRedirect({ scopes: SCOPES });
 }
 async function logout() {
-  await msalApp.logoutPopup();
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
+  await msalApp.logoutRedirect({ postLogoutRedirectUri: window.location.href });
 }
 
 // ══════════════════════════════════════════════════
@@ -567,7 +564,15 @@ document.getElementById('btn-login').addEventListener('click', login);
 document.getElementById('btn-logout').addEventListener('click', logout);
 document.getElementById('btn-refresh').addEventListener('click', loadMap);
 
-msalApp.handleRedirectPromise().then(initApp);
+msalApp.handleRedirectPromise().then(result => {
+  if (result) {
+    // Volvemos del redirect de login — guardar cuenta e iniciar app
+    initApp();
+  } else {
+    // Carga normal — comprobar si ya hay sesión
+    initApp();
+  }
+}).catch(err => console.error('Redirect error:', err));
 </script>
 </body>
 </html>
