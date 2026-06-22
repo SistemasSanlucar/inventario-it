@@ -125,6 +125,69 @@ header { display: flex; align-items: center; justify-content: space-between; pad
 .tooltip-desk { font-family: 'JetBrains Mono', monospace; font-size: 0.58rem; color: var(--muted); margin-bottom: 12px; }
 .tooltip-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
 
+
+/* SHAME SECTION */
+.shame-section {
+  margin: 0 40px 40px;
+  background: rgba(248,81,73,0.06);
+  border: 1px solid rgba(248,81,73,0.25);
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: none;
+}
+.shame-section.visible { display: block; }
+.shame-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.shame-icon { font-size: 1.2rem; }
+.shame-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #F85149;
+  letter-spacing: 0.01em;
+}
+.shame-subtitle {
+  font-size: 0.65rem;
+  color: var(--muted);
+  margin-left: auto;
+  font-style: italic;
+}
+.shame-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.shame-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(248,81,73,0.1);
+  border: 1px solid rgba(248,81,73,0.3);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text);
+  animation: shake 0.5s ease infinite alternate;
+}
+.shame-chip-ini {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(248,81,73,0.2);
+  color: #F85149;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+@keyframes shake {
+  0%   { transform: rotate(-1deg); }
+  100% { transform: rotate(1deg);  }
+}
+
 /* WEEKEND OVERLAY */
 .weekend-msg { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 60px 0; color: var(--muted); }
 .weekend-msg .icon { font-size: 3rem; opacity: 0.4; }
@@ -194,6 +257,16 @@ header { display: flex; align-items: center; justify-content: space-between; pad
     <div class="leg-item"><div class="leg-dot" style="background:var(--st-baja)"></div>Baja</div>
     <div class="leg-item"><div class="leg-dot" style="background:var(--st-libre)"></div>Sin definir</div>
   </div>
+  <!-- SHAME SECTION -->
+  <div class="shame-section" id="shame-section">
+    <div class="shame-header">
+      <span class="shame-icon">🔔</span>
+      <span class="shame-title">Pendientes de recibir el capón</span>
+      <span class="shame-subtitle">Por no rellenar el Excel de presencialidad</span>
+    </div>
+    <div class="shame-list" id="shame-list"></div>
+  </div>
+
 </div>
 
 <div class="tooltip" id="tooltip">
@@ -470,6 +543,37 @@ function renderMap(statusMap) {
   document.getElementById('cnt-vacaciones').textContent = counts['is-vacaciones'];
   document.getElementById('cnt-viaje').textContent      = counts['is-viaje'];
   document.getElementById('cnt-libre').textContent      = counts.other;
+
+  // Shame section — personas sin definir
+  const shamePeople = personTable.filter(p => {
+    const est = parseEstado(statusMap[p.puesto]);
+    return est.cls === 'is-libre';
+  });
+  const shameSection = document.getElementById('shame-section');
+  const shameList    = document.getElementById('shame-list');
+  if (shamePeople.length > 0 && !isWeekend(currentDate)) {
+    const msgs = [
+      '¿Dónde estás?',
+      'MIA',
+      '¿Existe?',
+      'Fantasma',
+      'En el limbo',
+      'Incógnita',
+      'Off the grid',
+    ];
+    shameList.innerHTML = shamePeople.map((p, i) =>
+      `<div class="shame-chip">
+        <div class="shame-chip-ini">${p.iniciales}</div>
+        ${p.nombre}
+        <span style="color:var(--muted);font-size:0.6rem">${msgs[i % msgs.length]}</span>
+      </div>`
+    ).join('');
+    shameSection.classList.add('visible');
+  } else {
+    shameSection.classList.remove('visible');
+    shameList.innerHTML = '';
+  }
+
 }
 
 function showWeekend() {
