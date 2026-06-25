@@ -188,6 +188,26 @@ header { display: flex; align-items: center; justify-content: space-between; pad
   100% { transform: rotate(1deg);  }
 }
 
+
+/* TEAMS PRESENCE INDICATOR */
+.presence-dot {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--elevated);
+  z-index: 2;
+}
+.presence-Available     { background: #3FB950; }
+.presence-Busy          { background: #F85149; }
+.presence-DoNotDisturb  { background: #F85149; }
+.presence-Away          { background: #E8A838; }
+.presence-BeRightBack   { background: #E8A838; }
+.presence-Offline       { background: #7D8590; }
+.presence-Unknown       { display: none; }
+
 /* WEEKEND OVERLAY */
 .weekend-msg { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 60px 0; color: var(--muted); }
 .weekend-msg .icon { font-size: 3rem; opacity: 0.4; }
@@ -383,6 +403,7 @@ if (isWeekend(currentDate)) currentDate = prevWorkday(currentDate);
 
 let cachedSiteId = null;
 let personTable  = []; // [{nombre, puesto, iniciales, fila}]
+let presenceMap  = {}; // {email: {availability, activity}}
 
 // ══════════════════════════════════════════════════
 //  MSAL
@@ -395,7 +416,7 @@ const msalApp = new msal.PublicClientApplication({
   },
   cache: { cacheLocation: "localStorage" },
 });
-const SCOPES = ["https://graph.microsoft.com/Sites.ReadWrite.All", "https://graph.microsoft.com/User.Read"];
+const SCOPES = ["https://graph.microsoft.com/Sites.ReadWrite.All", "https://graph.microsoft.com/User.Read", "https://graph.microsoft.com/Presence.Read.All"];
 
 async function getToken() {
   const accounts = msalApp.getAllAccounts();
@@ -435,7 +456,11 @@ async function fetchPersonTable(token) {
   // Columnas: [Nombre(0), Estado(1), Puesto(2), Iniciales(3), Fila(4)]
   return d.value.map(row => {
     const [nombre, , puesto, iniciales, fila] = row.values[0];
-    return { nombre: String(nombre||'').trim(), puesto: Number(puesto), iniciales: String(iniciales||'??').trim(), fila: Number(fila) };
+    const nombreClean = String(nombre||'').trim();
+    // Construir email asumiendo formato nombre.apellido@sanlucar.com
+    const parts = nombreClean.toLowerCase().split(' ');
+    const email = parts.length >= 2 ? `${parts[0]}.${parts[parts.length-1]}@sanlucar.com` : null;
+    return { nombre: nombreClean, email, puesto: Number(puesto), iniciales: String(iniciales||'??').trim(), fila: Number(fila) };
   }).filter(p => p.nombre && p.puesto && p.fila);
 }
 
@@ -465,6 +490,35 @@ async function fetchStatusForDate(token, date) {
     const person = personTable.find(p => p.fila === rowNum);
     if (person) result[person.puesto] = cell[0];
   });
+  return result;
+}
+
+
+// ══════════════════════════════════════════════════
+//  GRAPH API — presencia Teams en batch
+// ══════════════════════════════════════════════════
+async function fetchPresence(token) {
+  // Primero obtenemos los IDs de usuario por email
+  const emails = personTable.map(p => p.nombre);
+  if (!emails.length) return {};
+
+  // Buscar cada usuario y obtener su presencia en batch
+  const lookups = await Promise.all(personTable.map(async p => {
+    try {
+      const r = await fetch(
+        `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(p.email || p.nombre)}/presence`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!r.ok) return { puesto: p.puesto, availability: 'Unknown' };
+      const d = await r.json();
+      return { puesto: p.puesto, availability: d.availability, activity: d.activity };
+    } catch {
+      return { puesto: p.puesto, availability: 'Unknown' };
+    }
+  }));
+
+  const result = {};
+  lookups.forEach(l => { result[l.puesto] = { availability: l.availability, activity: l.activity }; });
   return result;
 }
 
@@ -509,6 +563,7 @@ function deskCard(num, statusMap) {
       <div class="desk-pip"></div>
       <div class="desk-status-lbl">${est.label}</div>
     </div>
+    ${presenceMap[num] ? `<div class="presence-dot presence-${presenceMap[num].availability}" title="Teams: ${presenceMap[num].activity || presenceMap[num].availability}"></div>` : ''}
   </div>`;
 }
 
@@ -626,6 +681,11 @@ async function loadForDate(date) {
     const token = await getToken();
     if (!token) return;
     const statusMap = await fetchStatusForDate(token, currentDate);
+    // Cargar presencia Teams en paralelo
+    fetchPresence(token).then(pm => {
+      presenceMap = pm;
+      renderMap(statusMap);
+    }).catch(() => {}); // silencioso si falla
     renderMap(statusMap);
   } catch(err) {
     document.getElementById('map-body').innerHTML = `<div class="state-msg">⚠️ ${err.message}<br><button class="btn-sm" onclick="loadForDate(currentDate)" style="margin-top:12px">Reintentar</button></div>`;
