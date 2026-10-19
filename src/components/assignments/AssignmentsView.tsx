@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { T } from '../../i18n'
 import { useAppContext } from '../../context/AppContext'
 import { useAuth } from '../../context/AuthContext'
+import { useAppData } from '../../hooks/useAppData'
 import { exportAssignmentToPDF } from '../../utils/pdf'
 import { showToast } from '../../hooks/useToast'
 import { useTabNavigation } from '../../hooks/useTabNavigation'
@@ -50,8 +51,9 @@ function parseProducts(a: Assignment) {
 }
 
 export default function AssignmentsView() {
-  const { state, dispatch } = useAppContext()
-  const { isAdmin } = useAuth()
+  const { state, dispatch, dataManagerRef } = useAppContext()
+  const { isAdmin, user } = useAuth()
+  const { refreshData } = useAppData()
   const { goToTab } = useTabNavigation()
   const t = T()
 
@@ -61,6 +63,44 @@ export default function AssignmentsView() {
   const [filterTipo, setFilterTipo] = useState('all')
   const [viewMode, setViewMode] = useState('cards')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  // Alargar prestamo modal state
+  const [extendTarget, setExtendTarget] = useState<Assignment | null>(null)
+  const [extendDate, setExtendDate] = useState('')
+  const [extendSaving, setExtendSaving] = useState(false)
+
+  const openExtend = (a: Assignment) => {
+    const fv = getFechaVencimientoPrestamo(a)
+    const iso = fv ? fv.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+    setExtendDate(iso)
+    setExtendTarget(a)
+  }
+  const closeExtend = () => { setExtendTarget(null); setExtendDate('') }
+  const handleExtend = async () => {
+    if (!extendTarget || !extendDate || !dataManagerRef.current) return
+    setExtendSaving(true)
+    try {
+      const dm = dataManagerRef.current
+      await dm.extendAssignmentDate(extendTarget.id, extendTarget.observaciones || '', extendDate)
+      const d = new Date(extendDate + 'T12:00:00')
+      const nice = d.toLocaleDateString('es-ES')
+      await dm.addToHistory({
+        tipo: 'Prestamo',
+        producto: `Prórroga préstamo (${extendTarget.cantidadProductos} item(s))`,
+        cantidad: extendTarget.cantidadProductos,
+        usuario: extendTarget.nombreEmpleado,
+        tecnico: user?.name || 'Sistema',
+        motivo: `Nueva fecha devolución: ${nice}`,
+      })
+      showToast(`Préstamo alargado hasta ${nice}`, 'success')
+      closeExtend()
+      await refreshData()
+    } catch (err: any) {
+      showToast('Error al alargar: ' + (err.message || err), 'error')
+    } finally {
+      setExtendSaving(false)
+    }
+  }
 
   useEffect(() => {
     const f = state.tabFilter
@@ -183,6 +223,9 @@ export default function AssignmentsView() {
             <button className="button button-secondary" style={{ padding: '9px 14px', fontSize: '13px' }} onClick={() => openModal('ver-asignacion', a)} title="Ver detalle">📄</button>
             <button className="button button-secondary" style={{ padding: '9px 14px', fontSize: '13px' }} onClick={() => exportAssignmentToPDF(a, showToast as any)} title="Descargar PDF">📥</button>
             <button className="button button-secondary" style={{ padding: '9px 14px', fontSize: '13px' }} onClick={() => goToTab('historial', { usuario: a.nombreEmpleado })} title={t.viewHistory}>📜</button>
+            {a.esPrestamo && a.estado === 'Activo' && (
+              <button style={{ padding: '9px 14px', fontSize: '13px', background: 'rgba(251,191,36,.1)', border: '1px solid rgba(251,191,36,.35)', color: '#fbbf24', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }} onClick={() => openExtend(a)} title="Alargar préstamo">📅</button>
+            )}
             {a.estado === 'Activo' && <button className="button button-warning" style={{ padding: '9px 16px', fontSize: '13px', flex: 1 }} onClick={() => openModal('devolver-material', a)}>↩️ Devolver</button>}
             {isAdmin && <button style={{ padding: '9px 14px', fontSize: '13px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: '#ef4444', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }} onClick={() => openConfirm('eliminar-asignacion', a)} title="Eliminar">🗑️</button>}
           </div>
@@ -217,6 +260,7 @@ export default function AssignmentsView() {
             <div className="action-icon" onClick={() => openModal('ver-asignacion', a)} title="Ver">📄</div>
             <div className="action-icon" onClick={() => exportAssignmentToPDF(a, showToast as any)} title="PDF">📥</div>
             <div className="action-icon" onClick={() => goToTab('historial', { usuario: a.nombreEmpleado })} title={t.viewHistory}>📜</div>
+            {a.esPrestamo && a.estado === 'Activo' && <div className="action-icon" style={{ color: '#fbbf24' }} onClick={() => openExtend(a)} title="Alargar préstamo">📅</div>}
             {a.estado === 'Activo' && <div className="action-icon" onClick={() => openModal('devolver-material', a)} title="Devolver">↩️</div>}
             {isAdmin && <div className="action-icon danger" onClick={() => openConfirm('eliminar-asignacion', a)} title="Eliminar">🗑️</div>}
           </div>
@@ -337,6 +381,53 @@ export default function AssignmentsView() {
             </thead>
             <tbody>{filtered.map(assignRow)}</tbody>
           </table>
+        </div>
+      )}
+
+      {/* Alargar prestamo modal */}
+      {extendTarget && (
+        <div className="modal-overlay" onMouseDown={closeExtend}>
+          <div className="modal" style={{ maxWidth: '440px' }} onMouseDown={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">📅 Alargar préstamo</h2>
+              <button className="modal-close" onClick={closeExtend}>&times;</button>
+            </div>
+            <div className="modal-body" style={{ padding: '20px 28px' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Empleado</div>
+              <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '16px' }}>{extendTarget.nombreEmpleado}</div>
+
+              {(() => {
+                const fv = getFechaVencimientoPrestamo(extendTarget)
+                return fv ? (
+                  <div style={{ marginBottom: '16px', padding: '10px 14px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Fecha actual de devolución</div>
+                    <div style={{ fontFamily: 'IBM Plex Mono,monospace', fontSize: '14px', fontWeight: 600, color: fv < hoy ? '#ef4444' : 'var(--text-primary)' }}>
+                      {fv.toLocaleDateString('es-ES')} {fv < hoy && ' (vencida)'}
+                    </div>
+                  </div>
+                ) : null
+              })()}
+
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Nueva fecha de devolución</label>
+              <input
+                type="date"
+                className="form-input"
+                value={extendDate}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setExtendDate(e.target.value)}
+                style={{ width: '100%', fontSize: '15px' }}
+              />
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '10px', lineHeight: 1.5 }}>
+                La nueva fecha se guardará en el préstamo y quedará registrada en el historial.
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="button button-secondary" onClick={closeExtend} disabled={extendSaving}>Cancelar</button>
+              <button className="button button-warning" onClick={handleExtend} disabled={!extendDate || extendSaving}>
+                {extendSaving ? 'Guardando...' : '📅 Alargar préstamo'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

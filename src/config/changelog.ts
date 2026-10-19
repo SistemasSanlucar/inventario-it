@@ -23,6 +23,24 @@ export function entryIcon(type: ChangeType): string {
 
 export const CHANGELOG: ChangelogVersion[] = [
   {
+    version: '3.6.2',
+    date: '2026-10-19',
+    changes: [
+      { type: 'feature', text: 'Botón "📅 Alargar préstamo" en cards y tabla de asignaciones — ya no hace falta cerrar el préstamo y crear uno nuevo para extender la fecha de devolución' },
+      { type: 'improvement', text: 'Modal con fecha actual precargada y aviso visual si el préstamo ya está vencido' },
+      { type: 'improvement', text: 'Cada prórroga queda registrada en el historial con la nueva fecha de devolución' },
+    ],
+  },
+  {
+    version: '3.6.1',
+    date: '2026-10-19',
+    changes: [
+      { type: 'bug', text: 'Etiqueta DYMO: texto en negro puro + negrita para que la térmica imprima legible' },
+      { type: 'improvement', text: 'Cabecera "SANLUCAR FRUIT · IT" con banda negra invertida para que destaque' },
+      { type: 'improvement', text: 'ID Etiqueta más grande (9pt) y separador horizontal bajo él' },
+    ],
+  },
+  {
     version: '3.6.0',
     date: '2026-04-10',
     changes: [

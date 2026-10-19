@@ -699,6 +699,30 @@ export class DataManager {
     await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, itemId, { Estado: nuevoEstado })
   }
 
+  /**
+   * Updates the "fecha prevista de devolucion" of a loan.
+   * The date is stored embedded inside the Observaciones field with format
+   * "[Dev. prevista: DD/MM/YYYY] + resto de observaciones".
+   * Handles three cases: existing prefix (replace), no prefix (prepend), empty obs (create).
+   */
+  async extendAssignmentDate(itemId: string, currentObs: string, newDateISO: string): Promise<string> {
+    const d = new Date(newDateISO + 'T12:00:00')
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    const newPrefix = `[Dev. prevista: ${dd}/${mm}/${yyyy}]`
+    const obs = currentObs || ''
+    const regex = /^\s*\[Dev\. prevista:\s*\d{1,2}\/\d{1,2}\/\d{4}\]\s*/
+    let newObs: string
+    if (regex.test(obs)) {
+      newObs = obs.replace(regex, newPrefix + ' ')
+    } else {
+      newObs = obs.trim() ? `${newPrefix} ${obs}` : newPrefix
+    }
+    await this.graph.updateListItem(CONFIG.sharepoint.lists.asignaciones, itemId, { Observaciones: newObs })
+    return newObs
+  }
+
   async deleteAssignment(itemId: string): Promise<void> {
     await this.graph.deleteListItem(CONFIG.sharepoint.lists.asignaciones, itemId)
   }

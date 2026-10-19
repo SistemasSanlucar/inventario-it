@@ -12,7 +12,10 @@
       "Bash(npm run:*)",
       "Bash(curl -s \"https://sistemassanlucar.github.io/inventario-it/\")",
       "Bash(curl -sI \"https://sistemassanlucar.github.io/inventario-it/\")",
-      "Bash(curl -v \"https://sistemassanlucar.github.io/inventario-it/index.html\" -o /tmp/page.html)"
+      "Bash(curl -v \"https://sistemassanlucar.github.io/inventario-it/index.html\" -o /tmp/page.html)",
+      "Bash(npm run *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)"
     ]
   }
 }
