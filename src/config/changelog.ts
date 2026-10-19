@@ -23,6 +23,13 @@ export function entryIcon(type: ChangeType): string {
 
 export const CHANGELOG: ChangelogVersion[] = [
   {
+    version: '3.6.3',
+    date: '2026-10-19',
+    changes: [
+      { type: 'bug', text: 'Modal "Alargar préstamo": confirmación visual con la fecha en formato español (DD/MM/YYYY) y día de la semana, para evitar confusión con el formato del selector nativo del navegador' },
+    ],
+  },
+  {
     version: '3.6.2',
     date: '2026-10-19',
     changes: [

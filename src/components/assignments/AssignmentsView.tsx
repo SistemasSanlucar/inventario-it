@@ -411,12 +411,27 @@ export default function AssignmentsView() {
               <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Nueva fecha de devolución</label>
               <input
                 type="date"
+                lang="es-ES"
                 className="form-input"
                 value={extendDate}
                 min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => setExtendDate(e.target.value)}
                 style={{ width: '100%', fontSize: '15px' }}
               />
+              {extendDate && (
+                <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(63,185,80,.08)', border: '1px solid rgba(63,185,80,.3)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '16px' }}>✅</span>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.3px' }}>Se guardará como</div>
+                    <div style={{ fontFamily: 'IBM Plex Mono,monospace', fontSize: '15px', fontWeight: 700, color: '#3fb950' }}>
+                      {new Date(extendDate + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      <span style={{ color: 'var(--text-secondary)', fontWeight: 400, marginLeft: '8px', fontSize: '13px' }}>
+                        · {new Date(extendDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long' })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '10px', lineHeight: 1.5 }}>
                 La nueva fecha se guardará en el préstamo y quedará registrada en el historial.
               </div>
