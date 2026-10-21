@@ -10,6 +10,7 @@ import { PacksManager } from '../../services/PacksManager'
 import { ErrorLog } from '../../services/ErrorLog'
 import { PAISES_LIST } from '../../config/constants'
 import { CHANGELOG, entryIcon } from '../../config/changelog'
+import AuditoriaSection from './AuditoriaSection'
 import type { CatalogoRawItem } from '../../types/equipment'
 
 // ── ErrorLogPanel ──
@@ -742,6 +743,7 @@ export default function AdminPanel() {
                   {sectionBtn('exportar', t.exportAudit, '📊')}
                   {sectionBtn('log', t.actionLog, '📋')}
                   {sectionBtn('errores', '🔴 Errores', '🐛')}
+                  {sectionBtn('auditoria', t.auditoriaInventario, '🔍')}
                   {sectionBtn('changelog', t.changelog, '📋')}
                 </div>
               )}
@@ -762,6 +764,7 @@ export default function AdminPanel() {
           {activeSection === 'exportar' && renderExportar()}
           {activeSection === 'errores' && <ErrorLogPanel />}
           {activeSection === 'log' && renderLog()}
+          {activeSection === 'auditoria' && <AuditoriaSection />}
           {activeSection === 'changelog' && <ChangelogSection />}
         </div>
       </div>

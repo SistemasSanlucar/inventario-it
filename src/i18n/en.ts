@@ -69,4 +69,5 @@ export const en = {
   viewHistory: 'View history', errors: 'Errors',
   phoneLines: '📱 Lines',
   about: 'ℹ️ About',
+  auditoriaInventario: 'Audit',
 } as const

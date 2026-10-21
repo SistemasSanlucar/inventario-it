@@ -23,6 +23,17 @@ export function entryIcon(type: ChangeType): string {
 
 export const CHANGELOG: ChangelogVersion[] = [
   {
+    version: '3.7.0',
+    date: '2026-10-21',
+    changes: [
+      { type: 'feature', text: 'Auditoría automática de inventario en el panel Admin — solo lectura, no modifica nada' },
+      { type: 'feature', text: 'Detecta 4 tipos de anomalías: empleado con varios portátiles/móviles/monitores; equipo en "Almacén" dentro de asignación vigente; equipo "Asignado" sin asignación vigente; equipo en varios empleados a la vez' },
+      { type: 'improvement', text: 'Identificación de empleados por email normalizado — nunca agrupa por nombre si falta el email' },
+      { type: 'improvement', text: 'Vista muestra qué tipos del catálogo real se clasifican como portátil/móvil/monitor para que el admin pueda validar en vivo' },
+      { type: 'improvement', text: 'Cada anomalía incluye evidencia expandible y acceso directo a la ficha del equipo o al historial del empleado' },
+    ],
+  },
+  {
     version: '3.6.3',
     date: '2026-10-19',
     changes: [

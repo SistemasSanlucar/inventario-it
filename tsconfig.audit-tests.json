@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": false,
+    "outDir": "./.audit-test-out",
+    "rootDir": "./src",
+    "isolatedModules": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "src/utils/audit.ts",
+    "src/utils/audit.test.ts",
+    "src/utils/categoryClassifier.ts",
+    "src/types/**/*.ts"
+  ]
+}
