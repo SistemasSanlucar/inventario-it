@@ -21,4 +21,8 @@ export const CONFIG = {
   },
   scopes: ['User.Read', 'Sites.ReadWrite.All'] as const,
   version: import.meta.env.VITE_APP_VERSION || '3.7.0',
+  // isDev=true solo cuando VITE_IS_DEV se pasa al build (workflow del repo
+  // target inventario-it-dev). En producción (main) la variable no se define
+  // y queda false. Muestra badge DEVELOPER en la cabecera.
+  isDev: import.meta.env.VITE_IS_DEV === 'true',
 }

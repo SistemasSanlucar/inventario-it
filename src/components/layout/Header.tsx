@@ -90,6 +90,25 @@ export default function Header() {
           >
             v{CONFIG.version}
           </span>
+          {CONFIG.isDev && (
+            <span
+              style={{
+                fontSize: '11px',
+                padding: '4px 10px',
+                background: '#ef4444',
+                color: 'white',
+                borderRadius: '6px',
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontWeight: '800',
+                letterSpacing: '1px',
+                boxShadow: '0 0 0 1px rgba(239,68,68,.4), 0 4px 12px rgba(239,68,68,.35)',
+                animation: 'pulse 2s ease-in-out infinite',
+              }}
+              title="Entorno DEVELOPER — cambios no publicados en producción"
+            >
+              DEVELOPER
+            </span>
+          )}
         </div>
         <div className="user-badges">
           <span className={'user-badge ' + (auth.isAdmin ? 'admin' : 'technician')}>

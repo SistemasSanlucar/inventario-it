@@ -1,0 +1,117 @@
+name: Deploy Developer to GitHub Pages
+
+# ─────────────────────────────────────────────────────────────────
+# ESTE FICHERO NO SE EJECUTA EN inventario-it.
+# Hay que COPIARLO al repo target `inventario-it-dev` en la ruta:
+#   .github/workflows/deploy-dev.yml
+#
+# Qué hace:
+#   - Clona la rama `developer` del repo fuente (SistemasSanlucar/inventario-it)
+#   - Compila con VITE_BASE_PATH=/inventario-it-dev/ y VITE_IS_DEV=true
+#   - Publica a GitHub Pages del propio target (inventario-it-dev)
+#
+# Trigger ÚNICO: workflow_dispatch (manual desde la pestaña Actions)
+# No hay schedule ni cron: cada publicación debe ser decidida por un humano.
+# ─────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages-dev
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pre-flight — comprobar acceso al repo source
+        # Verifica ANTES del checkout que el workflow puede ver la rama
+        # developer del repo source. Mensaje claro si falla, en vez de un
+        # error críptico del checkout. Si el repo source es público este
+        # ls-remote funciona anónimo; si es privado y no se pasa token al
+        # checkout, el checkout fallará igualmente — pero este paso lo
+        # avisa antes.
+        run: |
+          set -euo pipefail
+          echo "Comprobando lectura de SistemasSanlucar/inventario-it (rama developer)..."
+          if git ls-remote https://github.com/SistemasSanlucar/inventario-it refs/heads/developer >/dev/null 2>&1; then
+            echo "OK — repo source accesible de forma anónima (es público o GitHub lo expone)."
+          else
+            echo "::warning::No se pudo leer el source de forma anónima. Si el repo es PRIVADO el checkout necesitará el secret READ_SOURCE_PAT (ver README dev-deploy-staging)."
+          fi
+
+      - name: Checkout source repo — rama 'developer' explícita
+        uses: actions/checkout@v4
+        with:
+          repository: SistemasSanlucar/inventario-it
+          # refs/heads/developer blinda la selección: no resuelve a tags
+          # ni a commits homónimos. Si la rama 'developer' no existe el
+          # checkout falla, en vez de caer en el default (main).
+          ref: refs/heads/developer
+          # Si el repo source es PRIVADO, descomentar la línea siguiente y
+          # añadir un secret READ_SOURCE_PAT con un fine-grained PAT que tenga
+          # únicamente permiso "Contents: Read" sobre SistemasSanlucar/inventario-it.
+          # token: ${{ secrets.READ_SOURCE_PAT }}
+
+      - name: Verificar que el commit descargado = cabeza de refs/heads/developer
+        # actions/checkout deja HEAD en DETACHED al pasar un ref explícito,
+        # por lo que no podemos usar `git rev-parse --abbrev-ref HEAD`
+        # (devolvería 'HEAD'). Comprobación fiable: consultar la cabeza
+        # actual de refs/heads/developer en el remoto y verificar que
+        # coincide con el SHA que acabamos de descargar.
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(git rev-parse HEAD)"
+          REMOTE_LINE="$(git ls-remote origin refs/heads/developer || true)"
+          EXPECTED_SHA="$(echo "$REMOTE_LINE" | awk '{print $1}')"
+          echo "HEAD actual:          $HEAD_SHA"
+          echo "refs/heads/developer: ${EXPECTED_SHA:-<no encontrado>}"
+          if [ -z "$EXPECTED_SHA" ]; then
+            echo "::error::La rama 'developer' no existe en SistemasSanlucar/inventario-it. Deploy abortado."
+            exit 1
+          fi
+          if [ "$HEAD_SHA" != "$EXPECTED_SHA" ]; then
+            echo "::error::SHA del código descargado ($HEAD_SHA) NO coincide con la cabeza actual de refs/heads/developer ($EXPECTED_SHA). Deploy abortado para proteger producción."
+            exit 1
+          fi
+          echo "OK — código descargado = cabeza de refs/heads/developer"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (DEVELOPER)
+        env:
+          VITE_BASE_PATH: /inventario-it-dev/
+          VITE_IS_DEV: 'true'
+        run: npm run build
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
