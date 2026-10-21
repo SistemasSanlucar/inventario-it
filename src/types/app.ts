@@ -43,6 +43,7 @@ export interface AppState {
   globalSearch: string
   showGlobalResults: boolean
   deepLinkEquipo: Activo | null
+  fichaEmpleado: { email: string; nombre: string } | null
   loading: boolean
 }
 

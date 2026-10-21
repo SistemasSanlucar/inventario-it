@@ -17,6 +17,8 @@
     "src/utils/audit.ts",
     "src/utils/audit.test.ts",
     "src/utils/categoryClassifier.ts",
+    "src/utils/employeeView.ts",
+    "src/utils/employeeView.test.ts",
     "src/types/**/*.ts"
   ]
 }

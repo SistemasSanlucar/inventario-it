@@ -23,6 +23,27 @@ export function entryIcon(type: ChangeType): string {
 
 export const CHANGELOG: ChangelogVersion[] = [
   {
+    version: '3.8.1',
+    date: '2026-10-21',
+    changes: [
+      { type: 'bug', text: 'Ficha 360°: corregido retorno condicional antes de useMemo (violación de Rules of Hooks). Dividido en wrapper + componente interno con hooks incondicionales' },
+      { type: 'bug', text: 'Ficha 360°: cuando dos empleados comparten nombre y emails distintos, el historial YA NO se muestra. Aviso explícito: "no atribuible con seguridad"' },
+      { type: 'improvement', text: 'Añadidos tests específicos para los dos defectos corregidos + verificación de pureza al cambiar de ficha' },
+    ],
+  },
+  {
+    version: '3.8.0',
+    date: '2026-10-21',
+    changes: [
+      { type: 'feature', text: 'Ficha 360° del empleado accesible desde el buscador global' },
+      { type: 'feature', text: 'Equipos actuales, préstamos pendientes con fecha de devolución, historial reciente y duplicidades detectadas en una única pantalla' },
+      { type: 'feature', text: 'Acciones rápidas desde la ficha: asignar, prestar, dar de baja, ver historial completo — reutilizan los formularios existentes con el empleado pre-rellenado' },
+      { type: 'improvement', text: 'El buscador global ahora agrupa empleados por email (hasta 10) y los muestra primero, para evitar que queden fuera de los primeros resultados' },
+      { type: 'improvement', text: 'La ficha reutiliza el motor de auditoría 3.7.0 para destacar duplicidades de portátil/móvil/monitor' },
+      { type: 'bug', text: 'Advertencia visible cuando dos empleados tienen el mismo nombre y emails distintos (el historial se filtra por nombre por limitación del esquema actual)' },
+    ],
+  },
+  {
     version: '3.7.0',
     date: '2026-10-21',
     changes: [

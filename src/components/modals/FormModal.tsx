@@ -57,10 +57,25 @@ export default function FormModal({ modalType, selectedItem, onClose }: FormModa
     ticket: '',
     usuario: '',
     emailUsuario: '',
-    nombreEmpleado: '',
-    emailEmpleado: '',
-    departamento: '',
-    puesto: '',
+    // Prefill opcional desde selectedItem si viene de la ficha 360°.
+    // Solo aplica a nueva-asignacion / nuevo-prestamo / baja-empleado.
+    // La lógica de submit no cambia: estos campos se consumen igual que antes.
+    nombreEmpleado:
+      selectedItem && (modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo' || modalType === 'baja-empleado')
+        ? selectedItem.nombreEmpleado || ''
+        : '',
+    emailEmpleado:
+      selectedItem && (modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo' || modalType === 'baja-empleado')
+        ? selectedItem.emailEmpleado || ''
+        : '',
+    departamento:
+      selectedItem && (modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo' || modalType === 'baja-empleado')
+        ? selectedItem.departamento || ''
+        : '',
+    puesto:
+      selectedItem && (modalType === 'nueva-asignacion' || modalType === 'nuevo-prestamo' || modalType === 'baja-empleado')
+        ? selectedItem.puesto || ''
+        : '',
     fechaIncorporacion: new Date().toISOString().split('T')[0],
     observaciones: '',
     esPrestamo: modalType === 'nuevo-prestamo',

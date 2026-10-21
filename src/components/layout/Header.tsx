@@ -12,7 +12,7 @@ export default function Header() {
   const auth = useAuth()
   const { state, dispatch } = useAppContext()
   const { syncData } = useAppData()
-  const { query, showResults, results, setQuery, hideResults, navigateToResult } = useGlobalSearch()
+  const { query, showResults, results, setQuery, hideResults, navigateToResult, openEmployeeFicha } = useGlobalSearch()
   const { goToTab } = useTabNavigation()
   const t = T()
 
@@ -150,7 +150,14 @@ export default function Header() {
               <div
                 key={idx}
                 className="user-search-item"
-                onMouseDown={() => navigateToResult(r.tab)}
+                onMouseDown={() => {
+                  if (r.type === 'empleado' && r.email) {
+                    openEmployeeFicha(r.email, r.nombre || '')
+                  } else if (r.tab) {
+                    navigateToResult(r.tab)
+                  }
+                }}
+                style={r.type === 'empleado' ? { borderLeft: '3px solid var(--accent-blue)' } : undefined}
               >
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <span style={{ fontSize: '16px' }}>{r.icon}</span>

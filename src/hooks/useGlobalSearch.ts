@@ -1,13 +1,20 @@
 import { useMemo } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { useTabNavigation } from './useTabNavigation'
+import { buildEmployeeIndex, searchEmployees } from '../utils/employeeView'
 
 export interface GlobalSearchResult {
-  type: string
+  type: 'empleado' | 'inventory' | 'equipo' | 'asignacion'
   icon: string
   label: string
   sub: string
-  tab: string
+  // Para 'empleado': email del empleado (clave de la ficha 360°)
+  // Para los demás: tab destino para navegar
+  tab?: string
+  email?: string
+  nombre?: string
+  // Contadores informativos solo para 'empleado'
+  counts?: { equipos: number; asignaciones: number; prestamos: number }
 }
 
 export function useGlobalSearch() {
@@ -19,9 +26,30 @@ export function useGlobalSearch() {
     const q = state.globalSearch.toLowerCase()
     const r: GlobalSearchResult[] = []
 
+    // 1) Empleados (prioridad máxima, hasta 10). Agrupados por email único.
+    const empIndex = buildEmployeeIndex({ activos: state.activos || [], assignments: state.assignments || [] })
+    const empMatches = searchEmployees(empIndex, state.globalSearch, 10)
+    for (const emp of empMatches) {
+      const parts: string[] = []
+      if (emp.equiposActivos > 0) parts.push(`${emp.equiposActivos} equipo(s)`)
+      if (emp.asignacionesActivas > 0) parts.push(`${emp.asignacionesActivas} asignación(es)`)
+      if (emp.prestamosActivos > 0) parts.push(`${emp.prestamosActivos} préstamo(s)`)
+      r.push({
+        type: 'empleado',
+        icon: '👤',
+        label: emp.nombre || emp.email,
+        sub: emp.email + (parts.length ? ' · ' + parts.join(' · ') : ''),
+        email: emp.email,
+        nombre: emp.nombre,
+        counts: { equipos: emp.equiposActivos, asignaciones: emp.asignacionesActivas, prestamos: emp.prestamosActivos },
+      })
+    }
+
+    // 2) Resto de tipos — cap conjunto de 8
+    const otherResults: GlobalSearchResult[] = []
     ;(state.inventory || []).forEach((i) => {
       if ((i.nombre || '').toLowerCase().includes(q) || (i.barcode || '').includes(q)) {
-        r.push({ type: 'inventory', icon: '📦', label: i.nombre, sub: i.barcode, tab: 'inventario' })
+        otherResults.push({ type: 'inventory', icon: '📦', label: i.nombre, sub: i.barcode, tab: 'inventario' })
       }
     })
     ;(state.activos || []).forEach((a) => {
@@ -30,24 +58,49 @@ export function useGlobalSearch() {
         (a.numSerie || '').toLowerCase().includes(q) ||
         (a.modelo || '').toLowerCase().includes(q)
       ) {
-        r.push({ type: 'equipo', icon: '💻', label: a.tipo + ' · ' + a.modelo, sub: a.idEtiqueta, tab: 'equipos' })
+        otherResults.push({ type: 'equipo', icon: '💻', label: a.tipo + ' · ' + a.modelo, sub: a.idEtiqueta, tab: 'equipos' })
       }
     })
+    // Nota: NO duplicamos resultados de 'asignacion' — un empleado matcheado
+    // ya aparece como 'empleado'. Solo añadimos asignación cuando el match
+    // es sobre un dato no incluido en la ficha 360° (p.ej. observaciones).
     ;(state.assignments || []).forEach((a) => {
-      if ((a.nombreEmpleado || '').toLowerCase().includes(q) || (a.emailEmpleado || '').toLowerCase().includes(q)) {
+      const nameLower = (a.nombreEmpleado || '').toLowerCase()
+      const emailLower = (a.emailEmpleado || '').toLowerCase()
+      // Si ya hay un empleado match con este email, no añadas asignación
+      const alreadyAsEmployee = empMatches.some((e) => e.email === emailLower)
+      if (alreadyAsEmployee) return
+      // Solo añadir si matchea por nombre/email (en cuyo caso llegaríamos aquí
+      // únicamente si el empleado está pero no en los primeros 10 — fallback)
+      if (nameLower.includes(q) || emailLower.includes(q)) {
         const estadoBadge = a.estado === 'Activo' ? '' : ' (' + a.estado + ')'
-        r.push({ type: 'asignacion', icon: '📋', label: a.nombreEmpleado + estadoBadge, sub: a.emailEmpleado, tab: 'asignaciones' })
+        otherResults.push({
+          type: 'asignacion',
+          icon: '📋',
+          label: a.nombreEmpleado + estadoBadge,
+          sub: a.emailEmpleado,
+          tab: 'asignaciones',
+        })
       }
     })
 
-    return r.slice(0, 8)
+    return r.concat(otherResults.slice(0, 8))
   }, [state.globalSearch, state.inventory, state.activos, state.assignments])
 
   const setQuery = (value: string) => dispatch({ type: 'SET_GLOBAL_SEARCH', payload: value })
   const hideResults = () => dispatch({ type: 'SET_SHOW_GLOBAL_RESULTS', payload: false })
+
+  /** Para resultados con tab definido (inventory, equipo, asignacion) */
   const navigateToResult = (tab: string) => {
     dispatch({ type: 'SET_GLOBAL_SEARCH', payload: '' })
     goToTab(tab)
+  }
+
+  /** Para resultado tipo 'empleado' — abre la ficha 360° */
+  const openEmployeeFicha = (email: string, nombre: string) => {
+    dispatch({ type: 'SET_GLOBAL_SEARCH', payload: '' })
+    dispatch({ type: 'SET_SHOW_GLOBAL_RESULTS', payload: false })
+    dispatch({ type: 'SET_FICHA_EMPLEADO', payload: { email, nombre } })
   }
 
   return {
@@ -57,5 +110,6 @@ export function useGlobalSearch() {
     setQuery,
     hideResults,
     navigateToResult,
+    openEmployeeFicha,
   }
 }

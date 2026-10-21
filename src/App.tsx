@@ -19,6 +19,7 @@ import FormModal from './components/modals/FormModal'
 import ConfirmModal from './components/modals/ConfirmModal'
 import ErrorBoundary from './components/shared/ErrorBoundary'
 import ChangelogModal from './components/changelog/ChangelogModal'
+import Empleado360Modal from './components/employee/Empleado360Modal'
 import { CONFIG } from './config'
 import { useModal } from './hooks/useModal'
 import { useAppData } from './hooks/useAppData'
@@ -166,6 +167,7 @@ function AppContent() {
         </Routes>
       </ErrorBoundary>
       {modals}
+      {state.fichaEmpleado && <Empleado360Modal />}
       {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </AppLayout>
   )

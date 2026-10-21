@@ -18,6 +18,7 @@ type AppAction =
   | { type: 'SET_GLOBAL_SEARCH'; payload: string }
   | { type: 'SET_SHOW_GLOBAL_RESULTS'; payload: boolean }
   | { type: 'SET_DEEP_LINK'; payload: any }
+  | { type: 'SET_FICHA_EMPLEADO'; payload: { email: string; nombre: string } | null }
   | { type: 'SET_STOCK_MINIMO'; payload: number }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'RESET' }
@@ -49,6 +50,7 @@ export const initialAppState: AppState = {
   globalSearch: '',
   showGlobalResults: false,
   deepLinkEquipo: null,
+  fichaEmpleado: null,
   loading: true,
 }
 
@@ -88,6 +90,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, showGlobalResults: action.payload }
     case 'SET_DEEP_LINK':
       return { ...state, activeTab: 'equipos', deepLinkEquipo: action.payload, tabFilter: null }
+    case 'SET_FICHA_EMPLEADO':
+      return { ...state, fichaEmpleado: action.payload }
     case 'SET_STOCK_MINIMO':
       localStorage.setItem('stockMinimoDefault', String(action.payload))
       return { ...state, stockMinimoDefault: action.payload }
